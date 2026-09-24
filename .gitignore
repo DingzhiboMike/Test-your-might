@@ -1,0 +1,12 @@
+# Рабочие материалы и задачи — только локально, в репозиторий не попадают
+context/*
+!context/README.md
+!context/from-tasks/
+context/from-tasks/*
+!context/from-tasks/.gitkeep
+tasks/*
+!tasks/README.md
+
+# Системное
+.DS_Store
+*.swp
