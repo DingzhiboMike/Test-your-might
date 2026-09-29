@@ -1,0 +1,299 @@
+<title>Архитектура Полигона гипотез</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: one column of figures; each figure scrolls horizontally on phones */
+:root{
+  --bg:#f5f6f4; --fg:#1c2421; --muted:#5b6660; --line:#b9c2bc; --panel:#ffffff;
+  --accent:#0b6b5a; --accent-soft:#d9efe9; --warn:#a4491c; --warn-soft:#f7e5da; --store:#eceff2;
+  --sans:'IBM Plex Sans',system-ui,sans-serif; --mono:'IBM Plex Mono',ui-monospace,monospace;
+}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
+  --bg:#12181a; --fg:#e4eae7; --muted:#95a19b; --line:#3b4844; --panel:#1a2224;
+  --accent:#4fc4aa; --accent-soft:#17302b; --warn:#e79a6b; --warn-soft:#3a251a; --store:#1e272a; color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#12181a; --fg:#e4eae7; --muted:#95a19b; --line:#3b4844; --panel:#1a2224;
+  --accent:#4fc4aa; --accent-soft:#17302b; --warn:#e79a6b; --warn-soft:#3a251a; --store:#1e272a; color-scheme:dark}
+body{background:var(--bg);color:var(--fg);font-family:var(--sans);font-size:15px;line-height:1.55;
+  padding-inline:16px;padding-block:32px}
+main{max-width:980px;margin:0 auto;display:flex;flex-direction:column;gap:40px}
+h1{font-size:30px;line-height:1.15;margin:0 0 8px;font-weight:600;text-wrap:balance}
+h2{font-size:19px;margin:0 0 6px;font-weight:600;text-wrap:balance}
+p{margin:0;max-width:68ch;color:var(--muted)}
+code{font-family:var(--mono);font-size:.9em}
+figure{margin:0;display:flex;flex-direction:column;gap:10px}
+.scroll{overflow-x:auto;border:1px solid var(--line);background:var(--panel);border-radius:6px;padding:12px}
+svg{display:block;min-width:820px;width:100%;height:auto;color:var(--fg);font-family:var(--sans)}
+figcaption{color:var(--muted);font-size:13.5px;max-width:74ch}
+.box{fill:var(--panel);stroke:var(--fg);stroke-width:1.2}
+.acc{fill:var(--accent-soft);stroke:var(--accent);stroke-width:1.6}
+.warn{fill:var(--warn-soft);stroke:var(--warn);stroke-width:1.6}
+.store{fill:var(--store);stroke:var(--line);stroke-width:1.2}
+.grp{fill:none;stroke:var(--line);stroke-dasharray:5 4}
+.t{fill:var(--fg);font-size:12.5px}
+.tb{fill:var(--fg);font-size:13px;font-weight:600}
+.ts{fill:var(--muted);font-size:10.5px;font-family:var(--mono)}
+.tl{fill:var(--muted);font-size:11px}
+.ta{fill:var(--accent);font-size:11px;font-weight:500}
+.tw{fill:var(--warn);font-size:11px;font-weight:500}
+.ln{stroke:var(--fg);stroke-width:1.3;fill:none}
+.lm{stroke:var(--muted);stroke-width:1.2;fill:none;stroke-dasharray:4 3}
+.lw{stroke:var(--warn);stroke-width:1.4;fill:none}
+table{border-collapse:collapse;width:100%;font-size:14px;min-width:560px}
+th,td{text-align:left;padding:8px 10px;border-bottom:1px solid var(--line);vertical-align:top}
+th{font-size:12px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);font-weight:500}
+.rules{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:16px}
+.rules div{border-top:2px solid var(--accent);padding-top:8px}
+.rules b{display:block;margin-bottom:2px}
+.rules span{color:var(--muted);font-size:14px}
+</style>
+
+<main>
+<header>
+  <h1>Архитектура Полигона гипотез</h1>
+  <p>Система скиллов, которая ведёт задачу от сырого запроса до разбора, проверенных на бумаге гипотез или плана живой проверки. Пятнадцать скиллов, одна пауза для человека, всё общение между шагами идёт через файлы задачи.</p>
+</header>
+
+<section>
+<figure>
+  <h2>1. Роли, хранилища и маршрут</h2>
+  <div class="scroll">
+  <svg viewBox="0 0 900 610" role="img" aria-label="Человек даёт запрос диспетчеру, тот пишет ТЗ, человек его согласует, оркестратор по одному вызывает исполнителей и источники данных и пишет результаты в папку задачи.">
+    <defs>
+      <marker id="a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" fill="currentColor"/></marker>
+      <marker id="aw" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" fill="var(--warn)"/></marker>
+    </defs>
+
+    <!-- roles -->
+    <rect class="box" x="20" y="10" width="170" height="48" rx="4"/>
+    <text class="tb" x="105" y="31" text-anchor="middle">Человек</text>
+    <text class="tl" x="105" y="47" text-anchor="middle">заказчик</text>
+    <line class="ln" x1="190" y1="34" x2="288" y2="34" marker-end="url(#a)"/>
+    <text class="tl" x="239" y="27" text-anchor="middle">запрос</text>
+
+    <rect class="box" x="290" y="10" width="190" height="48" rx="4"/>
+    <text class="tb" x="385" y="31" text-anchor="middle">Диспетчер</text>
+    <text class="tl" x="385" y="47" text-anchor="middle">бизнес-аналитик, пишет ТЗ</text>
+
+    <line class="ln" x1="385" y1="58" x2="385" y2="108" marker-end="url(#a)"/>
+    <text class="tl" x="393" y="88">ТЗ на согласование</text>
+
+    <rect class="warn" x="290" y="110" width="190" height="44" rx="4"/>
+    <text class="tw" x="385" y="129" text-anchor="middle">Единственная пауза</text>
+    <text class="tl" x="385" y="145" text-anchor="middle">человек согласует ТЗ</text>
+    <polyline class="lw" points="290,132 105,132 105,60" marker-end="url(#aw)"/>
+    <text class="tw" x="112" y="100">правки / «согласовано»</text>
+
+    <line class="ln" x1="385" y1="154" x2="385" y2="198" marker-end="url(#a)"/>
+    <text class="tl" x="393" y="182">00-tz.md · СОГЛАСОВАНО</text>
+
+    <rect class="acc" x="230" y="200" width="310" height="52" rx="4"/>
+    <text class="tb" x="385" y="221" text-anchor="middle">Оркестратор</text>
+    <text class="tl" x="385" y="238" text-anchor="middle">маршрут, лог, стоп-правила, сдача</text>
+
+    <!-- chain -->
+    <line class="ln" x1="385" y1="252" x2="385" y2="288" marker-end="url(#a)"/>
+    <text class="tl" x="393" y="276">зовёт по одному, каждый — в своём контексте</text>
+
+    <rect class="grp" x="20" y="290" width="610" height="106" rx="6"/>
+    <text class="tl" x="30" y="306">Основная цепочка · консультант всегда первый</text>
+    <g>
+      <rect class="acc" x="28" y="318" width="104" height="60" rx="4"/>
+      <text class="t" x="80" y="343" text-anchor="middle">Консультант</text>
+      <text class="ts" x="80" y="362" text-anchor="middle">01-review</text>
+      <rect class="box" x="146" y="318" width="104" height="60" rx="4"/>
+      <text class="t" x="198" y="343" text-anchor="middle">Генератор</text>
+      <text class="ts" x="198" y="362" text-anchor="middle">02-hypotheses</text>
+      <rect class="box" x="264" y="318" width="104" height="60" rx="4"/>
+      <text class="t" x="316" y="337" text-anchor="middle">Проверка</text>
+      <text class="t" x="316" y="351" text-anchor="middle">по сути</text>
+      <text class="ts" x="316" y="369" text-anchor="middle">02c-validation</text>
+      <rect class="box" x="382" y="318" width="104" height="60" rx="4"/>
+      <text class="t" x="434" y="343" text-anchor="middle">Планировщик</text>
+      <text class="ts" x="434" y="362" text-anchor="middle">03-plan</text>
+      <rect class="box" x="500" y="318" width="104" height="60" rx="4"/>
+      <text class="t" x="552" y="337" text-anchor="middle">Набор для</text>
+      <text class="t" x="552" y="351" text-anchor="middle">проверки</text>
+      <text class="ts" x="552" y="369" text-anchor="middle">03b-test-kit</text>
+      <line class="ln" x1="132" y1="348" x2="144" y2="348" marker-end="url(#a)"/>
+      <line class="ln" x1="250" y1="348" x2="262" y2="348" marker-end="url(#a)"/>
+      <line class="ln" x1="368" y1="348" x2="380" y2="348" marker-end="url(#a)"/>
+      <line class="ln" x1="486" y1="348" x2="498" y2="348" marker-end="url(#a)"/>
+    </g>
+
+    <!-- sources -->
+    <line class="lm" x1="320" y1="396" x2="320" y2="428" marker-start="url(#a)" marker-end="url(#a)"/>
+    <text class="tl" x="330" y="416">дыра в GAP → данные</text>
+
+    <rect class="grp" x="20" y="430" width="610" height="104" rx="6"/>
+    <text class="tl" x="30" y="446">Шесть источников данных · вбок, по приоритетам: зависимость → риск → цена</text>
+    <g>
+      <rect class="box" x="28" y="456" width="90" height="66" rx="4"/>
+      <text class="t" x="73" y="480" text-anchor="middle">Интервью</text>
+      <text class="ts" x="73" y="504" text-anchor="middle">src-interview</text>
+      <rect class="box" x="126" y="456" width="90" height="66" rx="4"/>
+      <text class="t" x="171" y="474" text-anchor="middle">Боли</text>
+      <text class="t" x="171" y="488" text-anchor="middle">рынка</text>
+      <text class="ts" x="171" y="510" text-anchor="middle">src-market</text>
+      <rect class="box" x="224" y="456" width="90" height="66" rx="4"/>
+      <text class="t" x="269" y="474" text-anchor="middle">Портрет</text>
+      <text class="t" x="269" y="488" text-anchor="middle">ЦА</text>
+      <text class="ts" x="269" y="510" text-anchor="middle">src-audience</text>
+      <rect class="box" x="322" y="456" width="90" height="66" rx="4"/>
+      <text class="t" x="367" y="480" text-anchor="middle">Альтернативы</text>
+      <text class="ts" x="367" y="504" text-anchor="middle">src-altern…</text>
+      <rect class="box" x="420" y="456" width="90" height="66" rx="4"/>
+      <text class="t" x="465" y="474" text-anchor="middle">Оценка</text>
+      <text class="t" x="465" y="488" text-anchor="middle">рынка</text>
+      <text class="ts" x="465" y="510" text-anchor="middle">src-market-size</text>
+      <rect class="box" x="518" y="456" width="90" height="66" rx="4"/>
+      <text class="t" x="563" y="474" text-anchor="middle">Путь</text>
+      <text class="t" x="563" y="488" text-anchor="middle">клиента</text>
+      <text class="ts" x="563" y="510" text-anchor="middle">src-path</text>
+    </g>
+
+    <!-- special -->
+    <rect class="box" x="20" y="550" width="300" height="50" rx="4" stroke-dasharray="5 3"/>
+    <text class="t" x="170" y="570" text-anchor="middle">Синтетические интервью</text>
+    <text class="tl" x="170" y="587" text-anchor="middle">только если в ТЗ «старт с синтетики»</text>
+    <rect class="box" x="330" y="550" width="300" height="50" rx="4" stroke-dasharray="5 3"/>
+    <text class="t" x="480" y="570" text-anchor="middle">Сверка результатов</text>
+    <text class="tl" x="480" y="587" text-anchor="middle">тип «вердикты» · идёт первой вместо консультанта</text>
+
+    <!-- right column -->
+    <rect class="store" x="665" y="10" width="215" height="66" rx="4"/>
+    <text class="tb" x="677" y="30">methodology/</text>
+    <text class="tl" x="677" y="47">course-index, web-protocol,</text>
+    <text class="tl" x="677" y="62">модули курса M0–M13</text>
+
+    <rect class="store" x="665" y="92" width="215" height="76" rx="4"/>
+    <text class="tb" x="677" y="112">context/</text>
+    <text class="tl" x="677" y="129">кладёт человек до запуска</text>
+    <text class="tl" x="677" y="144">from-tasks/ — только src-* и</text>
+    <text class="tl" x="677" y="159">результаты живой проверки</text>
+
+    <rect class="store" x="665" y="184" width="215" height="132" rx="4"/>
+    <text class="tb" x="677" y="204">tasks/‹задача›/</text>
+    <text class="ts" x="677" y="223">00-tz.md  log.md</text>
+    <text class="ts" x="677" y="238">01-review … 03b-test-kit</text>
+    <text class="ts" x="677" y="253">src-*.md  04-results.md</text>
+    <text class="ts" x="677" y="268">results-templates/</text>
+    <text class="ts" x="677" y="283">results/  ← кладёт человек</text>
+    <text class="tl" x="677" y="304">папку создаёт диспетчер</text>
+
+    <rect class="store" x="665" y="342" width="215" height="54" rx="4"/>
+    <text class="tb" x="677" y="362">Веб</text>
+    <text class="tl" x="677" y="379">запрос на опровержение,</text>
+    <text class="tl" x="677" y="391">метки уверенности</text>
+
+    <rect class="store" x="665" y="430" width="215" height="54" rx="4"/>
+    <text class="tb" x="677" y="450">system-notes.md</text>
+    <text class="tl" x="677" y="467">замечания к системе из сдач</text>
+
+    <!-- right arrows -->
+    <line class="lm" x1="480" y1="30" x2="663" y2="118" marker-end="url(#a)"/>
+    <text class="tl" x="560" y="56">читает</text>
+    <line class="ln" x1="540" y1="226" x2="663" y2="226" marker-end="url(#a)"/>
+    <text class="tl" x="574" y="220">пишет</text>
+    <line class="lm" x1="612" y1="360" x2="663" y2="366" marker-end="url(#a)"/>
+    <polyline class="lm" points="608,500 775,500 775,398" marker-end="url(#a)"/>
+    <line class="lm" x1="775" y1="184" x2="775" y2="170" marker-end="url(#a)"/>
+  </svg>
+  </div>
+  <figcaption>Диспетчер и оркестратор не делают экспертной работы: первый отвечает «что должно получиться», второй «как дойти». Исполнители не видят друг друга и не пишут <code>log.md</code>; всё, что они отдают, лежит файлом в папке задачи. Из <code>tasks/</code> в <code>context/from-tasks/</code> оркестратор переносит только источники и результаты живой проверки.</figcaption>
+</figure>
+</section>
+
+<section>
+<figure>
+  <h2>2. Пять маршрутов по типу выхода</h2>
+  <div class="scroll">
+  <svg viewBox="0 0 900 330" role="img" aria-label="Маршруты по пяти типам выхода: разбор, гипотезы, план проверки, аудит гипотез и вердикты по проверке. Каждый заканчивается в своей точке.">
+    <defs>
+      <marker id="b" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" fill="currentColor"/></marker>
+    </defs>
+    <!-- rows -->
+    <text class="tb" x="10" y="30">Разбор</text>
+    <text class="tb" x="10" y="80">Гипотезы</text>
+    <text class="tb" x="10" y="130">План проверки</text>
+    <text class="tb" x="10" y="180">Аудит гипотез</text>
+    <text class="tb" x="10" y="230">Вердикты</text>
+
+    <g class="t">
+      <rect class="acc" x="130" y="10" width="110" height="30" rx="3"/><text x="185" y="30" text-anchor="middle">Консультант</text>
+      <rect class="warn" x="270" y="10" width="90" height="30" rx="3"/><text class="tw" x="315" y="30" text-anchor="middle">финиш</text>
+      <line class="ln" x1="240" y1="25" x2="268" y2="25" marker-end="url(#b)"/>
+
+      <rect class="acc" x="130" y="60" width="110" height="30" rx="3"/><text x="185" y="80" text-anchor="middle">Консультант</text>
+      <rect class="box" x="270" y="60" width="110" height="30" rx="3"/><text x="325" y="80" text-anchor="middle">Генератор</text>
+      <rect class="box" x="410" y="60" width="130" height="30" rx="3"/><text x="475" y="80" text-anchor="middle">Проверка по сути</text>
+      <rect class="warn" x="570" y="60" width="90" height="30" rx="3"/><text class="tw" x="615" y="80" text-anchor="middle">финиш</text>
+      <line class="ln" x1="240" y1="75" x2="268" y2="75" marker-end="url(#b)"/>
+      <line class="ln" x1="380" y1="75" x2="408" y2="75" marker-end="url(#b)"/>
+      <line class="ln" x1="540" y1="75" x2="568" y2="75" marker-end="url(#b)"/>
+
+      <rect class="acc" x="130" y="110" width="110" height="30" rx="3"/><text x="185" y="130" text-anchor="middle">Консультант</text>
+      <rect class="box" x="270" y="110" width="110" height="30" rx="3"/><text x="325" y="130" text-anchor="middle">Генератор</text>
+      <rect class="box" x="410" y="110" width="130" height="30" rx="3"/><text x="475" y="130" text-anchor="middle">Проверка по сути</text>
+      <rect class="box" x="570" y="110" width="100" height="30" rx="3"/><text x="620" y="130" text-anchor="middle">Планировщик</text>
+      <rect class="warn" x="700" y="110" width="110" height="30" rx="3"/><text class="tw" x="755" y="130" text-anchor="middle">Набор проверки</text>
+      <line class="ln" x1="240" y1="125" x2="268" y2="125" marker-end="url(#b)"/>
+      <line class="ln" x1="380" y1="125" x2="408" y2="125" marker-end="url(#b)"/>
+      <line class="ln" x1="540" y1="125" x2="568" y2="125" marker-end="url(#b)"/>
+      <line class="ln" x1="670" y1="125" x2="698" y2="125" marker-end="url(#b)"/>
+
+      <rect class="acc" x="130" y="160" width="90" height="30" rx="3"/><text x="175" y="180" text-anchor="middle">Консультант</text>
+      <rect class="box" x="240" y="160" width="110" height="30" rx="3"/><text x="295" y="180" text-anchor="middle">Гигиена</text>
+      <rect class="box" x="370" y="160" width="90" height="30" rx="3"/><text x="415" y="180" text-anchor="middle">Проверка 1</text>
+      <rect class="box" x="480" y="160" width="110" height="30" rx="3"/><text x="535" y="180" text-anchor="middle">Усиление</text>
+      <rect class="warn" x="610" y="160" width="100" height="30" rx="3"/><text class="tw" x="660" y="180" text-anchor="middle">Проверка 2</text>
+      <line class="ln" x1="220" y1="175" x2="238" y2="175" marker-end="url(#b)"/>
+      <line class="ln" x1="350" y1="175" x2="368" y2="175" marker-end="url(#b)"/>
+      <line class="ln" x1="460" y1="175" x2="478" y2="175" marker-end="url(#b)"/>
+      <line class="ln" x1="590" y1="175" x2="608" y2="175" marker-end="url(#b)"/>
+
+      <rect class="box" x="130" y="210" width="130" height="30" rx="3"/><text x="195" y="230" text-anchor="middle">Сверка результатов</text>
+      <rect class="box" x="290" y="210" width="110" height="30" rx="3" stroke-dasharray="4 3"/><text x="345" y="230" text-anchor="middle">Генератор*</text>
+      <rect class="box" x="430" y="210" width="130" height="30" rx="3" stroke-dasharray="4 3"/><text x="495" y="230" text-anchor="middle">Проверка по сути*</text>
+      <rect class="warn" x="590" y="210" width="90" height="30" rx="3"/><text class="tw" x="635" y="230" text-anchor="middle">финиш</text>
+      <line class="ln" x1="260" y1="225" x2="288" y2="225" marker-end="url(#b)"/>
+      <line class="ln" x1="400" y1="225" x2="428" y2="225" marker-end="url(#b)"/>
+      <line class="ln" x1="560" y1="225" x2="588" y2="225" marker-end="url(#b)"/>
+    </g>
+    <text class="tl" x="130" y="272">Аудит: гипотезы человека сохраняются дословно в 00-hypotheses-in.md; система усиливает их, а не заменяет своими.</text>
+    <text class="tl" x="130" y="290">Вердикты: * только для гипотез с вердиктом «переформулировать». Консультант не зовётся — задачу он оценивал в исходном прогоне.</text>
+    <text class="tl" x="130" y="308">Оранжевая рамка — точка финиша типа. Источники данных подключаются вбок в любой строке, кроме «Разбор» и «Вердикты».</text>
+  </svg>
+  </div>
+  <figcaption>Тип выхода выбирает диспетчер и не берёт «самый длинный по привычке». Он же задаёт финиш, до которого оркестратор доводит задачу.</figcaption>
+</figure>
+</section>
+
+<section>
+  <h2>3. Как оркестратор решает и когда останавливается</h2>
+  <div class="rules" style="margin-top:14px">
+    <div><b>Три слоя приоритета</b><span>Зависимость (нет обязательного входа), затем риск (связь с самым рискованным допущением консультанта), затем цена скилла.</span></div>
+    <div><b>Лимит шагов</b><span>Tier 1 — 8, Tier 2 — 6 вызовов, консультант включён. Tier 3 систему не запускает. В аудите бюджет больше на два шага.</span></div>
+    <div><b>Один возврат назад</b><span>Первый повтор звена цепочки — сам, со записью в лог. Второй — только с согласия человека. Поход к источнику возвратом не считается.</span></div>
+    <div><b>Два промаха подряд</b><span>Результат не совпал с ожиданием, записанным до вызова, дважды подряд — стоп.</span></div>
+    <div><b>Расхождение с ТЗ</b><span>Не та задача, сильная контрольная гипотеза, недостижимая цель, опровергнутое основание — стоп и возврат к диспетчеру с вариантами и их ценой.</span></div>
+    <div><b>Разделение труда</b><span>Генератор строит, отдельный контекст проверяет. Модель сверяет по заранее записанным пунктам, а не оценивает «хорошо ли».</span></div>
+  </div>
+</section>
+
+<section>
+  <h2>4. Принципы, которые держат архитектуру</h2>
+  <div class="scroll" style="margin-top:14px">
+  <table>
+    <thead><tr><th>Принцип</th><th>Где выражен в устройстве</th></tr></thead>
+    <tbody>
+      <tr><td>Знание не аксиома</td><td>Метки опоры и выводимости у гипотез; путь соответствия для контекста, сети и выдумки модели.</td></tr>
+      <tr><td>Кто строит, тот не проверяет</td><td>Генератор и проверка по сути — разные скиллы, разные подагенты.</td></tr>
+      <tr><td>Кабинетная проверка — не валидация</td><td>«Держится на бумаге» значит «готова к живой проверке»; подтверждает только сверка результатов.</td></tr>
+      <tr><td>Засчитывается только случившееся</td><td>Синтетика помечена и опорой не считается; в <code>context/</code> уходят только <code>src-*</code> и результаты живой проверки.</td></tr>
+      <tr><td>Критерии не двигаются</td><td>Планировщик записывает успех и отсечение до проверки, сверка результатов их не меняет.</td></tr>
+      <tr><td>Цель меняет только человек</td><td>Расхождение с ТЗ останавливает маршрут и возвращает задачу диспетчеру.</td></tr>
+    </tbody>
+  </table>
+  </div>
+</section>
+</main>
