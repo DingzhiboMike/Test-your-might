@@ -67,10 +67,10 @@ th{font-size:12px;letter-spacing:.06em;text-transform:uppercase;color:var(--mute
     <rect class="box" x="20" y="10" width="170" height="48" rx="4"/>
     <text class="tb" x="105" y="31" text-anchor="middle">Человек</text>
     <text class="tl" x="105" y="47" text-anchor="middle">заказчик</text>
-    <line class="ln" x1="190" y1="41" x2="288" y2="41" marker-end="url(#a)"/>
-    <text class="tl" x="239" y="34" text-anchor="middle">запрос</text>
+    <line class="ln" x1="190" y1="41" x2="268" y2="41" marker-end="url(#a)"/>
+    <text class="tl" x="229" y="34" text-anchor="middle">запрос</text>
 
-    <rect class="box" x="290" y="10" width="190" height="62" rx="4"/>
+    <rect class="box" x="270" y="10" width="230" height="62" rx="4"/>
     <text class="tb" x="385" y="28" text-anchor="middle">Диспетчер</text>
     <text class="tl" x="385" y="45" text-anchor="middle">агент — бизнес-аналитик,</text>
     <text class="tl" x="385" y="60" text-anchor="middle">формирует ТЗ для оркестратора</text>
@@ -94,7 +94,7 @@ th{font-size:12px;letter-spacing:.06em;text-transform:uppercase;color:var(--mute
 
     <!-- chain -->
     <line class="ln" x1="385" y1="266" x2="385" y2="288" marker-end="url(#a)"/>
-    <text class="tl" x="393" y="282">зовёт по одному, каждый — в своём контексте</text>
+    <text class="tl" x="393" y="282">зовёт суб-агентов по одному</text>
 
     <rect class="grp" x="20" y="290" width="610" height="106" rx="6"/>
     <text class="tl" x="30" y="306">Исполнители · всегда первый только консультант, остальных выбирает оркестратор</text>
@@ -136,12 +136,12 @@ th{font-size:12px;letter-spacing:.06em;text-transform:uppercase;color:var(--mute
       <text class="t" x="269" y="488" text-anchor="middle">ЦА</text>
       <text class="ts" x="269" y="510" text-anchor="middle">src-audience</text>
       <rect class="box" x="322" y="456" width="90" height="66" rx="4"/>
-      <text class="t" x="367" y="480" text-anchor="middle">Альтернативы</text>
+      <text class="t" style="font-size:11px" x="367" y="480" text-anchor="middle">Альтернативы</text>
       <text class="ts" x="367" y="504" text-anchor="middle">src-altern…</text>
       <rect class="box" x="420" y="456" width="90" height="66" rx="4"/>
       <text class="t" x="465" y="474" text-anchor="middle">Оценка</text>
       <text class="t" x="465" y="488" text-anchor="middle">рынка</text>
-      <text class="ts" x="465" y="510" text-anchor="middle">src-market-size</text>
+      <text class="ts" style="font-size:9px" x="465" y="510" text-anchor="middle">src-market-size</text>
       <rect class="box" x="518" y="456" width="90" height="66" rx="4"/>
       <text class="t" x="563" y="474" text-anchor="middle">Путь</text>
       <text class="t" x="563" y="488" text-anchor="middle">клиента</text>
@@ -154,7 +154,7 @@ th{font-size:12px;letter-spacing:.06em;text-transform:uppercase;color:var(--mute
     <text class="tl" x="170" y="587" text-anchor="middle">только если в ТЗ «старт с синтетики»</text>
     <rect class="box" x="330" y="550" width="300" height="50" rx="4" stroke-dasharray="5 3"/>
     <text class="t" x="480" y="570" text-anchor="middle">Сверка результатов</text>
-    <text class="tl" x="480" y="587" text-anchor="middle">тип «вердикты» · идёт первой вместо консультанта</text>
+    <text class="tl" x="480" y="587" text-anchor="middle">тип «вердикты» · вместо консультанта</text>
 
     <!-- right column -->
     <rect class="store" x="665" y="10" width="215" height="66" rx="4"/>
@@ -187,7 +187,7 @@ th{font-size:12px;letter-spacing:.06em;text-transform:uppercase;color:var(--mute
     <text class="tl" x="677" y="561">замечания к системе из сдач</text>
 
     <!-- right arrows -->
-    <line class="lm" x1="480" y1="30" x2="663" y2="118" marker-end="url(#a)"/>
+    <line class="lm" x1="500" y1="30" x2="663" y2="118" marker-end="url(#a)"/>
     <text class="tl" x="560" y="56">читает</text>
     <line class="ln" x1="550" y1="226" x2="663" y2="226" marker-end="url(#a)"/>
     <text class="tl" x="580" y="220">пишет</text>
@@ -204,16 +204,16 @@ th{font-size:12px;letter-spacing:.06em;text-transform:uppercase;color:var(--mute
 <figure>
   <h2>2. Пять маршрутов по типу выхода</h2>
   <div class="scroll">
-  <svg viewBox="0 0 900 330" role="img" aria-label="Маршруты по пяти типам выхода: разбор, гипотезы, план проверки, аудит гипотез и вердикты по проверке. Каждый заканчивается в своей точке.">
+  <svg viewBox="0 0 900 372" role="img" aria-label="Маршруты по пяти типам выхода: разбор, гипотезы, план проверки, аудит гипотез и вердикты по проверке. Каждый заканчивается в своей точке.">
     <defs>
       <marker id="b" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" fill="currentColor"/></marker>
     </defs>
     <!-- rows -->
-    <text class="tb" x="10" y="30">Разбор</text>
-    <text class="tb" x="10" y="80">Гипотезы</text>
-    <text class="tb" x="10" y="130">План проверки</text>
-    <text class="tb" x="10" y="180">Аудит гипотез</text>
-    <text class="tb" x="10" y="230">Вердикты</text>
+    <text class="tb" style="font-size:12px" x="10" y="30">Разбор</text>
+    <text class="tb" style="font-size:12px" x="10" y="80">Гипотезы</text>
+    <text class="tb" style="font-size:12px" x="10" y="130">План проверки</text>
+    <text class="tb" style="font-size:12px" x="10" y="180">Аудит гипотез</text>
+    <text class="tb" style="font-size:12px" x="10" y="230">Вердикты</text>
 
     <g class="t">
       <rect class="acc" x="130" y="10" width="110" height="30" rx="3"/><text x="185" y="30" text-anchor="middle">Консультант</text>
@@ -231,16 +231,16 @@ th{font-size:12px;letter-spacing:.06em;text-transform:uppercase;color:var(--mute
       <rect class="acc" x="130" y="110" width="110" height="30" rx="3"/><text x="185" y="130" text-anchor="middle">Консультант</text>
       <rect class="box" x="270" y="110" width="110" height="30" rx="3"/><text x="325" y="130" text-anchor="middle">Генератор</text>
       <rect class="box" x="410" y="110" width="130" height="30" rx="3"/><text x="475" y="130" text-anchor="middle">Валидатор</text>
-      <rect class="box" x="570" y="110" width="100" height="30" rx="3"/><text x="620" y="130" text-anchor="middle">Планировщик</text>
+      <rect class="box" x="570" y="110" width="100" height="30" rx="3"/><text style="font-size:11.5px" x="620" y="130" text-anchor="middle">Планировщик</text>
       <rect class="warn" x="700" y="110" width="110" height="30" rx="3"/><text class="tw" x="755" y="130" text-anchor="middle">Набор проверки</text>
       <line class="ln" x1="240" y1="125" x2="268" y2="125" marker-end="url(#b)"/>
       <line class="ln" x1="380" y1="125" x2="408" y2="125" marker-end="url(#b)"/>
       <line class="ln" x1="540" y1="125" x2="568" y2="125" marker-end="url(#b)"/>
       <line class="ln" x1="670" y1="125" x2="698" y2="125" marker-end="url(#b)"/>
 
-      <rect class="acc" x="130" y="160" width="90" height="30" rx="3"/><text x="175" y="180" text-anchor="middle">Консультант</text>
+      <rect class="acc" x="130" y="160" width="90" height="30" rx="3"/><text style="font-size:11px" x="175" y="180" text-anchor="middle">Консультант</text>
       <rect class="box" x="240" y="160" width="110" height="30" rx="3"/><text x="295" y="180" text-anchor="middle">Гигиена</text>
-      <rect class="box" x="370" y="160" width="90" height="30" rx="3"/><text x="415" y="180" text-anchor="middle">Валидатор 1</text>
+      <rect class="box" x="370" y="160" width="90" height="30" rx="3"/><text style="font-size:11px" x="415" y="180" text-anchor="middle">Валидатор 1</text>
       <rect class="box" x="480" y="160" width="110" height="30" rx="3"/><text x="535" y="180" text-anchor="middle">Усиление</text>
       <rect class="warn" x="610" y="160" width="100" height="30" rx="3"/><text class="tw" x="660" y="180" text-anchor="middle">Валидатор 2</text>
       <line class="ln" x1="220" y1="175" x2="238" y2="175" marker-end="url(#b)"/>
@@ -248,7 +248,7 @@ th{font-size:12px;letter-spacing:.06em;text-transform:uppercase;color:var(--mute
       <line class="ln" x1="460" y1="175" x2="478" y2="175" marker-end="url(#b)"/>
       <line class="ln" x1="590" y1="175" x2="608" y2="175" marker-end="url(#b)"/>
 
-      <rect class="box" x="130" y="210" width="130" height="30" rx="3"/><text x="195" y="230" text-anchor="middle">Сверка результатов</text>
+      <rect class="box" x="130" y="210" width="130" height="30" rx="3"/><text style="font-size:11px" x="195" y="230" text-anchor="middle">Сверка результатов</text>
       <rect class="box" x="290" y="210" width="110" height="30" rx="3" stroke-dasharray="4 3"/><text x="345" y="230" text-anchor="middle">Генератор*</text>
       <rect class="box" x="430" y="210" width="130" height="30" rx="3" stroke-dasharray="4 3"/><text x="495" y="230" text-anchor="middle">Валидатор*</text>
       <rect class="warn" x="590" y="210" width="90" height="30" rx="3"/><text class="tw" x="635" y="230" text-anchor="middle">финиш</text>
@@ -256,10 +256,13 @@ th{font-size:12px;letter-spacing:.06em;text-transform:uppercase;color:var(--mute
       <line class="ln" x1="400" y1="225" x2="428" y2="225" marker-end="url(#b)"/>
       <line class="ln" x1="560" y1="225" x2="588" y2="225" marker-end="url(#b)"/>
     </g>
-    <text class="tl" x="130" y="272">Аудит: гипотезы человека сохраняются дословно в 00-hypotheses-in.md; система усиливает их, а не заменяет своими.</text>
-    <text class="tl" x="130" y="290">Вердикты: * только для гипотез с вердиктом «переформулировать». Консультант не зовётся — задачу он оценивал в исходном прогоне.</text>
-    <text class="tl" x="130" y="308">Показан типичный ход, не жёсткий порядок. Оранжевая рамка — точка финиша типа. Агенты по данным и контексту подключаются вбок в любой строке, кроме «Разбор» и «Вердикты».</text>
-  </svg>
+    <text class="tl" x="130" y="272">Аудит: гипотезы человека сохраняются дословно в 00-hypotheses-in.md;</text>
+    <text class="tl" x="130" y="290">система усиливает их, а не заменяет своими.</text>
+    <text class="tl" x="130" y="308">Вердикты: * только для гипотез с вердиктом «переформулировать».</text>
+    <text class="tl" x="130" y="326">Консультант не зовётся: задачу он оценивал в исходном прогоне.</text>
+    <text class="tl" x="130" y="344">Показан типичный ход, не жёсткий порядок. Оранжевая рамка — точка финиша типа.</text>
+    <text class="tl" x="130" y="362">Агенты по данным и контексту подключаются вбок в любой строке, кроме «Разбор» и «Вердикты».</text>
+    </svg>
   </div>
   <figcaption>Тип выхода выбирает диспетчер и не берёт «самый длинный по привычке». Он же задаёт финиш, до которого оркестратор доводит задачу.</figcaption>
 </figure>
