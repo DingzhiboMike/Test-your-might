@@ -95,7 +95,7 @@ th{font-size:12px;letter-spacing:.06em;text-transform:uppercase;color:var(--mute
     <text class="tl" x="393" y="276">зовёт по одному, каждый — в своём контексте</text>
 
     <rect class="grp" x="20" y="290" width="610" height="106" rx="6"/>
-    <text class="tl" x="30" y="306">Основная цепочка · консультант всегда первый</text>
+    <text class="tl" x="30" y="306">Исполнители · всегда первый только консультант, остальных выбирает оркестратор</text>
     <g>
       <rect class="acc" x="28" y="318" width="104" height="60" rx="4"/>
       <text class="t" x="80" y="343" text-anchor="middle">Консультант</text>
@@ -114,10 +114,6 @@ th{font-size:12px;letter-spacing:.06em;text-transform:uppercase;color:var(--mute
       <text class="t" x="552" y="337" text-anchor="middle">Набор для</text>
       <text class="t" x="552" y="351" text-anchor="middle">проверки</text>
       <text class="ts" x="552" y="369" text-anchor="middle">03b-test-kit</text>
-      <line class="ln" x1="132" y1="348" x2="144" y2="348" marker-end="url(#a)"/>
-      <line class="ln" x1="250" y1="348" x2="262" y2="348" marker-end="url(#a)"/>
-      <line class="ln" x1="368" y1="348" x2="380" y2="348" marker-end="url(#a)"/>
-      <line class="ln" x1="486" y1="348" x2="498" y2="348" marker-end="url(#a)"/>
     </g>
 
     <!-- sources -->
@@ -199,7 +195,7 @@ th{font-size:12px;letter-spacing:.06em;text-transform:uppercase;color:var(--mute
     <line class="lm" x1="775" y1="184" x2="775" y2="170" marker-end="url(#a)"/>
   </svg>
   </div>
-  <figcaption>Диспетчер и оркестратор не делают экспертной работы: первый отвечает «что должно получиться», второй «как дойти». Исполнители не видят друг друга и не пишут <code>log.md</code>; всё, что они отдают, лежит файлом в папке задачи. Из <code>tasks/</code> в <code>context/from-tasks/</code> оркестратор переносит только источники и результаты живой проверки.</figcaption>
+  <figcaption>Диспетчер и оркестратор не делают экспертной работы: первый отвечает «что должно получиться», второй «как дойти». Порядок исполнителей не зашит: обычный ход — генератор, проверка по сути, планировщик, набор, но следующий шаг оркестратор выбирает после каждого результата. Исполнители не видят друг друга и не пишут <code>log.md</code>; всё, что они отдают, лежит файлом в папке задачи. Из <code>tasks/</code> в <code>context/from-tasks/</code> оркестратор переносит только источники и результаты живой проверки.</figcaption>
 </figure>
 </section>
 
@@ -261,7 +257,7 @@ th{font-size:12px;letter-spacing:.06em;text-transform:uppercase;color:var(--mute
     </g>
     <text class="tl" x="130" y="272">Аудит: гипотезы человека сохраняются дословно в 00-hypotheses-in.md; система усиливает их, а не заменяет своими.</text>
     <text class="tl" x="130" y="290">Вердикты: * только для гипотез с вердиктом «переформулировать». Консультант не зовётся — задачу он оценивал в исходном прогоне.</text>
-    <text class="tl" x="130" y="308">Оранжевая рамка — точка финиша типа. Источники данных подключаются вбок в любой строке, кроме «Разбор» и «Вердикты».</text>
+    <text class="tl" x="130" y="308">Показан типичный ход, не жёсткий порядок. Оранжевая рамка — точка финиша типа. Источники данных подключаются вбок в любой строке, кроме «Разбор» и «Вердикты».</text>
   </svg>
   </div>
   <figcaption>Тип выхода выбирает диспетчер и не берёт «самый длинный по привычке». Он же задаёт финиш, до которого оркестратор доводит задачу.</figcaption>
