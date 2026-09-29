@@ -57,7 +57,7 @@ th{font-size:12px;letter-spacing:.06em;text-transform:uppercase;color:var(--mute
 <figure>
   <h2>1. Роли, хранилища и маршрут</h2>
   <div class="scroll">
-  <svg viewBox="0 0 900 610" role="img" aria-label="Человек даёт запрос диспетчеру, тот пишет ТЗ, человек его согласует, оркестратор по одному вызывает исполнителей и источники данных и пишет результаты в папку задачи.">
+  <svg viewBox="0 0 900 610" role="img" aria-label="Человек даёт запрос диспетчеру, тот пишет ТЗ, человек его согласует, оркестратор по одному вызывает исполнителей и исследователей и пишет результаты в папку задачи.">
     <defs>
       <marker id="a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" fill="currentColor"/></marker>
       <marker id="aw" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" fill="var(--warn)"/></marker>
@@ -67,15 +67,16 @@ th{font-size:12px;letter-spacing:.06em;text-transform:uppercase;color:var(--mute
     <rect class="box" x="20" y="10" width="170" height="48" rx="4"/>
     <text class="tb" x="105" y="31" text-anchor="middle">Человек</text>
     <text class="tl" x="105" y="47" text-anchor="middle">заказчик</text>
-    <line class="ln" x1="190" y1="34" x2="288" y2="34" marker-end="url(#a)"/>
-    <text class="tl" x="239" y="27" text-anchor="middle">запрос</text>
+    <line class="ln" x1="190" y1="41" x2="288" y2="41" marker-end="url(#a)"/>
+    <text class="tl" x="239" y="34" text-anchor="middle">запрос</text>
 
-    <rect class="box" x="290" y="10" width="190" height="48" rx="4"/>
-    <text class="tb" x="385" y="31" text-anchor="middle">Диспетчер</text>
-    <text class="tl" x="385" y="47" text-anchor="middle">бизнес-аналитик, пишет ТЗ</text>
+    <rect class="box" x="290" y="10" width="190" height="62" rx="4"/>
+    <text class="tb" x="385" y="28" text-anchor="middle">Диспетчер</text>
+    <text class="tl" x="385" y="45" text-anchor="middle">собирает ТЗ: цель, GAP,</text>
+    <text class="tl" x="385" y="60" text-anchor="middle">тип выхода, готовность</text>
 
-    <line class="ln" x1="385" y1="58" x2="385" y2="108" marker-end="url(#a)"/>
-    <text class="tl" x="393" y="88">ТЗ на согласование</text>
+    <line class="ln" x1="385" y1="72" x2="385" y2="108" marker-end="url(#a)"/>
+    <text class="tl" x="393" y="95">ТЗ на согласование</text>
 
     <rect class="warn" x="290" y="110" width="190" height="44" rx="4"/>
     <text class="tw" x="385" y="129" text-anchor="middle">Единственная пауза</text>
@@ -86,13 +87,14 @@ th{font-size:12px;letter-spacing:.06em;text-transform:uppercase;color:var(--mute
     <line class="ln" x1="385" y1="154" x2="385" y2="198" marker-end="url(#a)"/>
     <text class="tl" x="393" y="182">00-tz.md · СОГЛАСОВАНО</text>
 
-    <rect class="acc" x="230" y="200" width="310" height="52" rx="4"/>
-    <text class="tb" x="385" y="221" text-anchor="middle">Оркестратор</text>
-    <text class="tl" x="385" y="238" text-anchor="middle">маршрут, лог, стоп-правила, сдача</text>
+    <rect class="acc" x="220" y="200" width="330" height="66" rx="4"/>
+    <text class="tb" x="385" y="220" text-anchor="middle">Оркестратор</text>
+    <text class="tl" x="385" y="237" text-anchor="middle">выбирает следующий скилл по приоритетам,</text>
+    <text class="tl" x="385" y="252" text-anchor="middle">ведёт лог, останавливается по правилам, сдаёт</text>
 
     <!-- chain -->
-    <line class="ln" x1="385" y1="252" x2="385" y2="288" marker-end="url(#a)"/>
-    <text class="tl" x="393" y="276">зовёт по одному, каждый — в своём контексте</text>
+    <line class="ln" x1="385" y1="266" x2="385" y2="288" marker-end="url(#a)"/>
+    <text class="tl" x="393" y="282">зовёт по одному, каждый — в своём контексте</text>
 
     <rect class="grp" x="20" y="290" width="610" height="106" rx="6"/>
     <text class="tl" x="30" y="306">Исполнители · всегда первый только консультант, остальных выбирает оркестратор</text>
@@ -118,10 +120,10 @@ th{font-size:12px;letter-spacing:.06em;text-transform:uppercase;color:var(--mute
 
     <!-- sources -->
     <line class="lm" x1="320" y1="396" x2="320" y2="428" marker-start="url(#a)" marker-end="url(#a)"/>
-    <text class="tl" x="330" y="416">дыра в GAP → данные</text>
+    <text class="tl" x="330" y="416">дыра в GAP → исследователь</text>
 
     <rect class="grp" x="20" y="430" width="610" height="104" rx="6"/>
-    <text class="tl" x="30" y="446">Шесть источников данных · вбок, по приоритетам: зависимость → риск → цена</text>
+    <text class="tl" x="30" y="446">Шесть исследователей · вбок, когда в GAP есть дыра · приоритет: зависимость → риск → цена</text>
     <g>
       <rect class="box" x="28" y="456" width="90" height="66" rx="4"/>
       <text class="t" x="73" y="480" text-anchor="middle">Интервью</text>
@@ -188,14 +190,14 @@ th{font-size:12px;letter-spacing:.06em;text-transform:uppercase;color:var(--mute
     <!-- right arrows -->
     <line class="lm" x1="480" y1="30" x2="663" y2="118" marker-end="url(#a)"/>
     <text class="tl" x="560" y="56">читает</text>
-    <line class="ln" x1="540" y1="226" x2="663" y2="226" marker-end="url(#a)"/>
-    <text class="tl" x="574" y="220">пишет</text>
+    <line class="ln" x1="550" y1="226" x2="663" y2="226" marker-end="url(#a)"/>
+    <text class="tl" x="580" y="220">пишет</text>
     <line class="lm" x1="612" y1="360" x2="663" y2="366" marker-end="url(#a)"/>
     <polyline class="lm" points="608,500 775,500 775,398" marker-end="url(#a)"/>
     <line class="lm" x1="775" y1="184" x2="775" y2="170" marker-end="url(#a)"/>
   </svg>
   </div>
-  <figcaption>Диспетчер и оркестратор не делают экспертной работы: первый отвечает «что должно получиться», второй «как дойти». Порядок исполнителей не зашит: обычный ход — генератор, проверка по сути, планировщик, набор, но следующий шаг оркестратор выбирает после каждого результата. Исполнители не видят друг друга и не пишут <code>log.md</code>; всё, что они отдают, лежит файлом в папке задачи. Из <code>tasks/</code> в <code>context/from-tasks/</code> оркестратор переносит только источники и результаты живой проверки.</figcaption>
+  <figcaption>Диспетчер и оркестратор не делают экспертной работы: первый отвечает «что должно получиться», второй «как дойти». Порядок исполнителей не зашит: обычный ход — генератор, проверка по сути, планировщик, набор, но следующий шаг оркестратор выбирает после каждого результата. Исполнители не видят друг друга и не пишут <code>log.md</code>; всё, что они отдают, лежит файлом в папке задачи. Из <code>tasks/</code> в <code>context/from-tasks/</code> оркестратор переносит только материалы исследователей и результаты живой проверки.</figcaption>
 </figure>
 </section>
 
@@ -257,7 +259,7 @@ th{font-size:12px;letter-spacing:.06em;text-transform:uppercase;color:var(--mute
     </g>
     <text class="tl" x="130" y="272">Аудит: гипотезы человека сохраняются дословно в 00-hypotheses-in.md; система усиливает их, а не заменяет своими.</text>
     <text class="tl" x="130" y="290">Вердикты: * только для гипотез с вердиктом «переформулировать». Консультант не зовётся — задачу он оценивал в исходном прогоне.</text>
-    <text class="tl" x="130" y="308">Показан типичный ход, не жёсткий порядок. Оранжевая рамка — точка финиша типа. Источники данных подключаются вбок в любой строке, кроме «Разбор» и «Вердикты».</text>
+    <text class="tl" x="130" y="308">Показан типичный ход, не жёсткий порядок. Оранжевая рамка — точка финиша типа. Исследователи подключаются вбок в любой строке, кроме «Разбор» и «Вердикты».</text>
   </svg>
   </div>
   <figcaption>Тип выхода выбирает диспетчер и не берёт «самый длинный по привычке». Он же задаёт финиш, до которого оркестратор доводит задачу.</figcaption>
@@ -269,7 +271,7 @@ th{font-size:12px;letter-spacing:.06em;text-transform:uppercase;color:var(--mute
   <div class="rules" style="margin-top:14px">
     <div><b>Три слоя приоритета</b><span>Зависимость (нет обязательного входа), затем риск (связь с самым рискованным допущением консультанта), затем цена скилла.</span></div>
     <div><b>Лимит шагов</b><span>Tier 1 — 8, Tier 2 — 6 вызовов, консультант включён. Tier 3 систему не запускает. В аудите бюджет больше на два шага.</span></div>
-    <div><b>Один возврат назад</b><span>Первый повтор звена цепочки — сам, со записью в лог. Второй — только с согласия человека. Поход к источнику возвратом не считается.</span></div>
+    <div><b>Один возврат назад</b><span>Первый повтор звена цепочки — сам, со записью в лог. Второй — только с согласия человека. Ход к исследователю возвратом не считается.</span></div>
     <div><b>Два промаха подряд</b><span>Результат не совпал с ожиданием, записанным до вызова, дважды подряд — стоп.</span></div>
     <div><b>Расхождение с ТЗ</b><span>Не та задача, сильная контрольная гипотеза, недостижимая цель, опровергнутое основание — стоп и возврат к диспетчеру с вариантами и их ценой.</span></div>
     <div><b>Разделение труда</b><span>Генератор строит, отдельный контекст проверяет. Модель сверяет по заранее записанным пунктам, а не оценивает «хорошо ли».</span></div>
