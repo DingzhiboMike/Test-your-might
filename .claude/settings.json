@@ -1,0 +1,25 @@
+{
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Write|Edit|MultiEdit|NotebookEdit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "sh -c 'f=\"$CLAUDE_PROJECT_DIR/scripts/hooks/guard_writes.py\"; [ -f \"$f\" ] && exec python3 \"$f\"; exit 0'"
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "sh -c 'f=\"$CLAUDE_PROJECT_DIR/scripts/hooks/stop_check.py\"; [ -f \"$f\" ] && exec python3 \"$f\"; exit 0'"
+          }
+        ]
+      }
+    ]
+  }
+}

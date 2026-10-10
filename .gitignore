@@ -1,0 +1,18 @@
+# Рабочие материалы и задачи — только локально, в репозиторий не попадают
+context/*
+!context/README.md
+!context/from-tasks/
+context/from-tasks/*
+!context/from-tasks/.gitkeep
+tasks/*
+!tasks/README.md
+
+# Системное
+.polygon-dev
+__pycache__/
+.DS_Store
+*.swp
+.obsidian/
+.opencode/
+.publish-stopwords
+*.bundle
