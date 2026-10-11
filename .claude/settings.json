@@ -6,7 +6,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "sh -c 'f=\"$CLAUDE_PROJECT_DIR/scripts/hooks/guard_writes.py\"; [ -f \"$f\" ] && exec python3 \"$f\"; exit 0'"
+            "command": "sh -c 'for d in \"$CLAUDE_PROJECT_DIR\" \"$(git rev-parse --show-toplevel 2>/dev/null)\" \"$PWD\"; do f=\"$d/scripts/hooks/guard_writes.py\"; [ -n \"$d\" ] && [ -f \"$f\" ] && exec python3 \"$f\"; done; exit 0'"
           }
         ]
       }
@@ -16,7 +16,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "sh -c 'f=\"$CLAUDE_PROJECT_DIR/scripts/hooks/stop_check.py\"; [ -f \"$f\" ] && exec python3 \"$f\"; exit 0'"
+            "command": "sh -c 'for d in \"$CLAUDE_PROJECT_DIR\" \"$(git rev-parse --show-toplevel 2>/dev/null)\" \"$PWD\"; do f=\"$d/scripts/hooks/stop_check.py\"; [ -n \"$d\" ] && [ -f \"$f\" ] && exec python3 \"$f\"; done; exit 0'"
           }
         ]
       }
