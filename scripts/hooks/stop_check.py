@@ -35,12 +35,34 @@ def recent_tasks(root):
     return out
 
 
+
+def project_root(data):
+    """Корень проекта. CLAUDE_PROJECT_DIR бывает пустым или устаревшим после смены папки в сессии, поэтому сначала —
+    рабочая папка сессии из события хука и её git-корень, потом переменная, потом текущая папка."""
+    import subprocess
+    candidates = []
+    cwd = data.get("cwd")
+    if cwd:
+        try:
+            top = subprocess.run(["git", "-C", cwd, "rev-parse", "--show-toplevel"], capture_output=True,
+                                 text=True, timeout=5).stdout.strip()
+        except Exception:
+            top = ""
+        candidates += [top, cwd]
+    for c in candidates:
+        if c and os.path.exists(os.path.join(c, "AGENTS.md")):
+            return c
+    env = os.environ.get("CLAUDE_PROJECT_DIR", "")
+    if env and os.path.isdir(env):
+        return env
+    return os.getcwd()
+
 def main():
     try:
         data = json.load(sys.stdin)
     except Exception:
         data = {}
-    root = os.environ.get("CLAUDE_PROJECT_DIR") or data.get("cwd") or os.getcwd()
+    root = project_root(data)
     if os.path.exists(os.path.join(root, ".polygon-dev")):
         return 0
     if data.get("stop_hook_active"):

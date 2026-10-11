@@ -163,6 +163,33 @@ def publish_tests(root):
     expect("публикация: хук перед отправкой ловит имя в сообщении коммита", r.returncode == 1 and "сообщение коммита" in r.stdout, r.stdout)
 
 
+def path_tests(root):
+    cp = os.path.join(HERE, "check_path.py")
+    d = os.path.join(root, "tasks", "pth")
+    os.makedirs(d)
+    open(os.path.join(d, "00-tz.md"), "w", encoding="utf-8").write(
+        "ТЗ\n\nGAP:\n  1. Держится ли идея чек-листа [ключевой]\n  2. Кто бросает пробный период\n  3. Сколько таких компаний\n\nНА ВХОДЕ: идея\n")
+    review = ("ПУТЬ\nП-1. Что должно стать известно: почему бросают пробный период\n     Закрывает GAP: 1, 2  [ключевой]\n"
+              "П-2. Что должно стать известно: хватит ли компаний\n     Закрывает GAP: 3\n")
+    open(os.path.join(d, "01-review.md"), "w", encoding="utf-8").write(review)
+    log = "# Лог\n\nПУТЬ — ИСХОДЫ\nП-1 | GAP 1, 2 | закрыт: src-market.md\nП-2 | GAP 3 | запрос данных D-1\n"
+    open(os.path.join(d, "log.md"), "w", encoding="utf-8").write(log)
+    r = run([cp, d])
+    expect("путь: всё привязано и у каждого пункта исход", r.returncode == 0, r.stdout)
+    open(os.path.join(d, "01-review.md"), "w", encoding="utf-8").write(review.replace("Закрывает GAP: 3", "Закрывает GAP: —"))
+    r = run([cp, d])
+    expect("путь: пункт GAP без привязки пойман", r.returncode == 1 and "GAP 3" in r.stdout, r.stdout)
+    open(os.path.join(d, "01-review.md"), "w", encoding="utf-8").write(review.replace("Закрывает GAP: 3", "Закрывает GAP: —") + "Вне пути: GAP 3 — не влияет на решение\n")
+    r = run([cp, d])
+    expect("путь: «вне пути» с причиной засчитан", r.returncode == 0, r.stdout)
+    open(os.path.join(d, "log.md"), "w", encoding="utf-8").write(log.replace("П-2 | GAP 3 | запрос данных D-1\n", "П-2 | GAP 3 | —\n"))
+    r = run([cp, d])
+    expect("путь: пункт без исхода пойман", r.returncode == 1 and "П-2" in r.stdout, r.stdout)
+    open(os.path.join(d, "log.md"), "w", encoding="utf-8").write("# Лог\n")
+    r = run([cp, d])
+    expect("путь: нет раздела «ПУТЬ — ИСХОДЫ» — ошибка", r.returncode == 1 and "ПУТЬ — ИСХОДЫ" in r.stdout, r.stdout)
+
+
 def readers_tests(root):
     import zipfile
     add = os.path.join(HERE, "add_source.py")
@@ -429,15 +456,26 @@ def main():
         pre_cmd = cfg["hooks"]["PreToolUse"][0]["hooks"][0]["command"]
         stop_cmd = cfg["hooks"]["Stop"][0]["hooks"][0]["command"]
         forbidden = _json.dumps({"tool_name": "Write", "tool_input": {"file_path": "methodology/x.md"}})
-        lost = subprocess.run(["sh", "-c", pre_cmd], input=forbidden, capture_output=True, text=True,
+        empty = tempfile.mkdtemp(prefix="polygon-empty-")
+        lost = subprocess.run(["sh", "-c", pre_cmd], input=forbidden, capture_output=True, text=True, cwd=empty,
                               env=dict(os.environ, CLAUDE_PROJECT_DIR="/нет/такой/папки"))
         expect("хук записи: скрипта нет — запись не блокируется", lost.returncode == 0, lost.stderr)
-        lost2 = subprocess.run(["sh", "-c", stop_cmd], input="{}", capture_output=True, text=True,
+        lost2 = subprocess.run(["sh", "-c", stop_cmd], input="{}", capture_output=True, text=True, cwd=empty,
                                env=dict(os.environ, CLAUDE_PROJECT_DIR="/нет/такой/папки"))
         expect("стоп-хук: скрипта нет — ответ не блокируется", lost2.returncode == 0, lost2.stderr)
-        found = subprocess.run(["sh", "-c", pre_cmd], input=forbidden, capture_output=True, text=True,
+        found = subprocess.run(["sh", "-c", pre_cmd], input=forbidden, capture_output=True, text=True, cwd=empty,
                                env=dict(os.environ, CLAUDE_PROJECT_DIR=proj))
         expect("хук записи: скрипт на месте — запись в систему блокируется", found.returncode == 2, found.stderr)
+        open(os.path.join(proj, "AGENTS.md"), "w", encoding="utf-8").write("# проект\n")
+        no_env = {k: v for k, v in os.environ.items() if k != "CLAUDE_PROJECT_DIR"}
+        found2 = subprocess.run(["sh", "-c", pre_cmd], input=forbidden, capture_output=True, text=True, cwd=proj,
+                                env=no_env)
+        expect("хук записи: переменной нет — скрипт найден по рабочей папке", found2.returncode == 2, found2.stderr)
+        stale = subprocess.run(["sh", "-c", pre_cmd],
+                               input=_json.dumps({"tool_name": "Write", "tool_input": {"file_path": "methodology/x.md"}, "cwd": proj}),
+                               capture_output=True, text=True, cwd=proj, env=dict(os.environ, CLAUDE_PROJECT_DIR=empty))
+        expect("хук записи: устаревшая переменная — корень берётся из рабочей папки сессии", stale.returncode == 2, stale.stderr)
+        shutil.rmtree(empty, ignore_errors=True)
         shutil.rmtree(proj, ignore_errors=True)
 
         hook = os.path.join(HERE, "hooks", "guard_writes.py")
@@ -484,6 +522,7 @@ def main():
         readable_tests(root)
         step_tests(root)
         log_sources_tests(root)
+        path_tests(root)
         publish_tests(root)
         readers_tests(root)
     finally:
