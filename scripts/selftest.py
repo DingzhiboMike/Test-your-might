@@ -169,8 +169,9 @@ def path_tests(root):
     os.makedirs(d)
     open(os.path.join(d, "00-tz.md"), "w", encoding="utf-8").write(
         "ТЗ\n\nGAP:\n  1. Держится ли идея чек-листа [ключевой]\n  2. Кто бросает пробный период\n  3. Сколько таких компаний\n\nНА ВХОДЕ: идея\n")
-    review = ("ПУТЬ\nП-1. Что должно стать известно: почему бросают пробный период\n     Закрывает GAP: 1, 2  [ключевой]\n"
-              "П-2. Что должно стать известно: хватит ли компаний\n     Закрывает GAP: 3\n")
+    review = ("ПУТЬ\nП-1. Что должно стать известно: почему бросают пробный период\n     Закрывает GAP: 1, 2  [ключевой] [проверка допущения]\n"
+              "     Сдвигает: А, Б\n     Чего не хватает в карте: причин ухода нет\n"
+              "П-2. Что должно стать известно: хватит ли компаний\n     Закрывает GAP: 3\n     Сдвигает: Б\n     Чего не хватает в карте: числа компаний нет\n")
     open(os.path.join(d, "01-review.md"), "w", encoding="utf-8").write(review)
     log = "# Лог\n\nПУТЬ — ИСХОДЫ\nП-1 | GAP 1, 2 | закрыт: src-market.md\nП-2 | GAP 3 | запрос данных D-1\n"
     open(os.path.join(d, "log.md"), "w", encoding="utf-8").write(log)
@@ -188,6 +189,36 @@ def path_tests(root):
     open(os.path.join(d, "log.md"), "w", encoding="utf-8").write("# Лог\n")
     r = run([cp, d])
     expect("путь: нет раздела «ПУТЬ — ИСХОДЫ» — ошибка", r.returncode == 1 and "ПУТЬ — ИСХОДЫ" in r.stdout, r.stdout)
+    r = run([cp, d, "--plan"])
+    expect("план: без исходов в логе проверка плана проходит", r.returncode == 0, r.stdout)
+    open(os.path.join(d, "00-tz.md"), "a", encoding="utf-8").write("РЕШЕНИЕ: запускать ли чек-лист; варианты: А — на всех; Б — только на новых; В — не запускать\n")
+    r = run([cp, d, "--plan"])
+    expect("план: вариант решения без пункта пути пойман", r.returncode == 1 and "«В»" in r.stdout, r.stdout)
+    open(os.path.join(d, "01-review.md"), "w", encoding="utf-8").write(review.replace(" [проверка допущения]", "").replace("Сдвигает: Б\n", "Сдвигает: Б, В\n"))
+    r = run([cp, d, "--plan"])
+    expect("план: нет пункта на проверку допущения — пойман", r.returncode == 1 and "проверка допущения" in r.stdout, r.stdout)
+
+
+def knowledge_tests(root):
+    ck = os.path.join(HERE, "check_knowledge.py")
+    d = os.path.join(root, "tasks", "knw")
+    os.makedirs(d)
+    open(os.path.join(d, "00-tz.md"), "w", encoding="utf-8").write("ТЗ\n\nGAP:\n  1. Почему бросают пробный период\n  2. Кто решает о покупке\n\nНА ВХОДЕ: идея\n")
+    open(os.path.join(d, "sources.csv"), "w", encoding="utf-8").write(
+        "id,kind,location\nF-001,context,context/a.md\nF-002,context,context/b.md\nF-003,web,https://x.ru\n")
+    good = ("1. ПОКРЫТИЕ ФАЙЛОВ\n\n| Файл | Тип | Прочитан | К каким пунктам GAP относится | Фрагментов взято |\n| --- | --- | --- | --- | --- |\n"
+            "| F-001 · интервью | прямая речь клиента | целиком | 1 | 4 |\n| F-002 · бриф | утверждение команды | целиком | — не относится: описание тарифов | 0 |\n\n"
+            "2. ПО ПУНКТАМ GAP\n\nGAP 1 — Почему бросают пробный период\nУже известно:\n  - «не нашли, где настроить отчёт» [F-001]\nЧего нет:\n  - доли бросивших по причинам\n\n"
+            "GAP 2 — Кто решает о покупке\nУже известно:\n  - нет\nЧего нет:\n  - кто подписывает оплату в малых командах\n")
+    open(os.path.join(d, "00k-knowledge.md"), "w", encoding="utf-8").write(good)
+    r = run([ck, d])
+    expect("материалы: полное покрытие проходит", r.returncode == 0, r.stdout)
+    open(os.path.join(d, "00k-knowledge.md"), "w", encoding="utf-8").write(good.replace("| F-002 · бриф | утверждение команды | целиком | — не относится: описание тарифов | 0 |\n", ""))
+    r = run([ck, d])
+    expect("материалы: пропущенный файл контекста пойман", r.returncode == 1 and "F-002" in r.stdout, r.stdout)
+    open(os.path.join(d, "00k-knowledge.md"), "w", encoding="utf-8").write(good.replace("Чего нет:\n  - кто подписывает оплату в малых командах\n", "Чего нет:\n"))
+    r = run([ck, d])
+    expect("материалы: пустое «Чего нет» поймано", r.returncode == 1 and "GAP 2" in r.stdout, r.stdout)
 
 
 def readers_tests(root):
@@ -523,6 +554,7 @@ def main():
         step_tests(root)
         log_sources_tests(root)
         path_tests(root)
+        knowledge_tests(root)
         publish_tests(root)
         readers_tests(root)
     finally:
