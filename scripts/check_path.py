@@ -10,6 +10,13 @@
    есть строка с исходом: закрыт / проверкой по сути / запрос данных / живая проверка / снят. Строка без исхода
    или пункт без строки — ошибка.
 
+С ключом `--plan` (сразу после консультанта, до первого хода) проверяется план, а не исходы:
+3. Каждый вариант из поля РЕШЕНИЕ в ТЗ («варианты: А — …; Б — …») назван хотя бы в одной строке «Сдвигает: …»
+   пункта пути. Решения нет («решения нет») — пункт не проверяется.
+4. У каждого пункта пути П-k есть непустые строки «Сдвигает:» и «Чего не хватает в карте:».
+5. Хотя бы один пункт помечен «[проверка допущения]» — он может опровергнуть главное допущение консультанта.
+В валидации (пункты У-k) проверки 3–5 не применяются: путь там — карта утверждений.
+
 Нет `01-review.md` — проверять нечего. Есть разбор, но в логе нет раздела «ПУТЬ — ИСХОДЫ» — ошибка: его пишут
 перед сдачей. Код возврата 1 — есть ошибки. Отчёт: tasks/<папка>/checks/path.md.
 """
@@ -41,6 +48,53 @@ def gap_refs(review):
     for m in re.finditer(r"GAP\s*:?\s*((?:\d+\s*(?:,|и)?\s*)+)", review):
         refs.update(int(n) for n in re.findall(r"\d+", m.group(1)))
     return refs
+
+
+def decision_variants(tz):
+    """Буквы вариантов из поля РЕШЕНИЕ: «варианты: А — …; Б — …». Нет поля или «решения нет» — пусто."""
+    m = re.search(r"^\**РЕШЕНИЕ\**:?\**(.*(?:\n[ \t]+.*)*)", tz, re.M)
+    if not m or re.search(r"решения нет", m.group(1), re.I):
+        return []
+    v = re.search(r"вариант\w*:?(.*)", m.group(1), re.I | re.S)
+    if not v:
+        return []
+    return sorted(set(re.findall(r"(?:^|[;,\s])([А-ЯЁA-Z])\s*[—–-]", v.group(1))))
+
+
+def item_blocks(review):
+    """Текст каждого пункта П-k: от его строки до следующего пункта или пустой строки после блока."""
+    blocks, cur = {}, None
+    for line in review.splitlines():
+        m = re.match(r"^\s*(?:[-*]\s*)?\**(П)-(\d+)\b", line)
+        if m:
+            cur = "П-%s" % m.group(2)
+            blocks[cur] = [line]
+        elif cur and line.strip():
+            blocks[cur].append(line)
+        elif cur and not line.strip():
+            cur = None
+    return {k: "\n".join(v) for k, v in blocks.items()}
+
+
+def check_plan(tz, review, errors):
+    blocks = item_blocks(review)
+    if not blocks:
+        return
+    for key, text in blocks.items():
+        for field in ("Сдвигает", "Чего не хватает в карте"):
+            m = re.search(r"%s:[ \t]*(.*)" % field, text)
+            if not m or not m.group(1).strip(" —-–"):
+                errors.append("%s: нет строки «%s:» или она пустая" % (key, field))
+    moved = set()
+    for text in blocks.values():
+        m = re.search(r"Сдвигает:[ \t]*(.*)", text)
+        if m:
+            moved.update(re.findall(r"\b([А-ЯЁA-Z])\b", m.group(1)))
+    for v in decision_variants(tz):
+        if v not in moved:
+            errors.append("вариант решения «%s» не сдвигает ни один пункт пути" % v)
+    if not any("[проверка допущения]" in t for t in blocks.values()):
+        errors.append("нет пункта пути с пометкой «[проверка допущения]»")
 
 
 def path_items(review):
@@ -75,7 +129,7 @@ def main():
     if len(sys.argv) < 2:
         sys.stderr.write(__doc__)
         return 2
-    task = sys.argv[1].rstrip("/")
+    task = [a for a in sys.argv[1:] if not a.startswith("--")][0].rstrip("/")
     review = read(os.path.join(task, "01-review.md"))
     if not review:
         print("Разбора консультанта нет: проверять нечего.")
@@ -88,10 +142,12 @@ def main():
     items = path_items(review)
     if not items:
         errors.append("в 01-review.md нет пунктов пути (П-1… или У-1…)")
-    found = outcomes(read(os.path.join(task, "log.md")))
+    tz = read(os.path.join(task, "00-tz.md"))
+    check_plan(tz, review, errors)
+    found = {} if "--plan" in sys.argv else outcomes(read(os.path.join(task, "log.md")))
     if found is None:
         errors.append("в log.md нет раздела «ПУТЬ — ИСХОДЫ»: его пишут перед сдачей")
-    else:
+    elif "--plan" not in sys.argv:
         for key in items:
             if key not in found:
                 errors.append("%s: нет строки в «ПУТЬ — ИСХОДЫ»" % key)
