@@ -6,6 +6,7 @@
 Запускает по очереди:
 - check_artifact.py — с теми же аргументами (--since, --allow, --review, --contains; маска для пачки);
 - check_quotes.py — по каждому файлу артефакта (маска раскрывается);
+- check_fresh.py — старые веб-источники в артефакте стоят с годом в тексте;
 - check_private.py — по задаче;
 - check_numbers.py — по задаче, если есть numbers.csv.
 
@@ -49,6 +50,7 @@ def main():
     checks = [("check_artifact", run("check_artifact.py", [task, artifact] + rest))]
     for f in files:
         checks.append(("check_quotes " + f if len(files) > 1 else "check_quotes", run("check_quotes.py", [task, f])))
+    checks.append(("check_fresh", run("check_fresh.py", [task, artifact])))
     checks.append(("check_private", run("check_private.py", [task])))
     if os.path.exists(os.path.join(task, "numbers.csv")):
         checks.append(("check_numbers", run("check_numbers.py", [task])))

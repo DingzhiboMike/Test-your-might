@@ -17,6 +17,11 @@
 5. Хотя бы один пункт помечен «[проверка допущения]» — он может опровергнуть главное допущение консультанта.
 В валидации (пункты У-k) проверки 3–5 не применяются: путь там — карта утверждений.
 
+С ключом `--tz` (диспетчер, до показа ТЗ человеку) проверяется только ТЗ:
+6. У каждого пункта GAP есть пометка, где ответ: `{ответ: контекст, данные, веб, живая}` — одно или несколько.
+7. Строка ВЕБ согласована с пометками: «да» — хотя бы у одного пункта есть «веб»; «нет» — ни у одного.
+Эти же проверки идут и в `--plan`.
+
 Нет `01-review.md` — проверять нечего. Есть разбор, но в логе нет раздела «ПУТЬ — ИСХОДЫ» — ошибка: его пишут
 перед сдачей. Код возврата 1 — есть ошибки. Отчёт: tasks/<папка>/checks/path.md.
 """
@@ -26,21 +31,68 @@ import sys
 
 OUTCOMES = re.compile(r"закрыт|проверк\w* по сути|запрос\w* данных|D-\d+|жив\w* проверк|снят", re.I)
 ITEM = re.compile(r"(?<![\w-])([ПУ])-(\d+)\b")
+ANSWER = re.compile(r"\{\s*ответ\s*:\s*([^}]*)\}", re.I)
+CHANNELS = ("контекст", "данные", "веб", "живая")
 
 
 def read(path):
     return open(path, encoding="utf-8").read() if os.path.exists(path) else ""
 
 
-def gap_numbers(tz):
-    """Номера пунктов GAP из ТЗ: строки «  1. …» после «GAP:» до следующего поля в верхнем регистре."""
+def gap_block(tz):
     m = re.search(r"^\**GAP\b[^\n]*?:\**[ \t]*", tz, re.M)
     if not m:
-        return set()
+        return ""
     rest = tz[m.end():]
     stop = re.search(r"^\**[А-ЯЁA-Z][А-ЯЁA-Z\- ]{2,}\**:", rest, re.M)
-    block = rest[:stop.start()] if stop else rest
-    return {int(n) for n in re.findall(r"^\s*(\d+)\.", block, re.M)}
+    return rest[:stop.start()] if stop else rest
+
+
+def gap_numbers(tz):
+    """Номера пунктов GAP из ТЗ: строки «  1. …» после «GAP:» до следующего поля в верхнем регистре."""
+    return {int(n) for n in re.findall(r"^\s*(\d+)\.", gap_block(tz), re.M)}
+
+
+def gap_items(tz):
+    """Пункты GAP с текстом: {номер: текст}. Строки продолжения (с отступом, без номера) приклеиваются к пункту."""
+    items, cur = {}, None
+    for line in gap_block(tz).splitlines():
+        m = re.match(r"^\s*(\d+)\.\s*(.*)$", line)
+        if m:
+            cur = int(m.group(1))
+            items[cur] = m.group(2).strip()
+        elif cur is not None and line.strip():
+            items[cur] += " " + line.strip()
+    return items
+
+
+def gap_answers(tz):
+    """Где ответ по каждому пункту GAP: {номер: множество каналов} или None, если пометки нет."""
+    out = {}
+    for n, text in gap_items(tz).items():
+        m = ANSWER.search(text)
+        out[n] = {c for c in CHANNELS if m and c in m.group(1).lower()} if m else None
+    return out
+
+
+def web_field(tz):
+    m = re.search(r"^\**ВЕБ\**:?\**[ \t]*(\S+)", tz, re.M)
+    return m.group(1).lower().strip(".,;—-") if m else ""
+
+
+def check_tz(tz, errors):
+    answers = gap_answers(tz)
+    for n, chans in sorted(answers.items()):
+        if chans is None:
+            errors.append("GAP %d: нет пометки, где ответ — {ответ: контекст / данные / веб / живая}" % n)
+        elif not chans:
+            errors.append("GAP %d: в пометке «ответ» нет ни одного из каналов: %s" % (n, ", ".join(CHANNELS)))
+    web_items = [n for n, c in answers.items() if c and "веб" in c]
+    web = web_field(tz)
+    if web.startswith("да") and answers and not web_items:
+        errors.append("ВЕБ: да, но ни у одного пункта GAP нет «веб» в пометке, где ответ")
+    if web.startswith("нет") and web_items:
+        errors.append("ВЕБ: нет, но у пунктов GAP %s ответ помечен «веб»" % ", ".join(map(str, web_items)))
 
 
 def gap_refs(review):
@@ -130,6 +182,15 @@ def main():
         sys.stderr.write(__doc__)
         return 2
     task = [a for a in sys.argv[1:] if not a.startswith("--")][0].rstrip("/")
+    tz = read(os.path.join(task, "00-tz.md"))
+    if "--tz" in sys.argv:
+        errors = []
+        check_tz(tz, errors)
+        for e in errors:
+            print("ТЗ: " + e)
+        if not errors:
+            print("ТЗ: пунктов GAP %d, у каждого есть пометка, где ответ; ВЕБ согласован." % len(gap_numbers(tz)))
+        return 1 if errors else 0
     review = read(os.path.join(task, "01-review.md"))
     if not review:
         print("Разбора консультанта нет: проверять нечего.")
@@ -142,8 +203,9 @@ def main():
     items = path_items(review)
     if not items:
         errors.append("в 01-review.md нет пунктов пути (П-1… или У-1…)")
-    tz = read(os.path.join(task, "00-tz.md"))
     check_plan(tz, review, errors)
+    if "--plan" in sys.argv:
+        check_tz(tz, errors)
     found = {} if "--plan" in sys.argv else outcomes(read(os.path.join(task, "log.md")))
     if found is None:
         errors.append("в log.md нет раздела «ПУТЬ — ИСХОДЫ»: его пишут перед сдачей")
