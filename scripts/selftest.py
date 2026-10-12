@@ -34,8 +34,8 @@ def closed_web_tests(root):
     cw = os.path.join(root, "tasks", "cw")
     os.makedirs(cw)
     open(os.path.join(cw, "closed-web.txt"), "w", encoding="utf-8").write("# партнёр\nПартнёрКо\n")
-    open(os.path.join(cw, "log.md"), "w", encoding="utf-8").write("ШАГ 1\nЗапросы:   WebSearch «закон о рекламе требования к акциям»\nПроверки: ок\nЗамечание: акция ПартнёрКо одобрена\n")
-    open(os.path.join(cw, "src-a.md"), "w", encoding="utf-8").write("Акция ПартнёрКо — чисто для артефакта.\n")
+    open(os.path.join(cw, "log.md"), "w", encoding="utf-8").write("ШАГ 1\nЗапросы:   WebSearch «требования к рекламе»\nПроверки: ок\nЗамечание: проект ПартнёрКо одобрен\n")
+    open(os.path.join(cw, "src-a.md"), "w", encoding="utf-8").write("Проект ПартнёрКо — чисто для артефакта.\n")
     r = run([os.path.join(HERE, "check_private.py"), cw])
     expect("закрытое слово не в запросах: проверка чистая", r.returncode == 0, r.stdout)
     open(os.path.join(cw, "log.md"), "w", encoding="utf-8").write("ШАГ 1\nЗапросы:   WebSearch «ПартнёрКо промокод условия»\nПроверки: ок\n")
@@ -50,7 +50,7 @@ def readable_tests(root):
     q = "Хочу один понятный отчёт, а не десять вкладок"
     files = {
         "07a-analyst.md": "# Задача аналитику\n\n## 1. Воронка по шагам — срочно\nЧто нужно: доля клиентов на каждом шаге.\nЗачем: если на активации теряем больше половины — чиним её, иначе смотрим письма.\n",
-        "07b-editor.md": "# Бриф\n\n## Онбординг\nСлова клиентов: «%s» (опрос ИП, 2025)\n" % q,
+        "07b-editor.md": "# Бриф\n\n## Онбординг\nСлова клиентов: «%s» (опрос клиентов)\n" % q,
         "07c-decisions.md": "# Решения\n\n1. Кому адресован запуск?\n   От чего зависит: срочно.\n",
         "07d-trace.md": "Г-1, вердикт: сузить. «%s» [F-012]\n" % q,
     }
@@ -264,18 +264,18 @@ def publish_tests(root):
     g("config", "user.email", "t@example.com")
     g("config", "user.name", "t")
     open(os.path.join(repo, ".gitignore"), "w", encoding="utf-8").write("tasks/*\n")
-    open(os.path.join(repo, "tasks", "t1", "private.txt"), "w", encoding="utf-8").write("# имена\nМарина\n")
+    open(os.path.join(repo, "tasks", "t1", "private.txt"), "w", encoding="utf-8").write("# имена\nТестина\n")
     open(os.path.join(repo, "tasks", "t1", "closed-web.txt"), "w", encoding="utf-8").write("ПартнёрКо\n")
-    open(os.path.join(repo, "a.md"), "w", encoding="utf-8").write("Собрать максимум источников. Пример: Ольга.\n")
+    open(os.path.join(repo, "a.md"), "w", encoding="utf-8").write("Собрать максимум источников. Пример: Пробна.\n")
     g("add", "-A")
     g("commit", "-q", "-m", "чистый коммит")
     r = subprocess.run([PY, cp, "--all"], capture_output=True, text=True, cwd=repo)
     expect("публикация: чистый репозиторий проходит", r.returncode == 0, r.stdout + r.stderr)
-    open(os.path.join(repo, "a.md"), "a", encoding="utf-8").write("Сказала Марине про акцию партнёрко.\n")
+    open(os.path.join(repo, "a.md"), "a", encoding="utf-8").write("Сказала Тестине про проект партнёрко.\n")
     g("commit", "-q", "-am", "добавил пример")
     r = subprocess.run([PY, cp, "--all"], capture_output=True, text=True, cwd=repo)
-    expect("публикация: имя в падеже и закрытое слово пойманы", r.returncode == 1 and "Марин" in r.stdout and "ПартнёрКо" in r.stdout, r.stdout)
-    g("commit", "-q", "--allow-empty", "-m", "по задаче Марины")
+    expect("публикация: имя в падеже и закрытое слово пойманы", r.returncode == 1 and "Тестин" in r.stdout and "ПартнёрКо" in r.stdout, r.stdout)
+    g("commit", "-q", "--allow-empty", "-m", "по задаче Тестины")
     head = g("rev-parse", "HEAD").stdout.strip()
     r = subprocess.run([PY, cp, "--pre-push"], input="refs/heads/main %s refs/heads/main %s\n" % (head, "0" * 40),
                        capture_output=True, text=True, cwd=repo)
@@ -393,21 +393,21 @@ def main():
         r2 = run([add, "--task", task, "--kind", "web", "--location", "https://b.ru/y", "--level", "3", "--root", "F-001"],
                  "Перепечатка: рынок вырос на 12% за 2025 год.\n")
         expect("перепечатка с корнем", r2.stdout.strip() == "F-002", r2.stderr)
-        tr = os.path.join(root, "context", "ivanov.md")
-        open(tr, "w", encoding="utf-8").write("Интервьюер: Как сверяете?\nИванов: Ёлки, вручную в Excel, каждую пятницу.\n")
+        tr = os.path.join(root, "context", "interview-01.md")
+        open(tr, "w", encoding="utf-8").write("Интервьюер: Как сверяете?\nРеспондент: Ёлки, вручную в Excel, каждую пятницу.\n")
         r3 = run([add, "--task", task, "--kind", "interview", "--location", tr, "--ctx-type", "voice", "--pub-date", "2026-08"])
         expect("регистрация транскрипта", r3.stdout.strip() == "F-003", r3.stderr)
         r4 = run([add, "--task", task, "--kind", "web", "--location", "https://c.ru", "--level", "3", "--read", "not-read"], "")
         expect("непрочитанный источник", r4.stdout.strip() == "F-004", r4.stderr)
         cprv = os.path.join(HERE, "check_private.py")
-        open(os.path.join(task, "private.txt"), "w", encoding="utf-8").write("# имена\nБорис\nМарин\n")
+        open(os.path.join(task, "private.txt"), "w", encoding="utf-8").write("# имена\nТестор\nТестин\n")
         pa = os.path.join(task, "src-priv.md")
         open(pa, "w", encoding="utf-8").write(
-            "Респондент Бориса: +7 (999) 123-45-67, ИНН 7701234567, почта ivan@example.ru.\n"
-            "Сказала Марина. Чисто: Интервью 3, сегмент ВВ.\n")
+            "Респондент Тестора: +7 (999) 123-45-67, ИНН 7701234567, почта ivan@example.ru.\n"
+            "Сказала Тестина. Чисто: Интервью 3, сегмент ВВ.\n")
         pv = run([cprv, task])
         expect("персональные данные пойманы", pv.returncode == 1 and "телефон" in pv.stdout and "e-mail" in pv.stdout
-               and "ИНН" in pv.stdout and "термин из private.txt: Борис" in pv.stdout and "термин из private.txt: Марин" in pv.stdout, pv.stdout)
+               and "ИНН" in pv.stdout and "термин из private.txt: Тестор" in pv.stdout and "термин из private.txt: Тестин" in pv.stdout, pv.stdout)
         expect("найденное в отчёт не копируется",
                "123-45-67" not in pv.stdout and "7701234567" not in pv.stdout and "ivan@" not in pv.stdout, pv.stdout)
         os.remove(pa)
@@ -597,12 +597,12 @@ def main():
             os.remove(os.path.join(task, f))
 
         # --- основы имён выводятся сами ---
-        open(os.path.join(task, "private.txt"), "w", encoding="utf-8").write("Ольга\nМарина\n")
+        open(os.path.join(task, "private.txt"), "w", encoding="utf-8").write("Пробна\nТестина\n")
         stem_art = os.path.join(task, "src-stem.md")
-        open(stem_art, "w", encoding="utf-8").write("Спросили Ольгу. Ответила Марине? Нет, Марины. Чисто: Интервью 4.\n")
+        open(stem_art, "w", encoding="utf-8").write("Спросили Пробну. Ответила Тестине? Нет, Тестины. Чисто: Интервью 4.\n")
         stp = run([os.path.join(HERE, "check_private.py"), task])
         expect("падежи имён ловятся, даже если в private.txt полная форма",
-               stp.returncode == 1 and stp.stdout.count("термин из private.txt: Ольга") == 1 and stp.stdout.count("термин из private.txt: Марина") == 1, stp.stdout)
+               stp.returncode == 1 and stp.stdout.count("термин из private.txt: Пробна") == 1 and stp.stdout.count("термин из private.txt: Тестина") == 1, stp.stdout)
         os.remove(stem_art)
         os.remove(os.path.join(task, "private.txt"))
 
