@@ -34,8 +34,8 @@ def closed_web_tests(root):
     cw = os.path.join(root, "tasks", "cw")
     os.makedirs(cw)
     open(os.path.join(cw, "closed-web.txt"), "w", encoding="utf-8").write("# партнёр\nПартнёрКо\n")
-    open(os.path.join(cw, "log.md"), "w", encoding="utf-8").write("ШАГ 1\nЗапросы:   WebSearch «закон о рекламе требования к акциям»\nПроверки: ок\nЗамечание: акция ПартнёрКо одобрена\n")
-    open(os.path.join(cw, "src-a.md"), "w", encoding="utf-8").write("Акция ПартнёрКо — чисто для артефакта.\n")
+    open(os.path.join(cw, "log.md"), "w", encoding="utf-8").write("ШАГ 1\nЗапросы:   WebSearch «требования к рекламе»\nПроверки: ок\nЗамечание: проект ПартнёрКо одобрен\n")
+    open(os.path.join(cw, "src-a.md"), "w", encoding="utf-8").write("Проект ПартнёрКо — чисто для артефакта.\n")
     r = run([os.path.join(HERE, "check_private.py"), cw])
     expect("закрытое слово не в запросах: проверка чистая", r.returncode == 0, r.stdout)
     open(os.path.join(cw, "log.md"), "w", encoding="utf-8").write("ШАГ 1\nЗапросы:   WebSearch «ПартнёрКо промокод условия»\nПроверки: ок\n")
@@ -50,7 +50,7 @@ def readable_tests(root):
     q = "Хочу один понятный отчёт, а не десять вкладок"
     files = {
         "07a-analyst.md": "# Задача аналитику\n\n## 1. Воронка по шагам — срочно\nЧто нужно: доля клиентов на каждом шаге.\nЗачем: если на активации теряем больше половины — чиним её, иначе смотрим письма.\n",
-        "07b-editor.md": "# Бриф\n\n## Онбординг\nСлова клиентов: «%s» (опрос ИП, 2025)\n" % q,
+        "07b-editor.md": "# Бриф\n\n## Онбординг\nСлова клиентов: «%s» (опрос клиентов)\n" % q,
         "07c-decisions.md": "# Решения\n\n1. Кому адресован запуск?\n   От чего зависит: срочно.\n",
         "07d-trace.md": "Г-1, вердикт: сузить. «%s» [F-012]\n" % q,
     }
@@ -121,19 +121,138 @@ def log_sources_tests(root):
     cl = os.path.join(HERE, "check_log_sources.py")
     d = os.path.join(root, "tasks", "ls")
     os.makedirs(d)
+    open(os.path.join(d, "00-tz.md"), "w", encoding="utf-8").write(
+        "ТЗ\n\nGAP:\n  1. Почему клиенты бросают пробный период [ключевой] {ответ: контекст, веб}\n"
+        "  2. Отзывы о сервисах: где искать / как отбирать / как строить выборку {ответ: веб}\n"
+        "  3. Доля бросивших по тарифам {ответ: данные}\n\nВЕБ: да\n")
     good = ("# Лог\n\nШАГ 1 — b2b-consultant\nДыра: постановка\n\n"
-            "ШАГ 2 — market-analyze\nДыра: GAP 1\nВопрос:   что клиенты называют причиной; веб; ≥5 причин со словами клиента; 12 запросов\n"
+            "ШАГ 2 — market-analyze\nПункт GAP: GAP 1 — Почему клиенты бросают пробный период\n"
+            "Вопрос:   что клиенты называют причиной; веб; ≥5 причин со словами клиента; 12 запросов\n"
             "Зачем:    без этого генератор угадает причину\nУже известно: F-002 — утверждение команды, проверяется\nРезультат: совпал\n\n"
-            "ШАГ 3 — hypothesis-generator\nДыра: гипотезы\n")
-    open(os.path.join(d, "log.md"), "w", encoding="utf-8").write(good)
+            "ШАГ 3 — alternatives-analyst\nПункт GAP: GAP 2 — Отзывы о сервисах: где искать / как отбирать / как строить выборку\n"
+            "Вопрос:   где искать отзывы, как их отбирать и как построить выборку; веб; три площадки и правило отбора; 10 запросов\n"
+            "Зачем:    без этого проверка по сути опирается на случайные отзывы\nУже известно: нет\n\n"
+            "Запрос данных D-1\nВопрос:      доля бросивших по тарифам\nЧто снять:   выгрузка\n"
+            "Если данных не будет: 10 звонков бросившим за неделю; не покажет долю, только причины\n\n"
+            "ШАГ 4 — hypothesis-generator\nДыра: гипотезы\n")
+    w = lambda t: open(os.path.join(d, "log.md"), "w", encoding="utf-8").write(t)
+    w(good)
     r = run([cl, d])
-    expect("лог: шаг-источник с вопросом, зачем и известным проходит", r.returncode == 0, r.stdout)
-    open(os.path.join(d, "log.md"), "w", encoding="utf-8").write(good.replace("Зачем:    без этого генератор угадает причину\n", "Зачем:    —\n"))
+    expect("лог: шаги-источники с дословным пунктом GAP и запрос данных с заменой проходят", r.returncode == 0, r.stdout)
+    w(good.replace("Зачем:    без этого генератор угадает причину\n", "Зачем:    —\n"))
     r = run([cl, d])
     expect("лог: пустое «Зачем» у источника поймано", r.returncode == 1 and "Зачем" in r.stdout, r.stdout)
-    open(os.path.join(d, "log.md"), "w", encoding="utf-8").write(good.replace("Уже известно: F-002 — утверждение команды, проверяется\n", ""))
+    w(good.replace("Уже известно: F-002 — утверждение команды, проверяется\n", ""))
     r = run([cl, d])
     expect("лог: нет «Уже известно» у источника — поймано", r.returncode == 1 and "Уже известно" in r.stdout, r.stdout)
+    w(good.replace("GAP 1 — Почему клиенты бросают пробный период", "GAP 1 — почему бросают"))
+    r = run([cl, d])
+    expect("лог: пересказ пункта GAP вместо дословного — пойман", r.returncode == 1 and "дословно" in r.stdout, r.stdout)
+    narrow = good.replace("где искать отзывы, как их отбирать и как построить выборку", "где искать отзывы")
+    w(narrow)
+    r = run([cl, d])
+    expect("лог: вопрос уже пункта GAP — потерянные части пойманы", r.returncode == 1 and "как отбирать" in r.stdout, r.stdout)
+    w(narrow.replace("Зачем:    без этого проверка", "Сужение: отбор и выборку задаёт проверка по сути — убраны\nЗачем:    без этого проверка"))
+    r = run([cl, d])
+    expect("лог: сужение с причиной засчитано", r.returncode == 0, r.stdout)
+    w(good.replace("Пункт GAP: GAP 1 — Почему клиенты бросают пробный период\n", "Пункт GAP: GAP 3 — Доля бросивших по тарифам\n"))
+    r = run([cl, d])
+    expect("лог: веб по пункту с ответом во внутренних данных — пойман", r.returncode == 1 and "Пересмотр" in r.stdout, r.stdout)
+    w(good.replace("Если данных не будет: 10 звонков бросившим за неделю; не покажет долю, только причины\n", ""))
+    r = run([cl, d])
+    expect("лог: запрос данных без дешёвой замены — пойман", r.returncode == 1 and "D-1" in r.stdout, r.stdout)
+
+
+def fresh_tests(root):
+    cf = os.path.join(HERE, "check_fresh.py")
+    d = os.path.join(root, "tasks", "frs")
+    os.makedirs(d)
+    open(os.path.join(d, "sources.csv"), "w", encoding="utf-8").write(
+        "id,kind,location,pub_date,data_date\nF-001,web,https://a.example,2015-05-01,unknown\n"
+        "F-002,web,https://b.example,2026-03-01,unknown\nF-003,web,https://c.example,unknown,unknown\n"
+        "F-004,context,context/a.md,2010,unknown\n")
+    w = lambda t: open(os.path.join(d, "src-x.md"), "w", encoding="utf-8").write(t)
+    w("«свежий тариф» [F-002]. Бриф: «старое» [F-004].\nНа форуме в 2015 году жаловались: «долго» [F-001].\n")
+    r = run([cf, d, "src-x.md", "--today", "2026-10-01"])
+    expect("свежесть: старый источник с годом в тексте проходит", r.returncode == 0, r.stdout)
+    w("Клиенты жалуются: «долго» [F-001].\n«без даты» [F-003]\n")
+    r = run([cf, d, "src-x.md", "--today", "2026-10-01"])
+    expect("свежесть: старый источник без года пойман, без даты — предупреждение",
+           r.returncode == 1 and "F-001" in r.stdout and "F-003 без даты" in r.stdout, r.stdout)
+
+
+def long_list_tests(root):
+    cl = os.path.join(HERE, "check_long_list.py")
+    d = os.path.join(root, "tasks", "lng")
+    os.makedirs(d)
+    open(os.path.join(d, "00-tz.md"), "w", encoding="utf-8").write(
+        "ТЗ\n\nРЕШЕНИЕ: что запускать; варианты: А — письмо; Б — звонок; критерий: ответы\n")
+    head = "| № | Ход | Кому | Вариант решения | Опора | Дешёвая проверка | Дней до сигнала |\n| --- | --- | --- | --- | --- | --- | --- |\n"
+    body = ""
+    for i in range(1, 17):
+        support = "«жалоба» [F-00%d] [F-01%d]" % (i % 9 + 1, i % 9) if i % 3 == 0 else "нет"
+        body += "| %d | Ход номер %d для малых команд | малые команды | %s | %s | 10 звонков | %d |\n" % (
+            i, i, "А" if i % 2 else "Б", support, 7 + i)
+    body += "| 17 | Ход без варианта | все | — | нет | опрос | 5 |\n"
+    body += "| 18 | Долгий ход | все | А | нет | пилот | 60 |\n"
+    open(os.path.join(d, "02-long-list.md"), "w", encoding="utf-8").write(head + body)
+    r = run([cl, d])
+    rep = open(os.path.join(d, "checks", "long-list.md"), encoding="utf-8").read()
+    expect("длинный список: отсев по правилам, опоры выше", r.returncode == 0 and "отсеян — не сдвигает решение" in rep
+           and "отсеян — дороже месяца" in rep and "в глубину 3, 6, 9, 12, 15" in r.stdout, r.stdout + rep)
+    open(os.path.join(d, "02-long-list.md"), "w", encoding="utf-8").write(head + body.split("| 6 |")[0])
+    r = run([cl, d])
+    expect("длинный список: меньше 15 строк — ошибка", r.returncode == 1 and "15–25" in r.stdout, r.stdout)
+
+
+def backlog_tests(root):
+    cr = os.path.join(HERE, "check_readable.py")
+    d = os.path.join(root, "tasks", "bkl")
+    os.makedirs(d)
+    open(os.path.join(d, "00-tz.md"), "w", encoding="utf-8").write("ТИП ВЫХОДА: гипотезы\n")
+    open(os.path.join(d, "02e-position.md"), "w", encoding="utf-8").write("# Позиция\n\nЗапускать письмо малым командам.\n")
+    r = run([cr, d])
+    expect("бэклог: финиш «гипотезы» без бэклога — ошибка", r.returncode == 1 and "03-backlog.md" in r.stdout, r.stdout)
+    row = "| 1 | малые команды, в выгрузке: нет входа 14 дней | «отчёт за минуту» | письмо, маркетолог | доля ответов | ≥8%% из 200 | <3%% | 2 недели, бесплатно | %s |\n"
+    head = "| № | Кому и как найти | Что говорим | Где и кто | Метрика | Успех | Отсечение | Срок и цена | Что решит |\n| --- | --- | --- | --- | --- | --- | --- | --- | --- |\n"
+    open(os.path.join(d, "03-backlog.md"), "w", encoding="utf-8").write(head + row % "запускать ли письмо всем")
+    r = run([cr, d])
+    expect("бэклог: полная таблица проходит", r.returncode == 0, r.stdout)
+    open(os.path.join(d, "03-backlog.md"), "w", encoding="utf-8").write(head + row % "—")
+    r = run([cr, d])
+    expect("бэклог: пустая колонка поймана", r.returncode == 1 and "не заполнены" in r.stdout, r.stdout)
+    open(os.path.join(d, "03-backlog.md"), "w", encoding="utf-8").write(head + row % "закрывает П-1")
+    r = run([cr, d])
+    expect("бэклог: внутренний номер пункта пути пойман", r.returncode == 1 and "П-1" in r.stdout, r.stdout)
+    open(os.path.join(d, "03-backlog.md"), "w", encoding="utf-8").write(head + row % "запускать ли письмо всем")
+    open(os.path.join(d, "08-handoff.md"), "w", encoding="utf-8").write(
+        "# Сдача\n\nЗапускаем письмо; ответ аналитика по выгрузке — до пятницы.\n\n## Служебное\n\nП-1 | GAP 1 | закрыт; D-4\n")
+    r = run([cr, d])
+    expect("сдача: служебная часть не проверяется", r.returncode == 0, r.stdout)
+    open(os.path.join(d, "08-handoff.md"), "w", encoding="utf-8").write("# Сдача\n\nСм. D-4 и Г-3.\n\n## Служебное\n")
+    r = run([cr, d])
+    expect("сдача: номера в части для человека пойманы", r.returncode == 1 and "D-4" in r.stdout and "номер гипотезы" in r.stdout, r.stdout)
+
+
+def knowledge_links_tests(root):
+    ck = os.path.join(HERE, "check_knowledge.py")
+    d = os.path.join(root, "tasks", "knl")
+    os.makedirs(d)
+    open(os.path.join(d, "00-tz.md"), "w", encoding="utf-8").write("ТЗ\n\nGAP:\n  1. Почему упали продажи\n\nНА ВХОДЕ: идея\n")
+    open(os.path.join(d, "sources.csv"), "w", encoding="utf-8").write("id,kind,location\nF-001,context,context/a.md\n")
+    base = ("1. ПОКРЫТИЕ ФАЙЛОВ\n\n| Файл | Тип | Прочитан | К каким пунктам GAP относится | Фрагментов взято |\n| --- | --- | --- | --- | --- |\n"
+            "| F-001 · таблица | данные | целиком | 1 | 2 |\n\n2. ПО ПУНКТАМ GAP\n\nGAP 1 — Почему упали продажи\nУже известно:\n%s"
+            "Чего нет:\n  - связи падения с ценой: данных нет\n")
+    w = lambda t: open(os.path.join(d, "00k-knowledge.md"), "w", encoding="utf-8").write(base % t)
+    w("  - «заказы за квартал» [F-001] — период таблицы\n")
+    r = run([ck, d])
+    expect("материалы: фрагмент без выводов и «связь» в «Чего нет» проходят", r.returncode == 0, r.stdout)
+    w("  - «заказы за квартал» [F-001] — совпадает с обновлением сайта\n")
+    r = run([ck, d])
+    expect("материалы: выведенное совпадение поймано", r.returncode == 1 and "совпадает" in r.stdout, r.stdout)
+    w("  - «заказы за квартал» [F-001] и «новая версия сайта» [F-001] [рядом, связь не проверена]\n")
+    r = run([ck, d])
+    expect("материалы: два фрагмента рядом с пометкой — допустимо", r.returncode == 0, r.stdout)
 
 
 def publish_tests(root):
@@ -145,18 +264,18 @@ def publish_tests(root):
     g("config", "user.email", "t@example.com")
     g("config", "user.name", "t")
     open(os.path.join(repo, ".gitignore"), "w", encoding="utf-8").write("tasks/*\n")
-    open(os.path.join(repo, "tasks", "t1", "private.txt"), "w", encoding="utf-8").write("# имена\nМарина\n")
+    open(os.path.join(repo, "tasks", "t1", "private.txt"), "w", encoding="utf-8").write("# имена\nТестина\n")
     open(os.path.join(repo, "tasks", "t1", "closed-web.txt"), "w", encoding="utf-8").write("ПартнёрКо\n")
-    open(os.path.join(repo, "a.md"), "w", encoding="utf-8").write("Собрать максимум источников. Пример: Ольга.\n")
+    open(os.path.join(repo, "a.md"), "w", encoding="utf-8").write("Собрать максимум источников. Пример: Пробна.\n")
     g("add", "-A")
     g("commit", "-q", "-m", "чистый коммит")
     r = subprocess.run([PY, cp, "--all"], capture_output=True, text=True, cwd=repo)
     expect("публикация: чистый репозиторий проходит", r.returncode == 0, r.stdout + r.stderr)
-    open(os.path.join(repo, "a.md"), "a", encoding="utf-8").write("Сказала Марине про акцию партнёрко.\n")
+    open(os.path.join(repo, "a.md"), "a", encoding="utf-8").write("Сказала Тестине про проект партнёрко.\n")
     g("commit", "-q", "-am", "добавил пример")
     r = subprocess.run([PY, cp, "--all"], capture_output=True, text=True, cwd=repo)
-    expect("публикация: имя в падеже и закрытое слово пойманы", r.returncode == 1 and "Марин" in r.stdout and "ПартнёрКо" in r.stdout, r.stdout)
-    g("commit", "-q", "--allow-empty", "-m", "по задаче Марины")
+    expect("публикация: имя в падеже и закрытое слово пойманы", r.returncode == 1 and "Тестин" in r.stdout and "ПартнёрКо" in r.stdout, r.stdout)
+    g("commit", "-q", "--allow-empty", "-m", "по задаче Тестины")
     head = g("rev-parse", "HEAD").stdout.strip()
     r = subprocess.run([PY, cp, "--pre-push"], input="refs/heads/main %s refs/heads/main %s\n" % (head, "0" * 40),
                        capture_output=True, text=True, cwd=repo)
@@ -168,7 +287,8 @@ def path_tests(root):
     d = os.path.join(root, "tasks", "pth")
     os.makedirs(d)
     open(os.path.join(d, "00-tz.md"), "w", encoding="utf-8").write(
-        "ТЗ\n\nGAP:\n  1. Держится ли идея чек-листа [ключевой]\n  2. Кто бросает пробный период\n  3. Сколько таких компаний\n\nНА ВХОДЕ: идея\n")
+        "ТЗ\n\nGAP:\n  1. Держится ли идея чек-листа [ключевой] {ответ: контекст, живая}\n  2. Кто бросает пробный период {ответ: данные}\n"
+        "  3. Сколько таких компаний {ответ: веб}\n\nНА ВХОДЕ: идея\nВЕБ: да — пункт 3\n")
     review = ("ПУТЬ\nП-1. Что должно стать известно: почему бросают пробный период\n     Закрывает GAP: 1, 2  [ключевой] [проверка допущения]\n"
               "     Сдвигает: А, Б\n     Чего не хватает в карте: причин ухода нет\n"
               "П-2. Что должно стать известно: хватит ли компаний\n     Закрывает GAP: 3\n     Сдвигает: Б\n     Чего не хватает в карте: числа компаний нет\n")
@@ -197,6 +317,15 @@ def path_tests(root):
     open(os.path.join(d, "01-review.md"), "w", encoding="utf-8").write(review.replace(" [проверка допущения]", "").replace("Сдвигает: Б\n", "Сдвигает: Б, В\n"))
     r = run([cp, d, "--plan"])
     expect("план: нет пункта на проверку допущения — пойман", r.returncode == 1 and "проверка допущения" in r.stdout, r.stdout)
+    r = run([cp, d, "--tz"])
+    expect("ТЗ: пометки, где ответ, и ВЕБ согласованы", r.returncode == 0, r.stdout)
+    tz = open(os.path.join(d, "00-tz.md"), encoding="utf-8").read()
+    open(os.path.join(d, "00-tz.md"), "w", encoding="utf-8").write(tz.replace(" {ответ: данные}", ""))
+    r = run([cp, d, "--tz"])
+    expect("ТЗ: пункт без пометки, где ответ, пойман", r.returncode == 1 and "GAP 2" in r.stdout, r.stdout)
+    open(os.path.join(d, "00-tz.md"), "w", encoding="utf-8").write(tz.replace("ВЕБ: да — пункт 3", "ВЕБ: нет — сеть закрыта"))
+    r = run([cp, d, "--tz"])
+    expect("ТЗ: «ВЕБ: нет» при пункте с ответом в вебе — пойман", r.returncode == 1 and "ВЕБ: нет" in r.stdout, r.stdout)
 
 
 def knowledge_tests(root):
@@ -264,21 +393,21 @@ def main():
         r2 = run([add, "--task", task, "--kind", "web", "--location", "https://b.ru/y", "--level", "3", "--root", "F-001"],
                  "Перепечатка: рынок вырос на 12% за 2025 год.\n")
         expect("перепечатка с корнем", r2.stdout.strip() == "F-002", r2.stderr)
-        tr = os.path.join(root, "context", "ivanov.md")
-        open(tr, "w", encoding="utf-8").write("Интервьюер: Как сверяете?\nИванов: Ёлки, вручную в Excel, каждую пятницу.\n")
+        tr = os.path.join(root, "context", "interview-01.md")
+        open(tr, "w", encoding="utf-8").write("Интервьюер: Как сверяете?\nРеспондент: Ёлки, вручную в Excel, каждую пятницу.\n")
         r3 = run([add, "--task", task, "--kind", "interview", "--location", tr, "--ctx-type", "voice", "--pub-date", "2026-08"])
         expect("регистрация транскрипта", r3.stdout.strip() == "F-003", r3.stderr)
         r4 = run([add, "--task", task, "--kind", "web", "--location", "https://c.ru", "--level", "3", "--read", "not-read"], "")
         expect("непрочитанный источник", r4.stdout.strip() == "F-004", r4.stderr)
         cprv = os.path.join(HERE, "check_private.py")
-        open(os.path.join(task, "private.txt"), "w", encoding="utf-8").write("# имена\nБорис\nМарин\n")
+        open(os.path.join(task, "private.txt"), "w", encoding="utf-8").write("# имена\nТестор\nТестин\n")
         pa = os.path.join(task, "src-priv.md")
         open(pa, "w", encoding="utf-8").write(
-            "Респондент Бориса: +7 (999) 123-45-67, ИНН 7701234567, почта ivan@example.ru.\n"
-            "Сказала Марина. Чисто: Интервью 3, сегмент ВВ.\n")
+            "Респондент Тестора: +7 (999) 123-45-67, ИНН 7701234567, почта ivan@example.ru.\n"
+            "Сказала Тестина. Чисто: Интервью 3, сегмент ВВ.\n")
         pv = run([cprv, task])
         expect("персональные данные пойманы", pv.returncode == 1 and "телефон" in pv.stdout and "e-mail" in pv.stdout
-               and "ИНН" in pv.stdout and "термин из private.txt: Борис" in pv.stdout and "термин из private.txt: Марин" in pv.stdout, pv.stdout)
+               and "ИНН" in pv.stdout and "термин из private.txt: Тестор" in pv.stdout and "термин из private.txt: Тестин" in pv.stdout, pv.stdout)
         expect("найденное в отчёт не копируется",
                "123-45-67" not in pv.stdout and "7701234567" not in pv.stdout and "ivan@" not in pv.stdout, pv.stdout)
         os.remove(pa)
@@ -468,12 +597,12 @@ def main():
             os.remove(os.path.join(task, f))
 
         # --- основы имён выводятся сами ---
-        open(os.path.join(task, "private.txt"), "w", encoding="utf-8").write("Ольга\nМарина\n")
+        open(os.path.join(task, "private.txt"), "w", encoding="utf-8").write("Пробна\nТестина\n")
         stem_art = os.path.join(task, "src-stem.md")
-        open(stem_art, "w", encoding="utf-8").write("Спросили Ольгу. Ответила Марине? Нет, Марины. Чисто: Интервью 4.\n")
+        open(stem_art, "w", encoding="utf-8").write("Спросили Пробну. Ответила Тестине? Нет, Тестины. Чисто: Интервью 4.\n")
         stp = run([os.path.join(HERE, "check_private.py"), task])
         expect("падежи имён ловятся, даже если в private.txt полная форма",
-               stp.returncode == 1 and stp.stdout.count("термин из private.txt: Ольга") == 1 and stp.stdout.count("термин из private.txt: Марина") == 1, stp.stdout)
+               stp.returncode == 1 and stp.stdout.count("термин из private.txt: Пробна") == 1 and stp.stdout.count("термин из private.txt: Тестина") == 1, stp.stdout)
         os.remove(stem_art)
         os.remove(os.path.join(task, "private.txt"))
 
@@ -555,6 +684,10 @@ def main():
         log_sources_tests(root)
         path_tests(root)
         knowledge_tests(root)
+        knowledge_links_tests(root)
+        fresh_tests(root)
+        long_list_tests(root)
+        backlog_tests(root)
         publish_tests(root)
         readers_tests(root)
     finally:

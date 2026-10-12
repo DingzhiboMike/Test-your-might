@@ -6,8 +6,8 @@
 
 Факт из источника — фрагмент с числом должен найтись в сыром тексте источника:
   python3 scripts/add_number.py --task tasks/<папка> --kind fact --key smb_count \
-      --what "число МСП в сегменте" --value 12400 --unit "компаний" --as-written "12,4 тыс." \
-      --scope "Россия, ОКВЭД 69" --period 2025-12 --source F-007 --fragment "насчитывалось 12,4 тыс. организаций"
+      --what "число компаний в сегменте" --value 12400 --unit "компаний" --as-written "12,4 тыс." \
+      --scope "<рынок, сегмент>" --period 2025-12 --source F-007 --fragment "насчитывалось 12,4 тыс. организаций"
 
 Производное — только формулой из других чисел реестра, скрипт пересчитывает сам:
   python3 scripts/add_number.py --task tasks/<папка> --kind derived --key need_clients \
@@ -90,7 +90,7 @@ def main():
     p.add_argument("--as-written", default="", help="как число записано в источнике, если не совпадает с --value: «12,4 тыс.»")
     p.add_argument("--scope", default="", help="где: страна, регион, сегмент")
     p.add_argument("--period", default="", help="к какому периоду или дате относятся данные: 2025, 2025-Q3, 2025-12")
-    p.add_argument("--base", default="", help="от чего доля или с чем сравнение: «от всех МСП», «к 2024»")
+    p.add_argument("--base", default="", help="от чего доля или с чем сравнение: «от всех компаний сегмента», «к прошлому году»")
     p.add_argument("--source", default="", help="id источника из sources.csv (для fact)")
     p.add_argument("--fragment", default="", help="дословный фрагмент источника с этим числом (для fact)")
     p.add_argument("--formula", default="", help="для derived: выражение из N-id, например N-001 / N-002 * 100")

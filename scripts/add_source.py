@@ -15,7 +15,7 @@
 
 Файл контекста или транскрипт (текст берётся из файла):
   python3 scripts/add_source.py --task tasks/<папка> --kind interview \
-      --location context/interviews/ivanov.md --ctx-type voice --author "Иванов, финдир" --pub-date 2026-08-01
+      --location context/interviews/interview-01.md --ctx-type voice --author "Интервью 1, <роль>" --pub-date 2026-08-01
 
 Файлы .docx (транскрипты, документы) скрипт читает сам: текст абзацев и таблиц. PDF — через pdftotext,
 PyMuPDF или pypdf, что найдётся (скан или слайды без текстового слоя отклоняются с подсказкой, как выгрузить страницы

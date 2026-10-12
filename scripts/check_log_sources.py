@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Проверяет, что каждый шаг-источник в логе поставлен, а не взят «для полноты».
+"""Проверяет, что каждый шаг-источник в логе поставлен, а не взят «для полноты», и что вопрос шага — тот же, что в ТЗ.
 
   python3 scripts/check_log_sources.py tasks/<папка>
 
@@ -7,7 +7,18 @@
 «ШАГ» или конца лога) должны быть строки:
 - «Вопрос:»       — вопрос, канал, критерий ответа до поиска, бюджет запросов;
 - «Зачем:»        — что без этого ответа генератору или проверке по сути пришлось бы угадывать;
-- «Уже известно:» — что по вопросу уже лежит в контексте и реестре; утверждения команды — с пометкой «проверяется».
+- «Уже известно:» — что по вопросу уже лежит в контексте и реестре; утверждения команды — с пометкой «проверяется»;
+- «Пункт GAP:»    — пункт GAP из ТЗ дословно, с номером («GAP 3 — …»). Текст сверяется с `00-tz.md`.
+
+Вопрос шага не уже пункта GAP. Если в пункте несколько частей («где искать / как отбирать / как строить», части
+через « / » или «;»), каждая часть должна быть видна в строке «Вопрос:» — или в блоке есть строка «Сужение:»: что
+убрано и почему. Части сверяются по основам слов, поэтому перефразировать можно, терять часть — нельзя.
+
+Канал «веб» в строке «Вопрос:» допустим, только если у пункта GAP в ТЗ пометка `{ответ: …}` содержит «веб» — или в
+блоке есть строка «Пересмотр:» с причиной (оркестратор после разбора материалов решил иначе, чем диспетчер).
+
+Каждый блок «Запрос данных D-N» в логе — со строкой «Если данных не будет:»: дешёвая замена (метод, выборка, срок)
+и чего она не покажет.
 
 Пустое значение («Зачем: —», «Зачем:») не засчитывается. Ошибка — код возврата 1. Отчёт: tasks/<папка>/checks/log-sources.md.
 """
@@ -15,10 +26,37 @@ import os
 import re
 import sys
 
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from check_path import ANSWER, gap_answers, gap_items  # noqa: E402
+
 SOURCES = ("interview-analyst", "interview-synthesis", "market-analyze", "target-audience-analyst",
            "alternatives-analyst", "customer-path", "market-sizing")
-FIELDS = ("Вопрос", "Зачем", "Уже известно")
+FIELDS = ("Вопрос", "Зачем", "Уже известно", "Пункт GAP")
 STEP = re.compile(r"^ШАГ\s+(\d+)\s*[—-]\s*([\w-]+)", re.M)
+# Пачка разборов интервью идёт по файлам контекста, а не по вопросу пункта GAP — для неё пункт GAP не сверяется.
+NO_GAP_TEXT = ("interview-analyst",)
+
+
+def norm(s):
+    s = ANSWER.sub(" ", s)
+    s = re.sub(r"\[[^\]]*\]", " ", s)
+    s = s.replace("ё", "е").replace("Ё", "Е").lower()
+    s = re.sub(r"[«»\"“”„*_`]", "", s)
+    return re.sub(r"\s+", " ", s).strip(" .;:—-")
+
+
+def stems(text):
+    return {w[:5] for w in re.findall(r"[а-яa-z]{5,}", norm(text))}
+
+
+def parts(item):
+    ps = [p for p in re.split(r"\s/\s|;", norm(item)) if p.strip()]
+    return ps if len(ps) > 1 else []
+
+
+def field(block, name):
+    f = re.search(r"^\s*%s:[ \t]*(.*)$" % re.escape(name), block, re.M)
+    return f.group(1).strip(" —-–\t") if f else ""
 
 
 def main():
@@ -31,6 +69,11 @@ def main():
         print("Лога нет: проверять нечего.")
         return 0
     text = open(path, encoding="utf-8").read()
+    tz_path = os.path.join(task, "00-tz.md")
+    tz = open(tz_path, encoding="utf-8").read() if os.path.exists(tz_path) else ""
+    items = {n: norm(t) for n, t in gap_items(tz).items()}
+    raw_items = gap_items(tz)
+    answers = gap_answers(tz)
     heads = list(STEP.finditer(text))
     errors, checked = [], 0
     for i, m in enumerate(heads):
@@ -38,21 +81,57 @@ def main():
         if skill not in SOURCES:
             continue
         checked += 1
+        where = "ШАГ %s — %s" % (m.group(1), skill)
         block = text[m.end():heads[i + 1].start() if i + 1 < len(heads) else len(text)]
-        for field in FIELDS:
-            f = re.search(r"^\s*%s:[ \t]*(.*)$" % re.escape(field), block, re.M)
-            value = f.group(1).strip(" —-–\t") if f else ""
-            if not value:
-                errors.append("ШАГ %s — %s: нет строки «%s:» или она пустая" % (m.group(1), skill, field))
+        for name in FIELDS:
+            if name == "Пункт GAP" and skill in NO_GAP_TEXT:
+                continue
+            if not field(block, name):
+                errors.append("%s: нет строки «%s:» или она пустая" % (where, name))
+        point = field(block, "Пункт GAP")
+        if not point or skill in NO_GAP_TEXT or not items:
+            continue
+        nums = [int(n) for n in re.findall(r"GAP\s*(\d+)", point)]
+        if not nums:
+            errors.append("%s: в «Пункт GAP:» нет номера («GAP k — текст пункта»)" % where)
+            continue
+        npoint = norm(re.sub(r"GAP\s*\d+\s*[—–:-]?", " ", point))
+        question = field(block, "Вопрос")
+        narrowed = field(block, "Сужение")
+        for n in nums:
+            if n not in items:
+                errors.append("%s: GAP %d нет в ТЗ" % (where, n))
+                continue
+            if items[n] not in npoint:
+                errors.append("%s: «Пункт GAP:» не совпадает с GAP %d в ТЗ дословно — скопируй пункт целиком, "
+                              "с подпунктами" % (where, n))
+            lost = [p for p in parts(raw_items[n]) if not (stems(p) & stems(question))]
+            if lost and not narrowed:
+                errors.append("%s: в «Вопрос:» не видно частей GAP %d: %s — добавь их или строку «Сужение:» "
+                              "(что убрано и почему)" % (where, n, " | ".join(lost)))
+            if re.search(r"\bвеб\b", question, re.I) and answers.get(n) is not None and "веб" not in answers[n] \
+                    and not field(block, "Пересмотр"):
+                errors.append("%s: канал «веб» по GAP %d, а в ТЗ ответ помечен «%s» — нет строки «Пересмотр:» с "
+                              "причиной" % (where, n, ", ".join(sorted(answers[n]))))
+
+    requests = 0
+    for m in re.finditer(r"^\s*Запрос данных\s+(D-\d+)", text, re.M):
+        requests += 1
+        rest = text[m.end():].split("\n", 1)[-1]
+        stop = re.search(r"^[ \t]*$|^ШАГ\s+\d|^\s*Запрос данных\s+D-\d", rest, re.M)
+        block = rest[:stop.start()] if stop else rest
+        if not field(block, "Если данных не будет"):
+            errors.append("%s: нет строки «Если данных не будет:» — дешёвая замена и чего она не покажет" % m.group(1))
 
     os.makedirs(os.path.join(task, "checks"), exist_ok=True)
-    out = ["# Шаги-источники в логе: " + os.path.basename(task), "", "Шагов-источников: %d" % checked, "", "## Ошибки"]
+    out = ["# Шаги-источники в логе: " + os.path.basename(task), "",
+           "Шагов-источников: %d, запросов данных: %d" % (checked, requests), "", "## Ошибки"]
     out += ["- " + e for e in errors] or ["- нет"]
     open(os.path.join(task, "checks", "log-sources.md"), "w", encoding="utf-8").write("\n".join(out) + "\n")
     for e in errors:
         print("лог: " + e)
     if not errors:
-        print("Шаги-источники: %d, ошибок нет." % checked)
+        print("Шаги-источники: %d, запросов данных: %d, ошибок нет." % (checked, requests))
     return 1 if errors else 0
 
 

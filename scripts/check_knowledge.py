@@ -8,6 +8,9 @@
    с заполненными полями «прочитан» и «к каким пунктам GAP относится». Для «не относится» нужна причина.
 2. По каждому пункту GAP из `00-tz.md` есть раздел «GAP k», и в нём непустая строка «Чего нет».
 3. Файл, отмеченный «прочитан частично», — предупреждение, а не ошибка: так и должно быть написано, если не дочитан.
+4. Нет выведенных связей. Слова «совпадает», «связано», «из-за», «потому что», «объясняет», «указывает на» и похожие
+   вне цитат — это вывод, а не фрагмент: следующий шаг примет его за факт. Допустимо только как пометка
+   «[рядом, связь не проверена]» в строке, где оба фрагмента приведены дословно с id. Строки «Чего нет» не проверяются.
 
 Цитаты в карте проверяет `check_quotes.py`, как в любом артефакте. Ошибка — код возврата 1.
 Отчёт: tasks/<папка>/checks/knowledge.md. Нет `00k-knowledge.md` — проверять нечего.
@@ -31,6 +34,33 @@ def context_ids(task):
         return []
     with open(path, encoding="utf-8") as f:
         return [r["id"] for r in csv.DictReader(f) if r.get("kind") == "context"]
+
+
+LINK = re.compile(r"совпада\w*|совпадени\w*|связан\w*|\bсвязь\b|\bсвязи\b|из-за|потому что|поэтому|коррелир\w*|"
+                  r"объясня\w*|объясн\w+ тем|вызван\w*|приводит к|привел\w* к|следстви\w*|указыва\w* на|говорит о том", re.I)
+LINK_OK = "[рядом, связь не проверена]"
+BLOCKS = re.compile(r"^\s*(Уже известно|Утверждения команды|Противоречия|Чего нет)\b", re.I)
+
+
+def links(kn):
+    """Строки с выведенной связью вне цитат: (номер строки, слово)."""
+    found, block = [], ""
+    for i, line in enumerate(kn.splitlines(), 1):
+        b = BLOCKS.match(line)
+        if b:
+            block = b.group(1).lower()
+        elif re.match(r"^\s*\**(GAP\s+\d+|\d+\.\s+[А-ЯЁA-Z]{3,})", line):
+            block = ""
+        if block == "чего нет" or line.lstrip().startswith("|"):
+            continue
+        bare = re.sub(r"«[^»]*»", " ", line)
+        m = LINK.search(bare)
+        if not m:
+            continue
+        if LINK_OK in line and len(re.findall(r"«[^»]+»\s*\[F-\d+\]", line)) >= 2:
+            continue
+        found.append((i, m.group(0).lower()))
+    return found
 
 
 def section(text, title_re):
@@ -91,6 +121,10 @@ def main():
         cm = re.search(r"Чего нет:\s*\n?((?:\s*[-—].*\n?)+|.*)", block)
         if not cm or not cm.group(1).strip().strip("-— ").strip():
             errors.append("GAP %d: пустая строка «Чего нет»" % n)
+
+    for i, word in links(kn):
+        errors.append("строка %d: «%s» вне цитаты — это вывод, а не фрагмент; оставь два фрагмента рядом с пометкой "
+                      "«%s» или убери" % (i, word, LINK_OK))
 
     os.makedirs(os.path.join(task, "checks"), exist_ok=True)
     out = ["# Разбор материалов: " + os.path.basename(task), "",
