@@ -68,7 +68,7 @@ def index_places():
     places = set()
     for line in open(INDEX, encoding="utf-8"):
         cells = [c.strip() for c in line.strip().strip("|").split("|")]
-        if len(cells) >= 2 and re.match(r"^(?:M\d+|[ЭДКО]\s·|Приложение)", cells[1]):
+        if len(cells) >= 2 and re.match(r"^(?:M\d+|[ЭДКОП]\s·|Приложение)", cells[1]):
             for part in cells[1].split(";"):
                 places.add(norm(part))
     return places
