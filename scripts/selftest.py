@@ -175,6 +175,9 @@ def fresh_tests(root):
     w("«свежий тариф» [F-002]. Бриф: «старое» [F-004].\nНа форуме в 2015 году жаловались: «долго» [F-001].\n")
     r = run([cf, d, "src-x.md", "--today", "2026-10-01"])
     expect("свежесть: старый источник с годом в тексте проходит", r.returncode == 0, r.stdout)
+    w("Вывод.\n\nСЧЁТ ОПОР (считает scripts/trust_map.py)\n\nПроверки смысла: отчётов нет\n  не сверено: источник [F-001]\n\n**Проверить вручную**\n")
+    r = run([cf, d, "src-x.md", "--today", "2026-10-01"])
+    expect("свежесть: блок СЧЁТ ОПОР не разбирается", r.returncode == 0, r.stdout)
     w("Клиенты жалуются: «долго» [F-001].\n«без даты» [F-003]\n")
     r = run([cf, d, "src-x.md", "--today", "2026-10-01"])
     expect("свежесть: старый источник без года пойман, без даты — предупреждение",
@@ -375,6 +378,19 @@ def readers_tests(root):
     open(pdf, "wb").write(b"%PDF-1.4\n%%EOF\n")
     r = run([add, "--task", d, "--kind", "context", "--location", pdf, "--ctx-type", "claim"])
     expect("битый PDF даёт понятную ошибку, а не пустой источник", r.returncode != 0 and ("check_env" in r.stderr + r.stdout or "текстового слоя" in r.stderr + r.stdout), r.stderr + r.stdout)
+    mh = os.path.join(root, "context", "page.mhtml")
+    open(mh, "w", encoding="utf-8").write(
+        "From: <Saved by test>\nMIME-Version: 1.0\nContent-Type: multipart/related; boundary=\"BND\"\n\n--BND\n"
+        "Content-Type: text/html; charset=utf-8\nContent-Transfer-Encoding: quoted-printable\n\n"
+        "<html><body><p>=D0=9F=D1=80=D0=BE=D0=B1=D0=BD=D0=B0=D1=8F =D1=81=D1=82=D1=80=D0=B0=D0=BD=D0=B8=D1=86=D0=B0 =D0=BF=D1=80=D0=BE =D1=82=D0=B0=D1=80=D0=B8=D1=84: =D1=82=D0=B5=D0=BA=D1=81=D1=82 =D0=BD=D0=B0=D0=BF=D0=B8=D1=81=D0=B0=D0=BD =D1=82=D0=BE=D0=BB=D1=8C=D0=BA=D0=BE =D0=B4=D0=BB=D1=8F =D0=BF=D1=80=D0=BE=D0=B2=D0=B5=D1=80=D0=BA=D0=B8 =D1=87=D1=82=D0=B5=D0=BD=D0=B8=D1=8F =D1=81=D0=BE=D1=85=D1=80=D0=B0=D0=BD=D1=91=D0=BD=D0=BD=D1=8B=D1=85 =D1=81=D1=82=D1=80=D0=B0=D0=BD=D0=B8=D1=86.</p></body></html>\n--BND--\n")
+    r = run([add, "--task", d, "--kind", "context", "--location", mh, "--ctx-type", "result"])
+    raw = open(os.path.join(d, "sources", "raw", r.stdout.strip() + ".txt"), encoding="utf-8").read() if r.returncode == 0 else ""
+    expect(".mhtml: кириллица декодирована, теги убраны", "Пробная страница про тариф" in raw and "=D0" not in raw and "<p>" not in raw, r.stderr + raw)
+    sx = os.path.join(root, "context", "secret.txt")
+    open(sx, "w", encoding="utf-8").write("Файл с расчётом.\nпароль: abc12345\n")
+    r = run([add, "--task", d, "--kind", "context", "--location", sx, "--ctx-type", "claim"])
+    expect("пароль в тексте: предупреждение с номером строки, без значения",
+           r.returncode == 0 and "строках 2" in r.stderr and "abc12345" not in r.stderr, r.stderr)
     e = run([os.path.join(HERE, "check_env.py")])
     expect("check_env печатает отчёт", e.returncode == 0 and "Чтение PDF с текстом" in e.stdout, e.stdout + e.stderr)
 
@@ -540,6 +556,21 @@ def main():
         expect("пересечение в value не мешает: настоящее противоречие поймано", "настоящее противоречие" in c2.stdout, c2.stdout)
         os.remove(os.path.join(task, "src-num.md"))
 
+        n4 = run([an, "--task", task, "--kind", "derived", "--key", "root", "--what", "корень из 4", "--formula", "sqrt(N-001 - N-001 + 4) + N-001 ** 2 - N-001 ** 2",
+                  "--value", "2", "--unit", "шт"])
+        expect("формула: sqrt и степень принимаются", n4.returncode == 0, n4.stderr)
+        n5 = run([an, "--task", task, "--kind", "derived", "--key", "z", "--what", "квантиль", "--formula", "ppf(0.975)", "--value", "1.96", "--unit", "z"])
+        expect("формула: обратная функция нормального распределения принимается", n5.returncode == 0, n5.stderr)
+        expect("формула: степень больше предела отклонена",
+               run([an, "--task", task, "--kind", "derived", "--key", "big", "--what", "x", "--formula", "N-001 ** 99", "--value", "1", "--unit", "шт"]).returncode == 2)
+        expect("add_number -h работает (знак процента в справке)", run([an, "-h"]).returncode == 0)
+        open(os.path.join(task, "src-blk.md"), "w", encoding="utf-8").write(
+            "Вывод.\n\nСЧЁТ ОПОР (считает scripts/trust_map.py)\n\nЧисел: 3\n  допущение [N-002] доля = 0.5 доля — причина\n\nПроверки смысла: отчётов нет\n\n**Проверить вручную**\nРост [N-001] 99%.\n")
+        cb = run([cn, task])
+        expect("блок СЧЁТ ОПОР не разбирается проверкой чисел, текст за блоком — разбирается",
+               "src-blk.md: рядом с [N-002]" not in cb.stdout and "src-blk.md: рядом с [N-001]" in cb.stdout, cb.stdout)
+        os.remove(os.path.join(task, "src-blk.md"))
+
         tm = run([os.path.join(HERE, "trust_map.py"), task])
         expect("счёт опор считается", "независимых корней:" in tm.stdout and "Чисел:" in tm.stdout and "Проверки смысла:" in tm.stdout, tm.stdout)
         expect("счёт опор: допущения перечислены", "допущение [N-002]" in tm.stdout, tm.stdout)
@@ -659,6 +690,7 @@ def main():
         shutil.copy(cq, os.path.join(root, "scripts", "check_quotes.py"))
         shutil.copy(cn, os.path.join(root, "scripts", "check_numbers.py"))
         shutil.copy(an, os.path.join(root, "scripts", "add_number.py"))
+        shutil.copy(os.path.join(HERE, "trust_block.py"), os.path.join(root, "scripts", "trust_block.py"))
         shutil.copy(cq, os.path.join(root, "scripts", "check_quotes.py"))
         os.remove(os.path.join(task, "src-bad.md"))
         open(os.path.join(task, "src-n.md"), "w", encoding="utf-8").write("Фантом числа [N-077]. Рост 12% [N-001].\n")

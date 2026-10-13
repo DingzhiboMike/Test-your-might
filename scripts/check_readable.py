@@ -124,7 +124,7 @@ def main():
                 errors.append("%s:%d — слово системы «%s»" % (f, i, m.group(0).lower()))
         words = len(re.findall(r"\w+", text))
         if words > LIMITS[f]:
-            errors.append("%s: %d слов при лимите %d — сократи" % (f, words, LIMITS[f]))
+            errors.append("%s: %d слов при лимите %d — сократи не менее чем на %d" % (f, words, LIMITS[f], words - LIMITS[f]))
         items = len(re.findall(r"^(?:##\s+\d+\.|\d+\.\s)", text, re.M))
         if f in ("07a-analyst.md", "07c-decisions.md") and items > 10:
             errors.append("%s: %d пунктов при лимите 10" % (f, items))

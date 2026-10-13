@@ -27,7 +27,9 @@ PyMuPDF или pypdf, что найдётся (скан или слайды бе
 import argparse
 import csv
 import datetime
+import email
 import hashlib
+import html as html_lib
 import os
 import re
 import subprocess
@@ -206,8 +208,52 @@ def read_pptx(path):
         fail("не удалось прочитать .pptx ({}): {}".format(path, e))
 
 
+def read_mhtml(path):
+    """Страница, сохранённая браузером (.mhtml/.mht): части письма декодируются, берётся текст html-части.
+
+    Без декодирования кириллица лежит в quoted-printable («=D0=9F…»), и цитаты по такому тексту не сверить.
+    """
+    with open(path, "rb") as f:
+        msg = email.message_from_binary_file(f)
+    parts = []
+    for part in msg.walk():
+        if part.get_content_type() == "text/html":
+            raw = part.get_payload(decode=True) or b""
+            parts.append(raw.decode(part.get_content_charset() or "utf-8", "replace"))
+    if not parts:
+        fail("в .mhtml нет html-части: {}".format(path))
+    page = max(parts, key=len)
+    try:
+        import trafilatura
+        text = trafilatura.extract(page, include_tables=True, include_comments=False) or ""
+    except ImportError:
+        text = ""
+    if not text.strip():
+        page = re.sub(r"(?is)<(script|style).*?</\1>", " ", page)
+        text = html_lib.unescape(re.sub(r"(?s)<[^>]+>", " ", page))
+        text = re.sub(r"[ \t]+", " ", re.sub(r"\n\s*\n+", "\n", text))
+    if not has_text(text):
+        fail("из .mhtml не удалось получить текст: {}".format(path))
+    return text
+
+
+SECRET_RE = re.compile(
+    r"(?i)(парол[ьяюе]|password|passwd|pwd|логин|login|secret|api[_ -]?key|токен|token)\s*[:=)(-]+\s*\S{3,}"
+    r"|\bBearer\s+[A-Za-z0-9._-]{12,}|\bsk-[A-Za-z0-9]{16,}")
+
+
+def warn_secrets(text, label):
+    """Предупреждение, если в тексте похоже на пароль, логин или ключ: номера строк, без значений."""
+    lines = [i for i, ln in enumerate(text.splitlines(), 1) if SECRET_RE.search(ln)]
+    if lines:
+        sys.stderr.write("add_source: ВНИМАНИЕ {}: похоже на пароль, логин или ключ в строках {} — значения в артефакты "
+                         "не переноси, из исходного файла убери сам\n".format(label, ", ".join(map(str, lines[:10]))))
+
+
 def read_local(path):
     low = path.lower()
+    if low.endswith((".mhtml", ".mht")):
+        return read_mhtml(path)
     if low.endswith(".docx"):
         return read_docx(path)
     if low.endswith(".pdf"):
@@ -329,6 +375,7 @@ def main():
     os.makedirs(raw_dir, exist_ok=True)
     rows = read_rows(reg)
 
+    warn_secrets(text, a.location)
     sha = hashlib.sha256(text.encode("utf-8")).hexdigest()
     for r in rows:
         if r["location"] == a.location and r["sha256"] == sha:

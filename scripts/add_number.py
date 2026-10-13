@@ -9,7 +9,8 @@
       --what "число компаний в сегменте" --value 12400 --unit "компаний" --as-written "12,4 тыс." \
       --scope "<рынок, сегмент>" --period 2025-12 --source F-007 --fragment "насчитывалось 12,4 тыс. организаций"
 
-Производное — только формулой из других чисел реестра, скрипт пересчитывает сам:
+Производное — только формулой из других чисел реестра, скрипт пересчитывает сам. Допустимы + - * / ** (степень — числом),
+sqrt, ln, exp, phi (функция нормального распределения), ppf (обратная к ней):
   python3 scripts/add_number.py --task tasks/<папка> --kind derived --key need_clients \
       --what "нужно клиентов под цель" --formula "N-001 / N-002" --value 834 --unit "клиентов"
 
@@ -22,10 +23,12 @@
 import argparse
 import ast
 import csv
+import math
 import operator
 import os
 import re
 import sys
+from statistics import NormalDist
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from check_quotes import norm  # noqa: E402
@@ -34,6 +37,10 @@ FIELDS = ["id", "key", "kind", "what", "value", "unit", "as_written", "scope", "
           "source", "fragment", "formula", "note"]
 KINDS = {"fact", "derived", "assumption"}
 OPS = {ast.Add: operator.add, ast.Sub: operator.sub, ast.Mult: operator.mul, ast.Div: operator.truediv}
+# функции формул: sqrt, ln, exp, phi (функция нормального распределения), ppf (её обратная)
+FUNCS = {"sqrt": math.sqrt, "ln": math.log, "exp": math.exp,
+         "phi": lambda x: NormalDist().cdf(x), "ppf": lambda p: NormalDist().inv_cdf(p)}
+MAX_POWER = 10
 TOLERANCE = 0.01  # 1%: округление при записи
 
 
@@ -62,6 +69,22 @@ def evaluate(formula, values):
             return ev(n.body)
         if isinstance(n, ast.BinOp) and type(n.op) in OPS:
             return OPS[type(n.op)](ev(n.left), ev(n.right))
+        if isinstance(n, ast.BinOp) and isinstance(n.op, ast.Pow):
+            if not (isinstance(n.right, ast.Constant) and isinstance(n.right.value, (int, float))
+                    and abs(n.right.value) <= MAX_POWER):
+                raise ValueError("степень — только число не больше {} по модулю: N-001 ** 2, N-001 ** 0.5".format(MAX_POWER))
+            try:
+                res = ev(n.left) ** n.right.value
+            except (ZeroDivisionError, OverflowError):
+                raise ValueError("степень не определена при таком основании")
+            if isinstance(res, complex):
+                raise ValueError("степень даёт комплексное число — основание должно быть неотрицательным")
+            return res
+        if isinstance(n, ast.Call) and isinstance(n.func, ast.Name) and n.func.id in FUNCS and len(n.args) == 1 and not n.keywords:
+            try:
+                return FUNCS[n.func.id](ev(n.args[0]))
+            except (ValueError, ZeroDivisionError, OverflowError):
+                raise ValueError("функция {} не определена при таком аргументе".format(n.func.id))
         if isinstance(n, ast.UnaryOp) and isinstance(n.op, ast.USub):
             return -ev(n.operand)
         if isinstance(n, ast.Constant) and isinstance(n.value, (int, float)):
@@ -71,7 +94,7 @@ def evaluate(formula, values):
             if nid not in values:
                 raise ValueError("в формуле {} нет в реестре чисел".format(nid))
             return values[nid]
-        raise ValueError("в формуле допустимы только числа, N-id и + - * /")
+        raise ValueError("в формуле допустимы только числа, N-id, + - * / **, sqrt, ln, exp, phi, ppf")
     return ev(tree)
 
 
@@ -86,7 +109,7 @@ def main():
     p.add_argument("--key", required=True, help="короткий ключ показателя латиницей: одинаковый у одного и того же показателя из разных источников")
     p.add_argument("--what", required=True, help="что именно измерено, словами")
     p.add_argument("--value", required=True, type=float, help="значение числом, без пробелов: 12400, 0.03")
-    p.add_argument("--unit", required=True, help="единица: компаний, руб., %, доля, руб./год")
+    p.add_argument("--unit", required=True, help="единица: компаний, руб., %%, доля, руб./год")
     p.add_argument("--as-written", default="", help="как число записано в источнике, если не совпадает с --value: «12,4 тыс.»")
     p.add_argument("--scope", default="", help="где: страна, регион, сегмент")
     p.add_argument("--period", default="", help="к какому периоду или дате относятся данные: 2025, 2025-Q3, 2025-12")
