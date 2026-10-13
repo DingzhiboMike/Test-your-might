@@ -390,6 +390,28 @@ def polygon_tests(root):
     expect("полигон: пустой ответ — ноль, а не падение", s3.returncode == 0 and "0%" in s3.stdout, s3.stdout + s3.stderr)
 
 
+def fixture_tests(root):
+    fx = os.path.join(HERE, "fixture.py")
+    d = os.path.join(root, "tasks", "fx")
+    r = run([fx, "make", "light", "--task", d, "--upto", "review"])
+    expect("фикстура: разворачивается до разбора консультанта",
+           r.returncode == 0 and os.path.exists(os.path.join(d, "01-review.md")), r.stdout + r.stderr)
+    d2 = os.path.join(root, "tasks", "fx2")
+    run([fx, "make", "light", "--task", d2, "--upto", "tz"])
+    expect("фикстура: до шага «tz» нет артефактов следующих шагов",
+           os.path.exists(os.path.join(d2, "00-tz.md")) and not os.path.exists(os.path.join(d2, "00k-knowledge.md")))
+    expect("фикстура: непустая папка не перезаписывается", run([fx, "make", "light", "--task", d]).returncode != 0)
+    q = run([os.path.join(HERE, "check_quotes.py"), d, "00k-knowledge.md"])
+    q2 = run([os.path.join(HERE, "check_quotes.py"), d, "01-review.md"])
+    expect("фикстура: цитаты карты знания и разбора сходятся с сырым текстом", q.returncode == 0 and q2.returncode == 0, q.stdout + q2.stdout)
+    k = run([os.path.join(HERE, "check_knowledge.py"), d])
+    expect("фикстура: карта знания покрывает все файлы контекста", k.returncode == 0, k.stdout)
+    pth = run([os.path.join(HERE, "check_path.py"), d, "--plan"])
+    expect("фикстура: путь консультанта проходит проверку пути", pth.returncode == 0, pth.stdout)
+    tz = run([os.path.join(HERE, "check_path.py"), d, "--tz"])
+    expect("фикстура: ТЗ проходит проверку пометок «где ответ»", tz.returncode == 0, tz.stdout)
+
+
 def readers_tests(root):
     import zipfile
     add = os.path.join(HERE, "add_source.py")
@@ -752,6 +774,7 @@ def main():
         step_tests(root)
         log_sources_tests(root)
         polygon_tests(root)
+        fixture_tests(root)
         path_tests(root)
         knowledge_tests(root)
         knowledge_links_tests(root)
