@@ -133,6 +133,8 @@ def log_sources_tests(root):
             "Вопрос:   где искать отзывы, как их отбирать и как построить выборку; веб; три площадки и правило отбора; 10 запросов\n"
             "Зачем:    без этого проверка по сути опирается на случайные отзывы\nУже известно: нет\n\n"
             "Запрос данных D-1\nВопрос:      доля бросивших по тарифам\nЧто снять:   выгрузка\n"
+            "Метрика:     доля бросивших = бросили / начали пробный; окно 30 дней\nОдна строка: один клиент\n"
+            "Сверка:      итог около 4 000 клиентов; главнее отчёт подписок\n"
             "Если данных не будет: 10 звонков бросившим за неделю; не покажет долю, только причины\n\n"
             "ШАГ 4 — hypothesis-generator\nДыра: гипотезы\n")
     w = lambda t: open(os.path.join(d, "log.md"), "w", encoding="utf-8").write(t)
@@ -145,6 +147,11 @@ def log_sources_tests(root):
     w(good.replace("Зачем:    без этого генератор угадает причину\n", tool_line + "Зачем:    без этого генератор угадает причину\n"))
     r = run([cl, d])
     expect("лог: «Инструмент» из указателя принят", r.returncode == 0 and "указателе" not in r.stdout, r.stdout)
+    for ref in ("Д · Шаблон запроса", "К · Паспорт источника", "О · Оценка Ферми: порядок величины", "П · Окупаемость акции",
+                "Ж · Этапы: по состоянию, а не по календарю", "С · Граница категории"):
+        w(good.replace("Зачем:    без этого генератор угадает причину\n", "Инструмент: %s — почему\nЗачем:    без этого генератор угадает причину\n" % ref))
+        r = run([cl, d])
+        expect("лог: «Инструмент» %s принят" % ref[:1], r.returncode == 0 and "указателе" not in r.stdout, r.stdout)
     w(good.replace("Зачем:    без этого генератор угадает причину\n", "Инструмент: M99 · Выдуманный раздел\nЗачем:    без этого генератор угадает причину\n"))
     r = run([cl, d])
     expect("лог: «Инструмент» не из указателя — ошибка", r.returncode == 1 and "указателе" in r.stdout, r.stdout)
@@ -173,6 +180,12 @@ def log_sources_tests(root):
     w(good.replace("Если данных не будет: 10 звонков бросившим за неделю; не покажет долю, только причины\n", ""))
     r = run([cl, d])
     expect("лог: запрос данных без дешёвой замены — пойман", r.returncode == 1 and "D-1" in r.stdout, r.stdout)
+    for field_name in ("Метрика", "Одна строка", "Сверка"):
+        lines = [ln for ln in good.split("\n") if ln.startswith(field_name)]
+        w(good.replace("\n".join(lines) + "\n", "") if lines else good)
+        r = run([cl, d])
+        expect("лог: запрос данных без строки «%s» — пойман" % field_name,
+               r.returncode == 1 and field_name in r.stdout, r.stdout)
 
 
 def fresh_tests(root):
@@ -410,6 +423,24 @@ def fixture_tests(root):
     expect("фикстура: путь консультанта проходит проверку пути", pth.returncode == 0, pth.stdout)
     tz = run([os.path.join(HERE, "check_path.py"), d, "--tz"])
     expect("фикстура: ТЗ проходит проверку пометок «где ответ»", tz.returncode == 0, tz.stdout)
+
+
+def sensitivity_tests(root):
+    sv = os.path.join(HERE, "sensitivity.py")
+    an = os.path.join(HERE, "add_number.py")
+    d = os.path.join(root, "tasks", "sens")
+    os.makedirs(d)
+    for key, val in (("total", "4200"), ("f1", "0.325"), ("f2", "0.65")):
+        run([an, "--task", d, "--kind", "assumption", "--key", key, "--what", key, "--value", val, "--unit", "шт", "--note", "тест"])
+    r = run([sv, "--task", d, "--formula", "N-001 * N-002 * N-003", "--range", "N-002=0.25..0.40",
+             "--range", "N-003=0.55..0.75", "--threshold", "800"])
+    expect("чувствительность: параметры упорядочены по размаху", r.returncode == 0 and "N-002 > N-003" in r.stdout, r.stdout + r.stderr)
+    expect("чувствительность: итог при базовых значениях посчитан", "887.25" in r.stdout, r.stdout)
+    expect("чувствительность: порог пересекается внутри диапазона", "вывод меняется внутри диапазона" in r.stdout, r.stdout)
+    expect("чувствительность: параметра нет в реестре — ошибка",
+           run([sv, "--task", d, "--formula", "N-001 * N-002", "--range", "N-009=1..2"]).returncode != 0)
+    expect("чувствительность: неверная формула — ошибка, а не падение",
+           "формула не считается" in run([sv, "--task", d, "--formula", "N-001 / 0", "--range", "N-002=1..2"]).stderr)
 
 
 def readers_tests(root):
@@ -775,6 +806,7 @@ def main():
         log_sources_tests(root)
         polygon_tests(root)
         fixture_tests(root)
+        sensitivity_tests(root)
         path_tests(root)
         knowledge_tests(root)
         knowledge_links_tests(root)
