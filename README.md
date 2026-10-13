@@ -16,7 +16,7 @@
 
 ## Архитектура
 
-![Роли, хранилища и маршрут](docs/architecture-1-roles.png)
+![Роли, хранилища, маршрут и контур эксперимента](docs/architecture-1-roles.png)
 
 ![Маршруты по типам выхода](docs/architecture-2-routes.png)
 
