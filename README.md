@@ -20,8 +20,6 @@
 
 ![Маршруты по типам выхода](docs/architecture-2-routes.png)
 
-![Пример прогона: валидация идеи](docs/architecture-3-example.png)
-
 
 ## Что внутри
 
