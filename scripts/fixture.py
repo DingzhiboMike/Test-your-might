@@ -20,6 +20,7 @@ import argparse
 import os
 import shutil
 import sys
+import time
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.dirname(HERE)
@@ -59,6 +60,11 @@ def main():
         done.append(stage)
         if stage == a.upto:
             break
+    # файлы фикстуры «старше» любого теста: проверка периметра (check_artifact --since) не примет их за правки шага
+    old = time.time() - 60
+    for dirpath, _, files in os.walk(a.task):
+        for f in files:
+            os.utime(os.path.join(dirpath, f), (old, old))
     open(os.path.join(a.task, "log.md"), "w", encoding="utf-8").write(
         "# Лог задачи (фикстура %s)\n\nШаги до «%s» взяты из фикстуры, не выполнялись.\n" % (a.name, a.upto))
     print("фикстура %s развёрнута в %s до шага: %s" % (a.name, a.task, ", ".join(done)))
