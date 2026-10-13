@@ -19,6 +19,9 @@ import os
 import re
 import sys
 
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from trust_block import mask_trust_block  # noqa: E402
+
 
 def parse_date(value):
     m = re.match(r"^(\d{4})(?:-(\d{2}))?(?:-(\d{2}))?$", value or "")
@@ -49,7 +52,7 @@ def main():
         if not os.path.exists(path):
             continue
         name = os.path.basename(path)
-        for i, line in enumerate(open(path, encoding="utf-8").read().splitlines(), 1):
+        for i, line in enumerate(mask_trust_block(open(path, encoding="utf-8").read()).splitlines(), 1):
             for sid in re.findall(r"\b(F-\d+)\b", line):
                 row = web.get(sid)
                 if not row:

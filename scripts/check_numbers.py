@@ -22,6 +22,7 @@ from collections import defaultdict
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from check_quotes import norm  # noqa: E402
 from add_number import evaluate, close  # noqa: E402
+from trust_block import mask_trust_block  # noqa: E402
 
 SKIP = {"log.md", "00-tz.md"}
 REF_RE = re.compile(r"\[(N-\d{3,})\]")
@@ -95,7 +96,7 @@ def main():
     names = sorted(n for n in os.listdir(task) if n.endswith(".md") and n not in SKIP)
     cited = defaultdict(set)
     for name in names:
-        text = open(os.path.join(task, name), encoding="utf-8").read()
+        text = mask_trust_block(open(os.path.join(task, name), encoding="utf-8").read())
         for m in REF_RE.finditer(text):
             nid = m.group(1)
             cited[nid].add(name)
