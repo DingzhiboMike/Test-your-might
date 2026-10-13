@@ -1,3 +1,0 @@
-id,kind,location,level,ctx_type,author,pub_date,data_date,opened,read,method,root,status,fetched,sha256,chars,note,ts
-F-001,context,context/note-team.md,,claim,команда продукта,unknown,unknown,2026-10-13,full,raw,self,unknown,file,1e697f7d27d5f0adbe64674396675619efdec8e7d332364298540a18f5dab9a4,425,,1791888549
-F-002,context,context/report-old-test.md,,data,отчёт прошлого A/B-теста,unknown,unknown,2026-10-13,full,raw,self,final,file,dd2830d30fae258d048c17f80cb70e217cfb2a0470184e08b9b875715438e5b1,650,,1791888549
