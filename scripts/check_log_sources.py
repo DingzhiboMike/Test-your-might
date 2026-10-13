@@ -3,12 +3,16 @@
 
   python3 scripts/check_log_sources.py tasks/<папка>
 
-Шаг-источник — заголовок «ШАГ N — <скилл>», где скилл один из семи источников данных. В его блоке (до следующего
+Шаг-источник — заголовок «ШАГ N — <скилл>», где скилл один из восьми источников данных. В его блоке (до следующего
 «ШАГ» или конца лога) должны быть строки:
 - «Вопрос:»       — вопрос, канал, критерий ответа до поиска, бюджет запросов;
 - «Зачем:»        — что без этого ответа генератору или проверке по сути пришлось бы угадывать;
 - «Уже известно:» — что по вопросу уже лежит в контексте и реестре; утверждения команды — с пометкой «проверяется»;
 - «Пункт GAP:»    — пункт GAP из ТЗ дословно, с номером («GAP 3 — …»). Текст сверяется с `00-tz.md`.
+
+Строка «Инструмент:» — инструмент методологии из раздела «Подбирать инструмент» указателя (`methodology/tools-index.md`)
+и почему; «—», если подходящего нет. Её отсутствие — предупреждение (старые логи её не знают); указанная строка,
+которой нет в указателе, — ошибка.
 
 Вопрос шага не уже пункта GAP. Если в пункте несколько частей («где искать / как отбирать / как строить», части
 через « / » или «;»), каждая часть должна быть видна в строке «Вопрос:» — или в блоке есть строка «Сужение:»: что
@@ -30,7 +34,7 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from check_path import ANSWER, gap_answers, gap_items  # noqa: E402
 
 SOURCES = ("interview-analyst", "interview-synthesis", "market-analyze", "target-audience-analyst",
-           "alternatives-analyst", "customer-path", "market-sizing")
+           "alternatives-analyst", "customer-path", "market-sizing", "experiment-review")
 FIELDS = ("Вопрос", "Зачем", "Уже известно", "Пункт GAP")
 STEP = re.compile(r"^ШАГ\s+(\d+)\s*[—-]\s*([\w-]+)", re.M)
 # Пачка разборов интервью идёт по файлам контекста, а не по вопросу пункта GAP — для неё пункт GAP не сверяется.
@@ -54,6 +58,22 @@ def parts(item):
     return ps if len(ps) > 1 else []
 
 
+INDEX = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "methodology", "tools-index.md")
+
+
+def index_places():
+    """Все строки «Где» из таблиц указателя (ячейка делится по «;»), в нормализованном виде."""
+    if not os.path.exists(INDEX):
+        return set()
+    places = set()
+    for line in open(INDEX, encoding="utf-8"):
+        cells = [c.strip() for c in line.strip().strip("|").split("|")]
+        if len(cells) >= 2 and re.match(r"^(?:M\d+|Э|Приложение)", cells[1]):
+            for part in cells[1].split(";"):
+                places.add(norm(part))
+    return places
+
+
 def field(block, name):
     f = re.search(r"^\s*%s:[ \t]*(.*)$" % re.escape(name), block, re.M)
     return f.group(1).strip(" —-–\t") if f else ""
@@ -75,7 +95,7 @@ def main():
     raw_items = gap_items(tz)
     answers = gap_answers(tz)
     heads = list(STEP.finditer(text))
-    errors, checked = [], 0
+    errors, warns, checked = [], [], 0
     for i, m in enumerate(heads):
         skill = m.group(2)
         if skill not in SOURCES:
@@ -88,6 +108,15 @@ def main():
                 continue
             if not field(block, name):
                 errors.append("%s: нет строки «%s:» или она пустая" % (where, name))
+        tool = re.search(r"^\s*Инструмент:[ \t]*(.*)$", block, re.M)
+        if not tool:
+            warns.append("%s: нет строки «Инструмент:» (инструмент методологии или «—»)" % where)
+        elif tool.group(1).strip() and not tool.group(1).strip().startswith(("—", "-", "–")):
+            places = index_places()
+            val = norm(tool.group(1))
+            if places and not any(pl in val for pl in places):
+                errors.append("%s: «Инструмент:» не найден в указателе методологии (раздел «Подбирать инструмент» или другие "
+                              "таблицы): %s" % (where, tool.group(1).strip()[:80]))
         point = field(block, "Пункт GAP")
         if not point or skill in NO_GAP_TEXT or not items:
             continue
@@ -127,9 +156,12 @@ def main():
     out = ["# Шаги-источники в логе: " + os.path.basename(task), "",
            "Шагов-источников: %d, запросов данных: %d" % (checked, requests), "", "## Ошибки"]
     out += ["- " + e for e in errors] or ["- нет"]
+    out += ["", "## Предупреждения"] + (["- " + w for w in warns] or ["- нет"])
     open(os.path.join(task, "checks", "log-sources.md"), "w", encoding="utf-8").write("\n".join(out) + "\n")
     for e in errors:
         print("лог: " + e)
+    for w in warns:
+        print("лог (внимание): " + w)
     if not errors:
         print("Шаги-источники: %d, запросов данных: %d, ошибок нет." % (checked, requests))
     return 1 if errors else 0
