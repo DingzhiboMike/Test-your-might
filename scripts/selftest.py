@@ -95,7 +95,7 @@ def readable_tests(root):
     expect("читаемость: документ валидации с [F-id] и словом «гипотеза» проходит", r.returncode == 0, r.stdout)
     open(os.path.join(d5, "06-validation.md"), "w", encoding="utf-8").write(val + "M1 · пройдена; слот пуст; см. D-1 и Г-2.\n")
     r = run([cr, d5])
-    expect("читаемость: модуль курса, слот, D-1 и Г-2 в документе валидации пойманы", r.returncode == 1 and "номер гипотезы" in r.stdout and "слово системы" in r.stdout, r.stdout)
+    expect("читаемость: модуль методологии, слот, D-1 и Г-2 в документе валидации пойманы", r.returncode == 1 and "номер гипотезы" in r.stdout and "слово системы" in r.stdout, r.stdout)
     d3 = os.path.join(root, "tasks", "rd3")
     os.makedirs(d3)
     open(os.path.join(d3, "00-tz.md"), "w", encoding="utf-8").write("**ТИП ВЫХОДА:** ТЗ на доработку\n")
@@ -139,6 +139,18 @@ def log_sources_tests(root):
     w(good)
     r = run([cl, d])
     expect("лог: шаги-источники с дословным пунктом GAP и запрос данных с заменой проходят", r.returncode == 0, r.stdout)
+    r = run([cl, d])
+    expect("лог: нет строки «Инструмент» — только предупреждение", r.returncode == 0 and "Инструмент" in r.stdout, r.stdout)
+    tool_line = "Инструмент: Э · Чувствительность: что тест мог увидеть — пункт про то, мог ли тест увидеть эффект\n"
+    w(good.replace("Зачем:    без этого генератор угадает причину\n", tool_line + "Зачем:    без этого генератор угадает причину\n"))
+    r = run([cl, d])
+    expect("лог: «Инструмент» из указателя принят", r.returncode == 0 and "указателе" not in r.stdout, r.stdout)
+    w(good.replace("Зачем:    без этого генератор угадает причину\n", "Инструмент: M99 · Выдуманный раздел\nЗачем:    без этого генератор угадает причину\n"))
+    r = run([cl, d])
+    expect("лог: «Инструмент» не из указателя — ошибка", r.returncode == 1 and "указателе" in r.stdout, r.stdout)
+    w(good.replace("Зачем:    без этого генератор угадает причину\n", "Инструмент: — подходящего нет\nЗачем:    без этого генератор угадает причину\n"))
+    r = run([cl, d])
+    expect("лог: «Инструмент: —» принят", r.returncode == 0, r.stdout)
     w(good.replace("Зачем:    без этого генератор угадает причину\n", "Зачем:    —\n"))
     r = run([cl, d])
     expect("лог: пустое «Зачем» у источника поймано", r.returncode == 1 and "Зачем" in r.stdout, r.stdout)
@@ -351,6 +363,31 @@ def knowledge_tests(root):
     open(os.path.join(d, "00k-knowledge.md"), "w", encoding="utf-8").write(good.replace("Чего нет:\n  - кто подписывает оплату в малых командах\n", "Чего нет:\n"))
     r = run([ck, d])
     expect("материалы: пустое «Чего нет» поймано", r.returncode == 1 and "GAP 2" in r.stdout, r.stdout)
+
+
+def polygon_tests(root):
+    import json as _json
+    pg = os.path.join(HERE, "polygon.py")
+    d = os.path.join(root, "pg")
+    os.makedirs(d)
+    r = run([pg, "make", "--seed", "1", "--reports", os.path.join(d, "r"), "--key-out", os.path.join(d, "key.json")])
+    expect("полигон: отчёты генерируются", r.returncode == 0 and len(os.listdir(os.path.join(d, "r"))) == 11, r.stdout + r.stderr)
+    expect("полигон: ключ вне папки отчётов", not os.path.exists(os.path.join(d, "r", "key.json")))
+    key = _json.load(open(os.path.join(d, "key.json"), encoding="utf-8"))
+    r2 = run([pg, "make", "--seed", "1", "--reports", os.path.join(d, "r2"), "--key-out", os.path.join(d, "key2.json")])
+    expect("полигон: тот же seed даёт тот же ключ", _json.load(open(os.path.join(d, "key2.json"), encoding="utf-8")) == key, r2.stderr)
+    perfect = "\n".join("%s | поле=%s | исход=%s | флаги=%s" % (
+        fid, v["поле"] or "—", v["исход"][0], ",".join(v["флаги"]) or "—") for fid, v in sorted(key.items()))
+    open(os.path.join(d, "good.md"), "w", encoding="utf-8").write("СВЕРКА\n" + perfect + "\n")
+    s = run([pg, "score", "--key", os.path.join(d, "key.json"), "--answer", os.path.join(d, "good.md"), "--min", "0.9"])
+    expect("полигон: точный ответ получает 100% по исходу", s.returncode == 0 and "100%" in s.stdout, s.stdout + s.stderr)
+    bad = perfect.replace("исход=", "исход=нет_данных_", 3)
+    open(os.path.join(d, "bad.md"), "w", encoding="utf-8").write(bad + "\n")
+    s2 = run([pg, "score", "--key", os.path.join(d, "key.json"), "--answer", os.path.join(d, "bad.md"), "--min", "0.9"])
+    expect("полигон: ошибки в ответе снижают точность и дают код 1", s2.returncode == 1 and "МИМО" in s2.stdout, s2.stdout)
+    open(os.path.join(d, "empty.md"), "w", encoding="utf-8").write("нет блока\n")
+    s3 = run([pg, "score", "--key", os.path.join(d, "key.json"), "--answer", os.path.join(d, "empty.md")])
+    expect("полигон: пустой ответ — ноль, а не падение", s3.returncode == 0 and "0%" in s3.stdout, s3.stdout + s3.stderr)
 
 
 def readers_tests(root):
@@ -714,6 +751,7 @@ def main():
         readable_tests(root)
         step_tests(root)
         log_sources_tests(root)
+        polygon_tests(root)
         path_tests(root)
         knowledge_tests(root)
         knowledge_links_tests(root)
