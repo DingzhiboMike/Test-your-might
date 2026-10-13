@@ -365,6 +365,31 @@ def knowledge_tests(root):
     expect("материалы: пустое «Чего нет» поймано", r.returncode == 1 and "GAP 2" in r.stdout, r.stdout)
 
 
+def polygon_tests(root):
+    import json as _json
+    pg = os.path.join(HERE, "polygon.py")
+    d = os.path.join(root, "pg")
+    os.makedirs(d)
+    r = run([pg, "make", "--seed", "1", "--reports", os.path.join(d, "r"), "--key-out", os.path.join(d, "key.json")])
+    expect("полигон: отчёты генерируются", r.returncode == 0 and len(os.listdir(os.path.join(d, "r"))) == 11, r.stdout + r.stderr)
+    expect("полигон: ключ вне папки отчётов", not os.path.exists(os.path.join(d, "r", "key.json")))
+    key = _json.load(open(os.path.join(d, "key.json"), encoding="utf-8"))
+    r2 = run([pg, "make", "--seed", "1", "--reports", os.path.join(d, "r2"), "--key-out", os.path.join(d, "key2.json")])
+    expect("полигон: тот же seed даёт тот же ключ", _json.load(open(os.path.join(d, "key2.json"), encoding="utf-8")) == key, r2.stderr)
+    perfect = "\n".join("%s | поле=%s | исход=%s | флаги=%s" % (
+        fid, v["поле"] or "—", v["исход"][0], ",".join(v["флаги"]) or "—") for fid, v in sorted(key.items()))
+    open(os.path.join(d, "good.md"), "w", encoding="utf-8").write("СВЕРКА\n" + perfect + "\n")
+    s = run([pg, "score", "--key", os.path.join(d, "key.json"), "--answer", os.path.join(d, "good.md"), "--min", "0.9"])
+    expect("полигон: точный ответ получает 100% по исходу", s.returncode == 0 and "100%" in s.stdout, s.stdout + s.stderr)
+    bad = perfect.replace("исход=", "исход=нет_данных_", 3)
+    open(os.path.join(d, "bad.md"), "w", encoding="utf-8").write(bad + "\n")
+    s2 = run([pg, "score", "--key", os.path.join(d, "key.json"), "--answer", os.path.join(d, "bad.md"), "--min", "0.9"])
+    expect("полигон: ошибки в ответе снижают точность и дают код 1", s2.returncode == 1 and "МИМО" in s2.stdout, s2.stdout)
+    open(os.path.join(d, "empty.md"), "w", encoding="utf-8").write("нет блока\n")
+    s3 = run([pg, "score", "--key", os.path.join(d, "key.json"), "--answer", os.path.join(d, "empty.md")])
+    expect("полигон: пустой ответ — ноль, а не падение", s3.returncode == 0 and "0%" in s3.stdout, s3.stdout + s3.stderr)
+
+
 def readers_tests(root):
     import zipfile
     add = os.path.join(HERE, "add_source.py")
@@ -726,6 +751,7 @@ def main():
         readable_tests(root)
         step_tests(root)
         log_sources_tests(root)
+        polygon_tests(root)
         path_tests(root)
         knowledge_tests(root)
         knowledge_links_tests(root)
