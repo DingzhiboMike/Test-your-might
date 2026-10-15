@@ -24,6 +24,11 @@
 Каждый блок «Запрос данных D-N» в логе — со строкой «Если данных не будет:»: дешёвая замена (метод, выборка, срок)
 и чего она не покажет; и со строками «Метрика:», «Одна строка:», «Сверка:» (методология, Д · Шаблон запроса).
 
+Линзы до генератора. В типах «гипотезы», «план проверки», «ТЗ на доработку» перед первым шагом hypothesis-generator
+должен стоять блок «ЛИНЗЫ» со строками «Когда», «Вместо нас», «Кто», «Что болит»: в каждой «зову <источник>» или
+«не нужно: <причина>». «Ответ во внутренних данных», «условия не выполнены», «экономия шагов» причиной не считаются —
+линза ищет сырьё, а не ответ. При «ВЕБ: да» хотя бы одна линза — «зову».
+
 Пустое значение («Зачем: —», «Зачем:») не засчитывается. Ошибка — код возврата 1. Отчёт: tasks/<папка>/checks/log-sources.md.
 """
 import os
@@ -77,6 +82,50 @@ def index_places():
 def field(block, name):
     f = re.search(r"^\s*%s:[ \t]*(.*)$" % re.escape(name), block, re.M)
     return f.group(1).strip(" —-–\t") if f else ""
+
+
+LENSES = ("Когда", "Вместо нас", "Кто", "Что болит")
+GENERATIVE = re.compile(r"ТИП ВЫХОДА\W*(гипотезы|план проверки|ТЗ на доработку)", re.I)
+BAD_REASON = re.compile(r"внутренн\w* данн|данн\w* компании|условия\s*(1|\d)|не выполн|экономи\w* шаг|бюджет", re.I)
+
+
+def lenses(text, tz, heads, errors):
+    """Блок ЛИНЗЫ перед первым генератором в генеративных типах."""
+    if not GENERATIVE.search(tz):
+        return
+    gen = next((m for m in heads if m.group(2) == "hypothesis-generator"), None)
+    if not gen:
+        return
+    before = text[:gen.start()]
+    m = None
+    for m in re.finditer(r"^\s*\**ЛИНЗЫ\b.*$", before, re.M):
+        pass
+    if not m:
+        errors.append("ЛИНЗЫ: перед генератором нет блока «ЛИНЗЫ» — когда, вместо нас, кто, что болит: зову или не нужно")
+        return
+    block = before[m.end():]
+    stop = re.search(r"^ШАГ\s+\d", block, re.M)
+    block = block[:stop.start()] if stop else block
+    called = 0
+    for name in LENSES:
+        lm = re.search(r"^\s*[-*]?\s*%s\s*[—:-]\s*(.*)$" % re.escape(name), block, re.M | re.I)
+        if not lm:
+            errors.append("ЛИНЗЫ: нет строки «%s» — зову <источник> или не нужно: <причина>" % name)
+            continue
+        val = lm.group(1).strip()
+        if re.match(r"зов\w*\s+[\w-]+", val, re.I):
+            called += 1
+        elif re.match(r"не нужн\w*\s*:", val, re.I):
+            reason = val.split(":", 1)[1].strip()
+            if len(reason) < 10:
+                errors.append("ЛИНЗЫ: «%s — не нужно» без причины" % name)
+            elif BAD_REASON.search(reason):
+                errors.append("ЛИНЗЫ: «%s — не нужно: %s» — не причина: линза ищет сырьё в открытом поле, а не ответ "
+                              "во внутренних данных" % (name, reason[:60]))
+        else:
+            errors.append("ЛИНЗЫ: «%s» — ни «зову <источник>», ни «не нужно: <причина>»" % name)
+    if called == 0 and re.search(r"^\**ВЕБ\**:\s*да", tz, re.M | re.I):
+        errors.append("ЛИНЗЫ: при «ВЕБ: да» ни одна линза не вызвана — генератор построит всё из одного корня")
 
 
 def main():
@@ -142,6 +191,8 @@ def main():
                     and not field(block, "Пересмотр"):
                 errors.append("%s: канал «веб» по GAP %d, а в ТЗ ответ помечен «%s» — нет строки «Пересмотр:» с "
                               "причиной" % (where, n, ", ".join(sorted(answers[n]))))
+
+    lenses(text, tz, heads, errors)
 
     requests = 0
     for m in re.finditer(r"^\s*Запрос данных\s+(D-\d+)", text, re.M):
