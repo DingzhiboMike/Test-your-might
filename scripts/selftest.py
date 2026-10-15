@@ -147,6 +147,23 @@ def log_sources_tests(root):
     w(good.replace("Зачем:    без этого генератор угадает причину\n", tool_line + "Зачем:    без этого генератор угадает причину\n"))
     r = run([cl, d])
     expect("лог: «Инструмент» из указателя принят", r.returncode == 0 and "указателе" not in r.stdout, r.stdout)
+    tz0 = open(os.path.join(d, "00-tz.md"), encoding="utf-8").read()
+    open(os.path.join(d, "00-tz.md"), "w", encoding="utf-8").write(tz0 + "ТИП ВЫХОДА: гипотезы\n")
+    r = run([cl, d])
+    expect("линзы: тип «гипотезы» без блока ЛИНЗЫ перед генератором — поймано", r.returncode == 1 and "ЛИНЗЫ" in r.stdout, r.stdout)
+    lens = ("ЛИНЗЫ\nКогда — зову customer-path: момент, когда бросают\nВместо нас — зову alternatives-analyst: чем заменяют\n"
+            "Кто — не нужно: карта знания отвечает, GAP 1, роли в двух интервью\nЧто болит — не нужно: шаг 2 market-analyze уже собрал слова\n\n")
+    w(good.replace("ШАГ 4 — hypothesis-generator", lens + "ШАГ 4 — hypothesis-generator"))
+    r = run([cl, d])
+    expect("линзы: блок с вызовами и причинами проходит", r.returncode == 0, r.stdout)
+    w(good.replace("ШАГ 4 — hypothesis-generator", lens.replace("зову customer-path: момент, когда бросают", "не нужно: ответ во внутренних данных компании") + "ШАГ 4 — hypothesis-generator"))
+    r = run([cl, d])
+    expect("линзы: «не нужно — внутренние данные» не принято", r.returncode == 1 and "Когда" in r.stdout, r.stdout)
+    nolens = lens.replace("зову customer-path: момент, когда бросают", "не нужно: линза не касается вопроса, он про цену").replace("зову alternatives-analyst: чем заменяют", "не нужно: альтернативы разобраны в прошлом квартале")
+    w(good.replace("ШАГ 4 — hypothesis-generator", nolens + "ШАГ 4 — hypothesis-generator"))
+    r = run([cl, d])
+    expect("линзы: при «ВЕБ: да» ни одной вызванной — поймано", r.returncode == 1 and "ни одна линза" in r.stdout, r.stdout)
+    open(os.path.join(d, "00-tz.md"), "w", encoding="utf-8").write(tz0)
     for ref in ("Д · Шаблон запроса", "К · Паспорт источника", "О · Оценка Ферми: порядок величины", "П · Окупаемость акции",
                 "Ж · Этапы: по состоянию, а не по календарю", "С · Граница категории"):
         w(good.replace("Зачем:    без этого генератор угадает причину\n", "Инструмент: %s — почему\nЗачем:    без этого генератор угадает причину\n" % ref))
