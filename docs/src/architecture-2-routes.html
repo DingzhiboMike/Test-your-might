@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="ru"><head><meta charset="utf-8">
+<style>
+:root{--bg:#141819;--box:#1d2223;--line:#e6e6e6;--teal:#4cc8a8;--tealbg:#17332d;--or:#e9955f;--orbg:#3b2a20;--muted:#a9adaf;}
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{background:var(--bg);width:952px}
+body{font-family:Inter,"SF Pro Text",-apple-system,"Helvetica Neue",Arial,sans-serif;color:#f2f2f2;padding:10px 10px 16px 10px}
+.row{display:flex;align-items:center;height:50px;margin-bottom:3px}
+.lbl{width:118px;font-weight:700;font-size:12.5px;flex:none}
+.flow{display:flex;align-items:center}
+.b{height:32px;border:1.5px solid var(--line);border-radius:5px;background:var(--box);display:flex;align-items:center;justify-content:center;text-align:center;font-size:11.5px;line-height:1.15;padding:0 6px;width:96px;flex:none}
+.b.w{width:118px}
+.t{border-color:var(--teal);background:var(--tealbg)}
+.o{border-color:var(--or);background:var(--orbg);color:var(--or);font-weight:600}
+.n{border-color:var(--teal);color:#bfeee0}
+.d{border-style:dashed}
+.a{width:18px;height:2px;background:var(--line);position:relative;flex:none;margin:0 1px}
+.a:after{content:"";position:absolute;right:-2px;top:-4px;border-left:7px solid var(--line);border-top:5px solid transparent;border-bottom:5px solid transparent}
+.notes{margin:12px 0 0 118px;color:var(--muted);font-size:10.6px;line-height:1.75}
+.notes b{color:#e6e6e6;font-weight:600}
+.leg{display:inline-block;width:10px;height:10px;border:1.5px solid var(--teal);border-radius:2px;vertical-align:-1px;margin-right:3px}
+</style></head><body>
+
+<div class="row"><div class="lbl">Разбор</div><div class="flow">
+<div class="b t">Консультант</div><div class="a"></div><div class="b o">финиш</div></div></div>
+
+<div class="row"><div class="lbl">Гипотезы</div><div class="flow">
+<div class="b t">Консультант</div><div class="a"></div><div class="b n">Линзы</div><div class="a"></div><div class="b">Генератор</div><div class="a"></div><div class="b">Проверка<br>по сути</div><div class="a"></div><div class="b n">Нострадамус<br>· отсев</div><div class="a"></div><div class="b">Позиция</div><div class="a"></div><div class="b o">Бэклог тестов</div></div></div>
+
+<div class="row"><div class="lbl">План проверки</div><div class="flow">
+<div class="b t">Консультант</div><div class="a"></div><div class="b n">Линзы</div><div class="a"></div><div class="b">Генератор</div><div class="a"></div><div class="b">Проверка<br>по сути</div><div class="a"></div><div class="b n">Нострадамус<br>· отсев</div><div class="a"></div><div class="b">Планировщик</div><div class="a"></div><div class="b o">Набор проверки</div></div></div>
+
+<div class="row"><div class="lbl">Валидация</div><div class="flow">
+<div class="b t">Консультант</div><div class="a"></div><div class="b">Проверка<br>по сути</div><div class="a"></div><div class="b">Усиление</div><div class="a"></div><div class="b">Методы</div><div class="a"></div><div class="b o w">Документ валидации</div></div></div>
+
+<div class="row"><div class="lbl">Вердикты</div><div class="flow">
+<div class="b">Сверка результатов</div><div class="a"></div><div class="b d">Генератор*</div><div class="a"></div><div class="b d">Проверка<br>по сути*</div><div class="a"></div><div class="b o">финиш</div></div></div>
+
+<div class="row"><div class="lbl">Исследование</div><div class="flow">
+<div class="b t">Консультант</div><div class="a"></div><div class="b">Источники</div><div class="a"></div><div class="b n">Нострадамус<br>· отсев</div><div class="a"></div><div class="b">Отчёт</div><div class="a"></div><div class="b o">Проверка смысла</div></div></div>
+
+<div class="row"><div class="lbl">ТЗ на доработку</div><div class="flow">
+<div class="b t">Консультант</div><div class="a"></div><div class="b n">Линзы</div><div class="a"></div><div class="b">Генератор</div><div class="a"></div><div class="b">Проверка<br>по сути</div><div class="a"></div><div class="b n">Нострадамус<br>· отсев</div><div class="a"></div><div class="b">Позиция</div><div class="a"></div><div class="b o">Писатель брифа</div></div></div>
+
+<div class="notes">
+Типичный ход, не жёсткий порядок; оранжевая рамка — финиш. Перед консультантом, кроме «Вердиктов», — разбор материалов.<br>
+<span class="leg"></span><b>Линзы</b> — до генератора: когда (путь клиента), вместо нас (альтернативы), кто (портрет ЦА), что болит (боли рынка); «зову» или «не нужно» с причиной.<br>
+Остальные источники данных подключаются вбок в любой строке, кроме «Разбор» и «Вердикты», — если без них шаг будет гадать.<br>
+<span class="leg"></span><b>Нострадамус · отсев</b> — новые идеи и лучшая версия там, где данных мало; отсев — на убийство; идеи — в конец сдачи, в следующий раунд.<br>
+Позиция — итоговая позиция консультанта по текущему раунду: что запускать, на что ставить, с какой уверенностью.<br>
+Валидация: идея → утверждения; по каждому — подтверждается, опровергается или нет данных (версии и что их различит).<br>
+Вердикты: * только для гипотез с вердиктом «переформулировать»; консультант не зовётся — задачу он оценивал в исходном прогоне.<br>
+Проверка смысла — по проверке по сути, итоговому документу и источнику по главному вопросу.<br>
+Пробный прогон (по ответу человека) — после набора проверки; его следствия правят бэклог или план до старта.
+</div>
+</body></html>
