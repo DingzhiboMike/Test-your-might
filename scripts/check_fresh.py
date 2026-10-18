@@ -65,8 +65,8 @@ def main():
                         warns.append((sid, "unknown", "%s:%d" % (name, i)))
                     continue
                 if d < limit and str(d.year) not in line:
-                    errors.append("%s:%d — %s от %s старше %g лет: поставь год в текст («по данным %d года») "
-                                  "или найди свежее" % (name, i, sid, raw, a.years, d.year))
+                    errors.append("%s:%d — %s от %s старше %g лет, а читатель не видит, что данные старые"
+                                  % (name, i, sid, raw, a.years))
 
     os.makedirs(os.path.join(task, "checks"), exist_ok=True)
     out = ["# Свежесть веб-источников: " + os.path.basename(task), "",

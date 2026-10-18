@@ -15,6 +15,9 @@
    «уточнит: …» (какие данные или наблюдение уточнят идею), «первый шаг: …» и «на чём: …» — поле или признак из источника
    дословно с id («…» [F-id]; что слово действительно есть в источнике, сверяет check_quotes.py) или «новый сбор: …».
    Идея без следствия — пожелание; шаг по полю, которого нет в источнике, — невыполним.
+5. Первая строка «РЕЖИМ:» — «только версии» или «версии и новые идеи» — и она совпадает с условием: новые идеи нужны,
+   если в ТЗ РЕЖИМ «новые идеи: да» или все итоговые вердикты «сузить / не держится» (check_effort.ideas_required).
+   В режиме «только версии» раздела «НОВЫЕ ИДЕИ» нет, и пункт 4 не проверяется.
 
 Цитаты в файле проверяет `check_quotes.py`, как в любом артефакте. Ошибка — код возврата 1.
 Отчёт: tasks/<папка>/checks/forecast.md. Нет `02f-forecast.md` — проверять нечего (код 0); есть ли он на финише,
@@ -26,6 +29,7 @@ import sys
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from check_path import gap_items  # noqa: E402
+from check_effort import all_narrowed, ideas_ordered  # noqa: E402
 
 FIELDS = ("Лучшая версия", "Уверенность", "На чём стоит", "Альтернативы", "Что различит", "Следующий шаг",
           "Если версия неверна")
@@ -127,8 +131,22 @@ def check(task):
 
     more = re.search(r"^#{0,3}\s*НОВЫЕ ИДЕИ\b.*$", fc, re.M | re.I)
     moves = 0
-    if not more:
-        errors.append("нет раздела «НОВЫЕ ИДЕИ» — главного выхода")
+    mode = re.search(r"^\s*РЕЖИМ\s*:\s*(.*)$", fc, re.M)
+    with_ideas = bool(mode) and "иде" in mode.group(1).lower()
+    tz = read(os.path.join(task, "00-tz.md"))
+    need = ideas_ordered(tz) or all_narrowed(task)
+    if not mode:
+        errors.append("нет строки «РЕЖИМ:» — «только версии» или «версии и новые идеи»")
+    elif with_ideas and not need:
+        errors.append("РЕЖИМ: новые идеи не заказаны в ТЗ, а итоговые вердикты не все «сузить / не держится»")
+    elif not with_ideas and need:
+        errors.append("РЕЖИМ: «только версии», а новые идеи нужны — %s" % (
+            "заказаны в ТЗ" if ideas_ordered(tz) else "все итоговые вердикты «сузить / не держится»"))
+    if not with_ideas:
+        if more:
+            errors.append("раздел «НОВЫЕ ИДЕИ» в режиме «только версии»")
+    elif not more:
+        errors.append("нет раздела «НОВЫЕ ИДЕИ» — главного выхода режима с новыми идеями")
     else:
         body = fc[more.end():]
         stop = re.search(r"^#{1,3}\s|^РАМКА\b", body, re.M)
@@ -151,8 +169,8 @@ def check(task):
                 errors.append("«НОВЫЕ ИДЕИ», идея %s: нет «На чём:» — на каком поле источника или новом сборе делается "
                               "первый шаг" % m.group(1))
             elif not re.search(r"«[^»]+»\s*\[F-\d+\]", on.group(1)) and not re.search(r"новый\s+сбор", on.group(1), re.I):
-                errors.append("«НОВЫЕ ИДЕИ», идея %s: «На чём:» без поля из источника («…» [F-id]) и без «новый сбор» — "
-                              "проверь, что шаг можно сделать на том, что есть" % m.group(1))
+                errors.append("«НОВЫЕ ИДЕИ», идея %s: первый шаг не опирается ни на поле источника, ни на новый сбор"
+                              % m.group(1))
     return keys, errors, moves
 
 

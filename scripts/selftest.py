@@ -9,6 +9,7 @@
 """
 import json
 import os
+import re
 import shutil
 import subprocess
 import sys
@@ -277,6 +278,56 @@ def backlog_tests(root):
     open(os.path.join(d, "08-handoff.md"), "w", encoding="utf-8").write("# Сдача\n\nСм. D-4 и Г-3.\n\n## Служебное\n")
     r = run([cr, d])
     expect("сдача: номера в части для человека пойманы", r.returncode == 1 and "D-4" in r.stdout and "номер гипотезы" in r.stdout, r.stdout)
+    open(os.path.join(d, "00-tz.md"), "w", encoding="utf-8").write("ТИП ВЫХОДА: гипотезы\nЁМКОСТЬ:    2 проверки за 2 недели\n")
+    os.remove(os.path.join(d, "08-handoff.md"))
+    open(os.path.join(d, "03-backlog.md"), "w", encoding="utf-8").write(head + "".join(
+        (row % "запускать ли письмо всем").replace("| 1 |", "| %d |" % i) for i in range(1, 5)))
+    r = run([cr, d])
+    expect("бэклог: тестов больше, чем ёмкость + 1, — поймано", r.returncode == 1 and "лимите 3" in r.stdout, r.stdout)
+    open(os.path.join(d, "03-backlog.md"), "w", encoding="utf-8").write(head + "".join(
+        (row % "запускать ли письмо всем").replace("| 1 |", "| %d |" % i) for i in range(1, 4)) + "\nВ очереди: письмо бухгалтерам.\n")
+    r = run([cr, d])
+    expect("бэклог: ёмкость + 1 тестов и строка «В очереди» проходят", r.returncode == 0, r.stdout)
+
+
+def effort_tests(root):
+    ce = os.path.join(HERE, "check_effort.py")
+    d = os.path.join(root, "tasks", "eff")
+    os.makedirs(d)
+    tz = ("ТЗ\n\nGAP:\n  1. Как выбрать момент письма [ключевой] {ответ: контекст, веб}\n  2. Что пишут конкуренты {ответ: веб}\n\n"
+          "ВЕБ:        да — пункты 1, 2\nТИП ВЫХОДА: гипотезы\nЁМКОСТЬ:    2 проверки за 2 недели\n")
+    open(os.path.join(d, "00-tz.md"), "w", encoding="utf-8").write(tz)
+    log = lambda t: open(os.path.join(d, "log.md"), "w", encoding="utf-8").write("# Лог задачи: eff\n\n" + t)
+    log("ШАГ 1 — b2b-consultant\n")
+    r = run([ce, d])
+    expect("усилие: ключевой пункт с ответом в вебе без хода — поймано", r.returncode == 1 and "GAP 1" in r.stdout and "GAP 2" not in r.stdout, r.stdout)
+    log("ШАГ 1 — b2b-consultant\nБез хода: GAP 1 — мало данных в открытых источниках\n")
+    r = run([ce, d])
+    expect("усилие: «мало данных» причиной не считается", r.returncode == 1 and "не принимается" in r.stdout, r.stdout)
+    log("ШАГ 1 — b2b-consultant\nБез хода: GAP 1 — момент виден целиком в выгрузке событий, которую человек приложил\n")
+    r = run([ce, d])
+    expect("усилие: пропуск с содержательной причиной принят", r.returncode == 0, r.stdout)
+    log("ШАГ 2 — customer-path\nПункт GAP: GAP 1 — Как выбрать момент письма\n")
+    r = run([ce, d])
+    expect("усилие: ход к источнику по ключевому пункту засчитан", r.returncode == 0, r.stdout)
+    log("ШАГ 5 — hypothesis-validator\nОстаток: свободных вызовов нет: дальше только резерв и финиш\n")
+    r = run([ce, d])
+    expect("усилие: без свободных вызовов пропуск — предупреждение, не ошибка", r.returncode == 0 and "предупреждение" in r.stdout, r.stdout)
+    open(os.path.join(d, "02c-validation.md"), "w", encoding="utf-8").write("ГИПОТЕЗА 1 — а\nВердикт:    сузить\n")
+    hand = lambda t: open(os.path.join(d, "08-handoff.md"), "w", encoding="utf-8").write(t)
+    hand("# Сдача\n\n## Что запускать\nПисьмо.\n\n## Служебное\n")
+    r = run([ce, d])
+    expect("усилие: всё «сузить», а сдача не с запроса данных — поймано", r.returncode == 1 and "двигаться дальше" in r.stdout, r.stdout)
+    more = "## А ещё есть идеи\n1. Бухгалтеру\n2. Календарь\n3. Кнопка\n4. Чат\n"
+    hand("# Сдача\n\n## Что нужно, чтобы двигаться дальше\nВыгрузка событий.\n\n" + more + "\n## Служебное\n")
+    r = run([ce, d])
+    expect("усилие: идей в сдаче больше ёмкости + 1 — поймано", r.returncode == 1 and "4 идей" in r.stdout, r.stdout)
+    hand("# Сдача\n\n## Что нужно, чтобы двигаться дальше\nВыгрузка событий.\n\n" + more.replace("4. Чат\n", "В очереди: чат.\n") + "\n## Служебное\n")
+    r = run([ce, d])
+    expect("усилие: сдача с запроса данных и ёмкостью + 1 идей проходит", r.returncode == 0, r.stdout)
+    open(os.path.join(d, "00-tz.md"), "w", encoding="utf-8").write(tz.replace("ТИП ВЫХОДА: гипотезы", "ТИП ВЫХОДА: валидация"))
+    r = run([ce, d])
+    expect("усилие: валидация не проверяется", r.returncode == 0 and "не из проверяемых" in r.stdout, r.stdout)
 
 
 def knowledge_links_tests(root):
@@ -333,7 +384,8 @@ def path_tests(root):
     os.makedirs(d)
     open(os.path.join(d, "00-tz.md"), "w", encoding="utf-8").write(
         "ТЗ\n\nGAP:\n  1. Держится ли идея чек-листа [ключевой] {ответ: контекст, живая}\n  2. Кто бросает пробный период {ответ: данные}\n"
-        "  3. Сколько таких компаний {ответ: веб}\n\nНА ВХОДЕ: идея\nВЕБ: да — пункт 3\n")
+        "  3. Сколько таких компаний {ответ: веб}\n\nНА ВХОДЕ: идея\nВЕБ: да — пункт 3\n"
+        "ЦЕНА:       ~20 вызовов исполнителей (свободная часть 8, резерв 12, потолок 26), ~1,7 млн токенов\n")
     review = ("ПУТЬ\nП-1. Что должно стать известно: почему бросают пробный период\n     Закрывает GAP: 1, 2  [ключевой] [проверка допущения]\n"
               "     Сдвигает: А, Б\n     Чего не хватает в карте: причин ухода нет\n"
               "П-2. Что должно стать известно: хватит ли компаний\n     Закрывает GAP: 3\n     Сдвигает: Б\n     Чего не хватает в карте: числа компаний нет\n")
@@ -371,6 +423,362 @@ def path_tests(root):
     open(os.path.join(d, "00-tz.md"), "w", encoding="utf-8").write(tz.replace("ВЕБ: да — пункт 3", "ВЕБ: нет — сеть закрыта"))
     r = run([cp, d, "--tz"])
     expect("ТЗ: «ВЕБ: нет» при пункте с ответом в вебе — пойман", r.returncode == 1 and "ВЕБ: нет" in r.stdout, r.stdout)
+    open(os.path.join(d, "00-tz.md"), "w", encoding="utf-8").write(re.sub(r"ЦЕНА:.*\n", "", tz))
+    r = run([cp, d, "--tz"])
+    expect("ТЗ: без строки ЦЕНА — поймано", r.returncode == 1 and "ЦЕНА" in r.stdout, r.stdout)
+
+
+def polygon_more_tests(root):
+    """Полигон: полнота тегов карты и сверка разбора интервью по заложенным сигналам."""
+    pg = os.path.join(HERE, "polygon.py")
+    r = run([pg, "map-recall", "--seed", "1", "--min", "0.9"])
+    expect("полигон карты: полнота тегов не ниже порога CI, ложных тегов нет", r.returncode == 0 and "ложных тегов на нейтральных строках: 0" in r.stdout, r.stdout)
+    out, key = os.path.join(root, "iv"), os.path.join(root, "iv-key.json")
+    r = run([pg, "make-interviews", "--seed", "3", "--n", "4", "--out", out, "--key-out", key])
+    k = json.load(open(key, encoding="utf-8"))
+    expect("полигон интервью: транскрипты и ключ отдельно", r.returncode == 0 and len(k) == 4 and len(os.listdir(out)) == 4, r.stdout)
+    ans = os.path.join(root, "iv-answer.md")
+    open(ans, "w", encoding="utf-8").write("СВЕРКА\n" + "".join("%s | сигналы=%s\n" % (i, ",".join(v)) for i, v in k.items()))
+    r = run([pg, "score-interviews", "--key", key, "--answer", ans, "--min", "0.99"])
+    expect("полигон интервью: точный ответ — F1 1,00", r.returncode == 0 and "1.00" in r.stdout.split("Средний")[1], r.stdout)
+    open(ans, "w", encoding="utf-8").write("СВЕРКА\nИ-01 | сигналы=цена\n")
+    r = run([pg, "score-interviews", "--key", key, "--answer", ans, "--min", "0.7"])
+    expect("полигон интервью: пропуски сигналов снижают F1 ниже порога", r.returncode == 1, r.stdout)
+
+
+def message_tests():
+    """Сообщения проверок называют нарушение и место, а не текст, которым его закрыть (защита от подгонки)."""
+    import re as _re
+    bad = []
+    tmpl = _re.compile(r"<[а-яё][^>]{0,30}>|или «не найдено|нужно «|поставь год|процитируй или|«…»\s*\[F-id\]")
+    for name in sorted(os.listdir(HERE)):
+        if not (name.startswith("check_") and name.endswith(".py")):
+            continue
+        src = open(os.path.join(HERE, name), encoding="utf-8").read()
+        for m in _re.finditer(r"(?:errors|problems|warns)\.append\((.*?)\)\n", src, _re.S):
+            if tmpl.search(m.group(1)):
+                bad.append("%s: %s" % (name, m.group(1)[:80]))
+    expect("сообщения проверок без шаблонов для подгонки", not bad, "; ".join(bad))
+
+
+def audit_tests(root):
+    """Выборочный аудит: воспроизводимый план из мест с опорами, каждое место закрыто оценкой из блока данных."""
+    d = os.path.join(root, "tasks", "aud")
+    os.makedirs(d)
+    au = os.path.join(HERE, "audit_sample.py")
+    lines = ["ГИПОТЕЗА %d — х\nВердикт:    сузить\nОснование: «клиенты платят по счёту и карту не берут» [F-00%d]\n" % (i, i) for i in range(1, 6)]
+    open(os.path.join(d, "02c-validation.md"), "w", encoding="utf-8").write("\n".join(lines))
+    r = run([au, d, "--check"])
+    expect("аудит: без плана — ошибка", r.returncode == 1 and "audit-plan.md" in r.stdout, r.stdout)
+    r = run([au, d])
+    plan1 = open(os.path.join(d, "audit-plan.md"), encoding="utf-8").read()
+    run([au, d])
+    expect("аудит: план воспроизводим — три места на артефакт",
+           "мест 3" in r.stdout and plan1 == open(os.path.join(d, "audit-plan.md"), encoding="utf-8").read(), r.stdout)
+    import re as _re
+    marks = [(a, int(n)) for a, n in _re.findall(r"^- (\S+), строка (\d+):", plan1, _re.M)]
+    rep = lambda items: open(os.path.join(d, "audit.md"), "w", encoding="utf-8").write(
+        "```данные\n" + json.dumps({"аудит": items}, ensure_ascii=False) + "\n```\n")
+    rep([{"артефакт": a, "строка": n, "оценка": "держит", "почему": "фрагмент прямо об этом"} for a, n in marks[:2]])
+    r = run([au, d, "--check"])
+    expect("аудит: неоценённое место поймано", r.returncode == 1 and "не оценено" in r.stdout, r.stdout)
+    rep([{"артефакт": a, "строка": n, "оценка": "держит" if i else "подогнано", "почему": "…"} for i, (a, n) in enumerate(marks)])
+    r = run([au, d, "--check"])
+    expect("аудит: все места оценены — строка для сдачи", r.returncode == 0 and "подогнано 1" in r.stdout and "держит 2" in r.stdout, r.stdout)
+
+
+def rules_tests():
+    """Реестр правил: id в тексте и в реестре совпадают; новое правило без прогона не проходит; срабатывания по логам."""
+    r = run([os.path.join(HERE, "rules.py"), "--check"])
+    expect("правила: id в тексте системы и реестр совпадают", r.returncode == 0, r.stdout[-600:])
+    proj = tempfile.mkdtemp(prefix="polygon-rules-")
+    try:
+        os.makedirs(os.path.join(proj, ".claude", "skills", "orchestrator", "routes"))
+        os.makedirs(os.path.join(proj, "methodology"))
+        open(os.path.join(proj, "AGENTS.md"), "w", encoding="utf-8").write(
+            "# А\n\n## Принципы\n\n- **Знание не аксиома.** Проверяется.\n- **Мало данных — не ответ.** Версия нужна.\n\n## Где\n\n- не правило\n")
+        open(os.path.join(proj, ".claude", "skills", "orchestrator", "SKILL.md"), "w", encoding="utf-8").write(
+            "# Ядро\n\n**Без повтора на том же входе.** Нельзя.\n\n**Кто:** не правило\n")
+        rp = [os.path.join(HERE, "rules.py"), "--root", proj]
+        r = run(rp + ["--check"])
+        expect("правила: правило без id поймано", r.returncode == 1 and "без id" in r.stdout, r.stdout)
+        r = run(rp + ["--assign"])
+        expect("правила: id расставлены только правилам", "Новых правил с id: 3" in r.stdout, r.stdout)
+        expect("правила: после расстановки всё сходится", run(rp + ["--check"]).returncode == 0)
+        reg = os.path.join(proj, "methodology", "rules.csv")
+        lines = open(reg, encoding="utf-8").read().splitlines()
+        cells = lines[1].split(",")
+        cells[3] = "2099-01-01"
+        lines[1] = ",".join(cells)
+        open(reg, "w", encoding="utf-8").write("\n".join(lines) + "\n")
+        r = run(rp + ["--check"])
+        expect("правила: новое правило без прогона и регрессии не проходит", r.returncode == 1 and "R-001" in r.stdout and "прогон" in r.stdout, r.stdout)
+        for i in range(5):
+            t = os.path.join(proj, "tasks", "t%d" % i)
+            os.makedirs(t)
+            open(os.path.join(t, "00-tz.md"), "w", encoding="utf-8").write("ТИП ВЫХОДА: гипотезы\n")
+            open(os.path.join(t, "log.md"), "w", encoding="utf-8").write("ШАГ 1\nПравило:  R-002 — сходил за данными вместо сдачи\n" if i == 0 else "ШАГ 1\n")
+        r = run(rp + ["--usage"])
+        expect("правила: без срабатываний за пять прогонов — кандидат на удаление, сработавшее — нет",
+               "Кандидаты на удаление" in r.stdout and "R-003" in r.stdout.split("Кандидаты")[1] and "R-002" not in r.stdout.split("Кандидаты")[1], r.stdout)
+    finally:
+        shutil.rmtree(proj, ignore_errors=True)
+
+
+def data_block_tests(root):
+    """Блоки данных: проверяются по схеме и разбираются теми же проверками, что и текст."""
+    d = os.path.join(root, "tasks", "dbk")
+    os.makedirs(d)
+    blk = lambda obj: "Текст для людей.\n\n```данные\n" + json.dumps(obj, ensure_ascii=False, indent=1) + "\n```\n"
+    open(os.path.join(d, "02f-forecast.md"), "w", encoding="utf-8").write(
+        "## НОВЫЕ ИДЕИ\n1. Писать бухгалтеру\n   Суть: …\n2. Календарь\n   Суть: …\n\nРАМКА\nСовпадает: да\n")
+    idea = lambda n, v: {"n": n, "суть": "идея %d" % n, "вердикт": v, "убивает": "нет",
+                         "возражения": "«бухгалтер не заходит в банк» [F-003] — ослабляет", "новая": "да",
+                         "первый_шаг_различает": "да — поддержит: треть звонков; убьёт: ни одного",
+                         "первый_шаг_выполним": "да — поле роли в реестре", "один_источник": "нет",
+                         "данные_следующего_раунда": "роль пользователя"}
+    ci = os.path.join(HERE, "check_ideas.py")
+    open(os.path.join(d, "02g-ideas-check.md"), "w", encoding="utf-8").write(blk({"отсев_идей": [idea(1, "кажется валидной"), idea(2, "кажется валидной")]}))
+    r = run([ci, d])
+    expect("блок данных: отсев идей по схеме проходит", r.returncode == 0, r.stdout)
+    open(os.path.join(d, "02g-ideas-check.md"), "w", encoding="utf-8").write(blk({"отсев_идей": [idea(1, "кажется валидной"), idea(2, "наверное да")]}))
+    r = run([ci, d])
+    expect("блок данных: вердикт не из списка пойман по полю", r.returncode == 1 and "отсев_идей[2].вердикт" in r.stdout, r.stdout)
+    open(os.path.join(d, "02g-ideas-check.md"), "w", encoding="utf-8").write("```данные\n{\"отсев_идей\": [\n```\n")
+    r = run([ci, d])
+    expect("блок данных: битый JSON — ошибка, а не тишина", r.returncode == 1 and "не JSON" in r.stdout, r.stdout)
+
+    ca = os.path.join(HERE, "check_artifact.py")
+    open(os.path.join(d, "review-src-x.md"), "w", encoding="utf-8").write("С-01 [блок] Вывод сильнее фрагмента — …\nС-02 [блок] Круг — …\n")
+    art = "# Разбор\n\n" + "Разрыв логики между первым запуском и регулярным использованием продукта. " * 8 + "\n\n"
+    ans = [{"замечание": "С-01", "ответ": "исправлено", "что": "сузил вывод до группы"},
+           {"замечание": "С-02", "ответ": "оспорено", "что": "второй фрагмент из другого корня [F-004]"}]
+    open(os.path.join(d, "src-x.md"), "w", encoding="utf-8").write(art + blk({"по_проверке_смысла": ans}))
+    r = run([ca, d, "src-x.md", "--review", "review-src-x.md"])
+    expect("блок данных: ответы на проверку смысла засчитаны", r.returncode == 0, r.stdout)
+    open(os.path.join(d, "src-x.md"), "w", encoding="utf-8").write(art + blk({"по_проверке_смысла": ans[:1]}))
+    r = run([ca, d, "src-x.md", "--review", "review-src-x.md"])
+    expect("блок данных: нет ответа на блокирующее — поймано", r.returncode == 1 and "С-02" in r.stdout, r.stdout)
+
+    cr = os.path.join(HERE, "check_rehearsal.py")
+    row = "| %d | новые клиенты | «вот что проверяет банк» | пуш, CRM | переходы | ≥20%% | <10%% | 6 недель | берём ли |\n"
+    backlog = ("| № | Кому | Что говорим | Где | Метрика | Успех | Отсечение | Срок | Что решит |\n"
+               "| --- | --- | --- | --- | --- | --- | --- | --- | --- |\n" + row % 1 + row % 2)
+    sl = {"для_эксперимента": [{"тест": "Строка 1", "статус": "как есть"},
+                               {"тест": "Строка 2", "статус": "после правки", "что": "убрать наводящий вопрос"}],
+          "для_решения": "решение не меняется, но тест 2 короче", "что_подсказали_персоны": "путают выписку и отчёт"}
+    open(os.path.join(d, "03c-rehearsal.md"), "w", encoding="utf-8").write(blk({"следствия": sl}))
+    open(os.path.join(d, "03-backlog.md"), "w", encoding="utf-8").write(backlog + "\n" + blk({"по_пробному_прогону": [
+        {"тест": "Строка 2", "ответ": "применено", "что": "вопрос переписан"}]}))
+    r = run([cr, d])
+    expect("блок данных: следствия пробного прогона и ответы на них проходят", r.returncode == 0, r.stdout)
+    open(os.path.join(d, "03-backlog.md"), "w", encoding="utf-8").write(backlog)
+    r = run([cr, d])
+    expect("блок данных: следствие без ответа в бэклоге поймано", r.returncode == 1 and "ПО ПРОБНОМУ ПРОГОНУ" in r.stdout, r.stdout)
+
+
+def route_tests():
+    """Маршрут в коде: state.json, периметр шага по хэшам, хук записи по шагу, возврат ошибок исполнителю."""
+    proj = tempfile.mkdtemp(prefix="polygon-route-")
+    try:
+        open(os.path.join(proj, "AGENTS.md"), "w", encoding="utf-8").write("#\n")
+        t = os.path.join(proj, "tasks", "rt")
+        os.makedirs(t)
+        rt = os.path.join(HERE, "route.py")
+        open(os.path.join(t, "00-tz.md"), "w", encoding="utf-8").write("ТЗ\nТИП ВЫХОДА: вердикты по проверке\n")
+        r = run([rt, "init", t])
+        expect("маршрут: без СОГЛАСОВАНО не заводится", r.returncode == 1 and "СОГЛАСОВАНО" in r.stdout, r.stdout)
+        open(os.path.join(t, "00-tz.md"), "a", encoding="utf-8").write("СОГЛАСОВАНО: да\n")
+        r = run([rt, "init", t])
+        expect("маршрут: заведён по типу выхода", r.returncode == 0 and "вердикты по проверке" in r.stdout, r.stdout)
+        body = "# Вердикты\n\n" + "Гипотеза о письме малым командам: критерий успеха не достигнут, отсекаем. " * 8 + "\n"
+        hook = os.path.join(HERE, "hooks", "guard_writes.py")
+
+        def write_code(name):
+            d = {"cwd": proj, "tool_name": "Write", "agent_id": "a1", "agent_type": "results-reviewer",
+                 "tool_input": {"file_path": os.path.join(t, name)}}
+            return run([hook], json.dumps(d)).returncode
+
+        expect("хук: без зарегистрированного шага подагенту в задачу нельзя", write_code("04-results.md") == 2)
+        r = run([rt, "start", t, "results-reviewer", "04-results.md"])
+        expect("маршрут: шаг зарегистрирован", r.returncode == 0 and "Шаг 1" in r.stdout, r.stdout)
+        expect("хук: в артефакт идущего шага можно", write_code("04-results.md") == 0)
+        expect("хук: в чужой файл при идущем шаге нельзя", write_code("02-hypotheses.md") == 2)
+        open(os.path.join(t, "04-results.md"), "w", encoding="utf-8").write(body)
+        open(os.path.join(t, "02-hypotheses.md"), "w", encoding="utf-8").write("чужое\n")
+        r = run([rt, "done", t])
+        expect("маршрут: чужой файл пойман по хэшу", r.returncode == 1 and "02-hypotheses.md" in r.stdout and "Проверки:" in r.stdout, r.stdout)
+        r = run([rt, "ready", t])
+        expect("готовность: шаг с ошибками не даёт сдать", r.returncode == 1 and "закрыт с ошибками" in r.stdout, r.stdout)
+        os.remove(os.path.join(t, "02-hypotheses.md"))
+        r = run([rt, "start", t, "results-reviewer", "04-results.md"])
+        open(os.path.join(t, "04-results.md"), "a", encoding="utf-8").write("Дополнение.\n")
+        r = run([rt, "done", t])
+        expect("маршрут: только свой артефакт — шаг закрыт", r.returncode == 0 and "ок" in r.stdout, r.stdout)
+        st = json.load(open(os.path.join(t, "state.json"), encoding="utf-8"))
+        st["steps"][0]["status"] = "done"
+        open(os.path.join(t, "state.json"), "w", encoding="utf-8").write(json.dumps(st))
+        r = run([rt, "ready", t])
+        expect("готовность: артефакты и проверки типа на месте", r.returncode == 0, r.stdout)
+        r = run([rt, "status", t])
+        expect("маршрут: статус для продолжения после обрыва", "Шаг 2 — results-reviewer" in r.stdout and "Обязательные впереди" in r.stdout, r.stdout)
+
+        gate = os.path.join(HERE, "hooks", "step_gate.py")
+        tr = os.path.join(proj, "agent.jsonl")
+        open(tr, "w", encoding="utf-8").write(json.dumps({"type": "user", "timestamp": "2026-10-18T10:00:00Z",
+            "message": {"role": "user", "content": "Сверь результаты, артефакт tasks/rt/04-results.md"}}) + "\n")
+        run([rt, "start", t, "results-reviewer", "04-results.md"])
+        open(os.path.join(t, "04-results.md"), "w", encoding="utf-8").write("коротко\n")
+        ev = {"hook_event_name": "SubagentStop", "cwd": proj, "agent_id": "a2", "agent_type": "results-reviewer",
+              "agent_transcript_path": tr, "stop_hook_active": False}
+        g = run([gate], json.dumps(ev))
+        expect("ворота: артефакт с ошибками возвращается исполнителю", g.returncode == 2 and "04-results.md" in g.stderr, g.stderr)
+        ev["stop_hook_active"] = True
+        expect("ворота: второй раз подряд не держат", run([gate], json.dumps(ev)).returncode == 0)
+        ev["stop_hook_active"] = False
+        open(os.path.join(t, "04-results.md"), "w", encoding="utf-8").write(body)
+        expect("ворота: исправленный артефакт пропускают", run([gate], json.dumps(ev)).returncode == 0)
+    finally:
+        shutil.rmtree(proj, ignore_errors=True)
+
+
+def roles_tests():
+    """Описания агентов совпадают с таблицей ролей; хук держит Bash и сеть подагентов."""
+    r = run([os.path.join(HERE, "check_size.py")])
+    expect("размер: ядро, маршруты, скиллы и загрузка оркестратора на тип в пределах порогов", r.returncode == 0, r.stdout[-800:])
+    r = run([os.path.join(HERE, "roles.py"), "--check"])
+    expect("роли: описания агентов в .claude/agents совпадают с таблицей", r.returncode == 0, r.stdout)
+    proj = tempfile.mkdtemp(prefix="polygon-roles-")
+    try:
+        open(os.path.join(proj, "AGENTS.md"), "w", encoding="utf-8").write("#\n")
+        hook = os.path.join(HERE, "hooks", "guard_writes.py")
+
+        def code(tool, agent_type, command=None, agent_id="a1"):
+            d = {"cwd": proj, "tool_name": tool, "tool_input": {"command": command} if command else {}}
+            if agent_id:
+                d.update(agent_id=agent_id, agent_type=agent_type)
+            return run([hook], json.dumps(d)).returncode
+
+        expect("хук: скрипт системы подагенту разрешён", code("Bash", "document-mapper", "python3 scripts/check_map.py tasks/x") == 0)
+        expect("хук: python3 -c подагенту запрещён", code("Bash", "document-mapper", "python3 -c 'import os'") == 2)
+        expect("хук: запись перенаправлением запрещена", code("Bash", "nostradamus", "cat a > tasks/x/02f.md") == 2)
+        expect("хук: чтение с 2>/dev/null разрешено", code("Bash", "nostradamus", "ls tasks 2>/dev/null | head") == 0)
+        expect("хук: rm подагенту запрещён", code("Bash", "meaning-review", "rm -rf tasks") == 2)
+        expect("хук: curl роли без сети запрещён", code("Bash", "nostradamus", "curl -s https://example.com") == 2)
+        expect("хук: curl роли с сетью разрешён", code("Bash", "customer-path", "curl -s https://example.com | trafilatura") == 0)
+        expect("хук: WebSearch роли без сети запрещён", code("WebSearch", "meaning-review") == 2)
+        expect("хук: WebSearch источнику данных разрешён", code("WebSearch", "market-analyze") == 0)
+        expect("хук: агент общего типа сеть не теряет", code("WebSearch", "general-purpose") == 0)
+        expect("хук: основная сессия Bash не ограничена", code("Bash", "", "rm -rf x", agent_id=None) == 0)
+    finally:
+        shutil.rmtree(proj, ignore_errors=True)
+
+
+def trace_tests():
+    """Хук трассы, сводка расхода, цена маршрута и остаток — на выдуманных транскриптах."""
+    proj = tempfile.mkdtemp(prefix="polygon-trace-")
+    try:
+        open(os.path.join(proj, "AGENTS.md"), "w", encoding="utf-8").write("#\n")
+        for sk in ("hypothesis-validator", "document-mapper", "nostradamus"):
+            os.makedirs(os.path.join(proj, ".claude", "skills", sk))
+            open(os.path.join(proj, ".claude", "skills", sk, "SKILL.md"), "w", encoding="utf-8").write("#\n")
+        task = os.path.join(proj, "tasks", "trc")
+        os.makedirs(task)
+        open(os.path.join(task, "log.md"), "w", encoding="utf-8").write("# Лог задачи: trc\n")
+
+        def line(**kw):
+            return json.dumps(kw, ensure_ascii=False) + "\n"
+
+        def asst(mid, ts, out, model="model-strong"):
+            u = {"input_tokens": 10, "cache_creation_input_tokens": 1000, "cache_read_input_tokens": 50000,
+                 "output_tokens": out}
+            return line(type="assistant", timestamp=ts, message={"id": mid, "model": model, "usage": u})
+
+        call = ("Прочитай .claude/skills/hypothesis-validator/SKILL.md, режим «отсев идей». "
+                "Вход: tasks/trc/02f-forecast.md, ТЗ, nostradamus не передавать.")
+        sub = os.path.join(proj, "agent-a1.jsonl")
+        open(sub, "w", encoding="utf-8").write(
+            line(type="user", timestamp="2026-10-18T10:00:00Z", message={"role": "user", "content": call})
+            + asst("m1", "2026-10-18T10:00:30Z", 200) + asst("m1", "2026-10-18T10:00:31Z", 200)
+            + asst("m2", "2026-10-18T10:03:00Z", 300))
+        hook = os.path.join(HERE, "hooks", "trace.py")
+        ev = {"hook_event_name": "SubagentStop", "cwd": proj, "agent_id": "a1", "agent_transcript_path": sub,
+              "agent_type": "general-purpose"}
+        r = run([hook], json.dumps(ev))
+        rows = [json.loads(x) for x in open(os.path.join(task, "trace.jsonl"), encoding="utf-8")]
+        rec = rows[0] if rows else {}
+        expect("трасса: подагент записан, ответ с одним id посчитан один раз",
+               r.returncode == 0 and len(rows) == 1 and rec.get("out") == 500 and rec.get("responses") == 2, str(rows))
+        expect("трасса: роль по пути к SKILL.md, режим и фактическая модель",
+               rec.get("role") == "hypothesis-validator" and rec.get("mode") == "отсев идей"
+               and rec.get("model") == "model-strong" and rec.get("sec") == 180, str(rec))
+        run([hook], json.dumps(ev))
+        rows = open(os.path.join(task, "trace.jsonl"), encoding="utf-8").read().splitlines()
+        expect("трасса: повторное событие того же агента заменяет строку", len(rows) == 1, str(rows))
+        expect("трасса: битый вход хука — молча выход 0", run([hook], "не json").returncode == 0)
+
+        main = os.path.join(proj, "main.jsonl")
+        open(main, "w", encoding="utf-8").write(
+            asst("p0", "2026-10-18T09:00:00Z", 999)
+            + line(type="user", timestamp="2026-10-18T09:10:00Z", message={"role": "user", "content": "диспетчер, задача tasks/trc"})
+            + asst("p1", "2026-10-18T09:11:00Z", 100)
+            + line(type="assistant", timestamp="2026-10-18T09:12:00Z", isSidechain=True,
+                   message={"id": "p2", "model": "x", "usage": {"output_tokens": 7777}}))
+        run([hook], json.dumps({"hook_event_name": "Stop", "cwd": proj, "session_id": "s1", "transcript_path": main}))
+        m = json.load(open(os.path.join(task, "trace-main.json"), encoding="utf-8")).get("s1", {})
+        expect("трасса: основная сессия — с первого упоминания задачи и без побочных веток", m.get("out") == 100, str(m))
+
+        ts = os.path.join(HERE, "trace_summary.py")
+        r = run([ts, task, "--since", "0"])
+        expect("сводка: строка «Расход» за шаг", r.stdout.startswith("Расход: 1 вызов,") and "model-strong" in r.stdout, r.stdout)
+        r = run([ts, task])
+        expect("сводка: таблица по ролям с основной сессией", "hypothesis-validator · отсев идей" in r.stdout
+               and "основная сессия" in r.stdout, r.stdout)
+        expect("сводка: вызов подагента до согласования ТЗ виден", "до согласования ТЗ — 1 вызов" in r.stdout, r.stdout)
+        open(os.path.join(task, "00-tz.md"), "w", encoding="utf-8").write("ТЗ\nСОГЛАСОВАНО: да\n")
+        run([hook], json.dumps(ev))
+        r = run([ts, task])
+        expect("сводка: после согласования предупреждения нет", "до согласования" not in r.stdout, r.stdout)
+
+        cst = os.path.join(proj, "tasks", "cst")
+        os.makedirs(cst)
+        open(os.path.join(cst, "sources.csv"), "w", encoding="utf-8").write(
+            "id,kind\n" + "".join("F-%03d,context\n" % i for i in range(14)) + "F-100,interview\nF-101,interview\nF-102,interview\nF-200,web\n")
+        open(os.path.join(cst, "00d-map.md"), "w", encoding="utf-8").write("#\n")
+        tz = "ТИР:        Tier 1 — и бюджет шагов: 8\nТИП ВЫХОДА: гипотезы\nРЕЖИМ:      обычный\n            пробный прогон: нет\n"
+        open(os.path.join(cst, "00-tz.md"), "w", encoding="utf-8").write(tz)
+        ce = os.path.join(HERE, "cost_estimate.py")
+        r = run([ce, cst, "--detail"])
+        expect("цена: вызовы по структуре маршрута — свободная часть 10, резерв 26, потолок 47",
+               r.returncode == 0 and "~36 вызовов" in r.stdout and "резерв 26" in r.stdout and "потолок 47" in r.stdout, r.stdout)
+        expect("цена: токены по трассе прошлой задачи, основная сессия оценена",
+               "по 1 прогону" in r.stdout and "основная сессия — ещё" in r.stdout, r.stdout)
+        open(os.path.join(cst, "00-tz.md"), "w", encoding="utf-8").write(tz.replace("ТИП ВЫХОДА: гипотезы", "ТИП ВЫХОДА: разбор / гипотезы"))
+        open(os.path.join(cst, "00-tz.md"), "w", encoding="utf-8").write(tz + "            новые идеи: да\n")
+        r = run([ce, cst])
+        expect("цена: с заказом новых идей — плюс вызов на отсев", "~37 вызовов" in r.stdout and "резерв 27" in r.stdout, r.stdout)
+        open(os.path.join(cst, "00-tz.md"), "w", encoding="utf-8").write(tz.replace("ТИП ВЫХОДА: гипотезы", "ТИП ВЫХОДА: разбор / гипотезы"))
+        r = run([ce, cst])
+        expect("цена: тип выхода не выбран — отказ, а не догадка", r.returncode == 1 and "ТИП ВЫХОДА" in r.stdout, r.stdout)
+        open(os.path.join(cst, "00-tz.md"), "w", encoding="utf-8").write(tz)
+        price = run([ce, cst]).stdout
+        open(os.path.join(cst, "00-tz.md"), "w", encoding="utf-8").write(tz + price)
+        open(os.path.join(cst, "trace.jsonl"), "w", encoding="utf-8").write(
+            "".join(line(ts=1, agent_id="d%d" % i, role="document-mapper", out=10) for i in range(3)))
+        r = run([ce, cst, "--left"])
+        expect("остаток: потрачено 3, резерв впереди 23, свободных 21",
+               "Потрачено: 3 вызова" in r.stdout and "резерв впереди 23" in r.stdout and "до потолка 21" in r.stdout, r.stdout + price)
+        r = run([os.path.join(HERE, "trace_summary.py"), cst, "--save"])
+        c = json.load(open(os.path.join(cst, "checks", "cost.json"), encoding="utf-8"))
+        expect("сдача: cost.json с оценкой и фактом", c.get("estimate_calls") == 36 and c.get("calls") == 3
+               and "из ~36" in r.stdout, r.stdout)
+        open(os.path.join(cst, "01-review.md"), "w", encoding="utf-8").write("# Разбор\n\n" + "Разрыв логики между первым запуском и использованием. " * 10 + "\n")
+        r = run([os.path.join(HERE, "check_step.py"), cst, "01-review.md", "--since", "0"])
+        expect("шаг: под строкой проверок — строка «Расход»", "\nРасход: 3 вызова" in r.stdout, r.stdout)
+        r = run([os.path.join(HERE, "trace_summary.py"), "--version"])
+        expect("версия системы для шапки лога", r.stdout.startswith("Система: "), r.stdout)
+    finally:
+        shutil.rmtree(proj, ignore_errors=True)
 
 
 def forecast_tests(root):
@@ -379,7 +787,7 @@ def forecast_tests(root):
     os.makedirs(d)
     open(os.path.join(d, "00-tz.md"), "w", encoding="utf-8").write(
         "ТЗ\n\nGAP:\n  1. Как разделить клиентов для рассылок [ключевой] {ответ: контекст}\n  2. Каким признаком определить группу [ключевой] {ответ: данные}\n"
-        "  3. Что делают другие сервисы {ответ: веб}\n\nНА ВХОДЕ: идея\n")
+        "  3. Что делают другие сервисы {ответ: веб}\n\nНА ВХОДЕ: идея\nРЕЖИМ:      обычный\n            новые идеи: да\n")
     sec = ("## GAP %d — вопрос\nЛучшая версия [оценка]: делить по тому, как часто клиент выводит деньги\n"
            "Уверенность: низкая — опор: 1\nНа чём стоит:\n  - рассуждение: так говорили в звонках\nАльтернативы:\n  - делить по стажу в банке\n"
            "Что различит: доля повторных выводов за 90 дней\nСледующий шаг: менеджер — 10 звонков — неделя — бесплатно\n"
@@ -391,7 +799,8 @@ def forecast_tests(root):
     idea = ("%d. Идея %d\n   Суть: делить по тому, кто проводит платежи\n   Почему может сработать: рассуждение: решает бухгалтер\n"
             "   Не повторяет: срок в банке — другая ось\n   Уточнит: вопрос «кто проводит платежи» в интерфейсе\n"
             "   Первый шаг: 10 звонков\n   На чём: новый сбор: 10 звонков клиентам\n   Убьёт: везде платит владелец\n")
-    good = "## НОВЫЕ ИДЕИ\n" + "".join(idea % (i, i) for i in range(1, 6)) + "\n" + good
+    versions = "РЕЖИМ: только версии\n\n" + good
+    good = "РЕЖИМ: версии и новые идеи\n\n## НОВЫЕ ИДЕИ\n" + "".join(idea % (i, i) for i in range(1, 6)) + "\n" + good
     w = lambda t: open(os.path.join(d, "02f-forecast.md"), "w", encoding="utf-8").write(t)
     r = run([cf, d])
     expect("нострадамус: нет файла — проверять нечего", r.returncode == 0, r.stdout)
@@ -431,6 +840,26 @@ def forecast_tests(root):
     w(good.replace("   На чём: новый сбор: 10 звонков клиентам\n", "   На чём: «Сегмент» [F-007]\n", 1))
     r = run([cf, d])
     expect("нострадамус: «На чём» с полем из источника проходит", r.returncode == 0, r.stdout)
+    w(versions)
+    r = run([cf, d])
+    expect("нострадамус: новые идеи заказаны, а режим «только версии» — поймано", r.returncode == 1 and "заказаны" in r.stdout, r.stdout)
+    tz = open(os.path.join(d, "00-tz.md"), encoding="utf-8").read()
+    open(os.path.join(d, "00-tz.md"), "w", encoding="utf-8").write(tz.replace("новые идеи: да", "новые идеи: нет"))
+    r = run([cf, d])
+    expect("нострадамус: «только версии» без заказа проходит", r.returncode == 0, r.stdout)
+    w(good)
+    r = run([cf, d])
+    expect("нострадамус: новые идеи без заказа и без сплошного «сузить» — пойманы", r.returncode == 1 and "не заказаны" in r.stdout, r.stdout)
+    open(os.path.join(d, "02c-validation.md"), "w", encoding="utf-8").write(
+        "ГИПОТЕЗА 1 — а\nВердикт:    сузить\n\nГИПОТЕЗА 2 — б\nВердикт:    не держится\n")
+    r = run([cf, d])
+    expect("нострадамус: все вердикты «сузить / не держится» — новые идеи обязательны и проходят", r.returncode == 0, r.stdout)
+    w(versions)
+    r = run([cf, d])
+    expect("нострадамус: все «сузить», а режим «только версии» — поймано", r.returncode == 1 and "сузить" in r.stdout, r.stdout)
+    open(os.path.join(d, "02d-validation2.md"), "w", encoding="utf-8").write("ГИПОТЕЗА 1 — а\nВердикт:    держится на бумаге\n")
+    r = run([cf, d])
+    expect("нострадамус: условие берётся по второму проходу проверки", r.returncode == 0, r.stdout)
 
 
 def rehearsal_tests(root):
@@ -501,7 +930,7 @@ def ideas_tests(root):
     expect("отсев идей: снята за «нет опор» — поймано", r.returncode == 1 and "идея 3" in r.stdout, r.stdout)
     w(blk[1].replace("Возражения: «бухгалтер не заходит в банк» [F-003] — ослабляет\n", "") + blk[2] + blk[3])
     r = run([ci, d])
-    expect("отсев идей: нет поля «Возражения» — поймано", r.returncode == 1 and "Возражения" in r.stdout, r.stdout)
+    expect("отсев идей: нет поля «Возражения» — поймано", r.returncode == 1 and "возражения не указаны" in r.stdout, r.stdout)
     w(blk[1] + blk[2].replace("Вердикт: переделать первый шаг", "Вердикт: кажется валидной") + blk[3])
     r = run([ci, d])
     expect("отсев идей: невыполнимый шаг при «кажется валидной» — пойман", r.returncode == 1 and "идея 2" in r.stdout and "невыполним" in r.stdout, r.stdout)
@@ -625,36 +1054,51 @@ def map_tests(root):
     os.makedirs(os.path.join(d, "sources", "raw"))
     open(os.path.join(d, "sources.csv"), "w", encoding="utf-8").write(
         "id,kind,location,read\nF-001,context,context/a.md,full\nF-002,interview,context/b.md,full\nF-003,web,https://x.ru,full\n")
-    raw1 = ("Тест кешбэка среди бросивших ИП\nГруппа A: 331 / 1733 = 19.09%\nГруппа B: 337 / 1757 = 19.18%\n"
-            "p-value 0.95, различий нет\nКешбэк начисляется баллами программы лояльности\n"
+    raw1 = ("Тест бонуса в сегменте малых команд\nГруппа A: 331 / 1733 = 19.09%\nГруппа B: 337 / 1757 = 19.18%\n"
+            "p-value 0.95, различий нет\nБонус начисляется баллами программы лояльности\n"
             "Ограничение: мощность теста низкая\nКонверсия 4,5% против 3,9%\nОтток 12% за 2 недели\n"
             "В тесте 120 клиентов\n<table><tr><td>Группа C</td><td>9 / 5 264 = 0.17%</td></tr></table>\n")
     open(os.path.join(d, "sources", "raw", "F-001.txt"), "w", encoding="utf-8").write(raw1)
     open(os.path.join(d, "sources", "raw", "F-002.txt"), "w", encoding="utf-8").write(
-        "Респондент 1: Мы платим по счёту, карту не берём.\nИнтервьюер: Почему?\n")
+        "Респондент 1: Мы платим по счёту, сервис не берём.\nИнтервьюер: Почему?\n")
     r = run([md, d])
     expect("карта: строится для context и interview, web пропущен", r.returncode == 0 and "документов 2" in r.stdout, r.stdout + r.stderr)
     data = _json.load(open(os.path.join(d, "map", "F-001.json"), encoding="utf-8"))
     byt = {l["text"]: l["tags"] for l in data["lines"]}
     expect("карта: теги число, продукт, срез", "число" in byt.get("Группа A: 331 / 1733 = 19.09%", [])
-           and "продукт" in byt.get("Кешбэк начисляется баллами программы лояльности", [])
-           and "срез" in byt.get("Тест кешбэка среди бросивших ИП", []), str(byt))
+           and "продукт" in byt.get("Бонус начисляется баллами программы лояльности", [])
+           and "срез" in byt.get("Тест бонуса в сегменте малых команд", []), str(byt))
     expect("карта: строка HTML-таблицы собрана по ячейкам", "Группа C | 9 / 5 264 = 0.17%" in byt, str(list(byt)))
     r = run([md, d])
     expect("карта: неизменившийся документ берётся из кэша", "из кэша 2" in r.stdout, r.stdout)
+    terms = os.path.join(root, "map-terms.txt")
+    open(terms, "w", encoding="utf-8").write("продукт: стрелк\nсрез: дальн\\w* клиент\\w*\nмусор без двоеточия\n")
+    probe = ("import sys; sys.path.insert(0, %r); import map_docs as m; "
+             "print(m.tags('Стрелка включена у дальних клиентов'), m.tags('Стрелка включена'))" % HERE)
+    env = dict(os.environ, MAP_TERMS=terms)
+    r = subprocess.run([PY, "-c", probe], capture_output=True, text=True, env=env)
+    r0 = subprocess.run([PY, "-c", probe], capture_output=True, text=True, env=dict(os.environ, MAP_TERMS=terms + ".нет"))
+    expect("карта: слова своего продукта из локального .map-terms размечаются, без файла — нет",
+           "'срез', 'продукт'" in r.stdout and "['продукт']" in r.stdout and "[] []" in r0.stdout, r.stdout + r.stderr + r0.stdout)
+    ms = os.path.join(HERE, "map_summary.py")
+    r = run([ms, d])
+    expect("сводка карты: строка на документ, срезы и строки про продукт без модели",
+           r.returncode == 0 and "| F-001 | a.md |" in r.stdout and "- сегменте — 1" in r.stdout and "F-001 L" in r.stdout
+           and "Бонус начисляется баллами" in r.stdout and os.path.exists(os.path.join(d, "map", "summary.md")), r.stdout)
+    expect("сводка карты: прочитанные целиком не попадают в «не читается»", "## Не читается или частично\n- нет" in r.stdout, r.stdout)
     num = [l["n"] for l in data["lines"] if "число" in l["tags"]]
     n = {l["text"]: l["n"] for l in data["lines"]}
-    la, lb = n["Группа A: 331 / 1733 = 19.09%"], n["Кешбэк начисляется баллами программы лояльности"]
-    lr = n["Респондент 1: Мы платим по счёту, карту не берём."] if "Респондент 1: Мы платим по счёту, карту не берём." in n else 1
+    la, lb = n["Группа A: 331 / 1733 = 19.09%"], n["Бонус начисляется баллами программы лояльности"]
+    lr = n["Респондент 1: Мы платим по счёту, сервис не берём."] if "Респондент 1: Мы платим по счёту, сервис не берём." in n else 1
     d2 = os.path.join(d, "..")
     f2 = _json.load(open(os.path.join(d, "map", "F-002.json"), encoding="utf-8"))["lines"][0]["n"]
     cover = ", ".join("L%d" % x for x in num)
 
-    def dossier(num_refs=cover, key="L%d: «Кешбэк начисляется баллами программы лояльности»" % lb, extra="", f2status="прочитан",
+    def dossier(num_refs=cover, key="L%d: «Бонус начисляется баллами программы лояльности»" % lb, extra="", f2status="прочитан",
                 drop_field=None, second=True):
-        b1 = ("### F-001 — тест кешбэка\n- Тип: отчёт о тесте\n- Про кого: бросившие ИП, L1\n- Сколько: 120 клиентов, L%d\n"
+        b1 = ("### F-001 — тест бонуса\n- Тип: отчёт о тесте\n- Про кого: сегмент малых команд, L1\n- Сколько: 120 клиентов, L%d\n"
               "- Что измерено: результат теста\n- Дата: не указана\n- Выводы документа:\n  - различий нет, L%d\n"
-              "- Числа и срезы: %s\n- Про продукт: кешбэк баллами, L%d\n- Риски и ограничения команды: мощность низкая\n"
+              "- Числа и срезы: %s\n- Про продукт: бонус баллами, L%d\n- Риски и ограничения команды: мощность низкая\n"
               "- Ключевая цитата: %s\n- Сверх схемы: нет\n- Отброшено: нет\n- Статус чтения: прочитан\n%s" % (
                   n["В тесте 120 клиентов"], n["p-value 0.95, различий нет"], num_refs, lb, key, extra))
         if drop_field:
@@ -674,10 +1118,10 @@ def map_tests(root):
     dossier(key="L%d: «Кешбэк начисляется рублями на счёт»" % lb)
     r = run([ck, d])
     expect("досье: цитата не из строки поймана", r.returncode == 1 and "не найдена" in r.stdout, r.stdout)
-    dossier(key="«Кешбэк начисляется баллами программы лояльности»")
+    dossier(key="«Бонус начисляется баллами программы лояльности»")
     r = run([ck, d])
     expect("досье: цитата без адреса строки поймана", r.returncode == 1 and "без адреса" in r.stdout, r.stdout)
-    dossier(key="L999: «Кешбэк начисляется баллами программы лояльности»")
+    dossier(key="L999: «Бонус начисляется баллами программы лояльности»")
     r = run([ck, d])
     expect("досье: несуществующая строка поймана", r.returncode == 1 and "нет строки" in r.stdout, r.stdout)
     dossier(drop_field="Про продукт")
@@ -724,18 +1168,18 @@ def model_tests(root):
     open(os.path.join(d, "sources.csv"), "w", encoding="utf-8").write(
         "id,kind,location,read,root\nF-001,context,context/a.md,full,\nF-002,interview,context/b.md,full,\nF-003,context,context/c.md,full,\n")
     open(os.path.join(d, "sources", "raw", "F-001.txt"), "w", encoding="utf-8").write(
-        "Тест кешбэка среди бросивших ИП\nГруппа A: 331 / 1733 = 19.09%\nГруппа B: 337 / 1757 = 19.18%\n"
-        "Размер теста 5264 клиента\nКешбэк начисляется баллами программы лояльности\n")
-    open(os.path.join(d, "sources", "raw", "F-002.txt"), "w", encoding="utf-8").write("Респондент 1: платим по счёту, карту не берём\n")
+        "Тест бонуса в сегменте малых команд\nГруппа A: 331 / 1733 = 19.09%\nГруппа B: 337 / 1757 = 19.18%\n"
+        "Размер теста 5264 клиента\nБонус начисляется баллами программы лояльности\n")
+    open(os.path.join(d, "sources", "raw", "F-002.txt"), "w", encoding="utf-8").write("Респондент 1: платим по счёту, сервис не берём\n")
     open(os.path.join(d, "sources", "raw", "F-003.txt"), "w", encoding="utf-8").write("Мы считаем, что клиенты уходят из-за цены.\n")
     run([md, d])
     open(os.path.join(d, "00m-schema.txt"), "w", encoding="utf-8").write(
-        "row: Бросившие ИП\nrow: Новые\nfeature: Размер группы\nfeature: Причины\nfeature: Что вместо карты\n")
+        "row: Малые команды\nrow: Новые\nfeature: Размер группы\nfeature: Причины\nfeature: Что вместо сервиса\n")
     head = "row,feature,value,quote,source,lines,group_match,group_note,n,type,date\n"
-    good = ("Бросившие ИП,Размер группы,5264 клиента,Размер теста 5264 клиента,F-001,L4,точная,,5264,результат теста,2026-04\n"
-            "Бросившие ИП,Причины,платят по счёту,\"платим по счёту, карту не берём\",F-002,L1,соседняя,,1,слова,2026\n"
+    good = ("Малые команды,Размер группы,5264 клиента,Размер теста 5264 клиента,F-001,L4,точная,,5264,результат теста,2026-04\n"
+            "Малые команды,Причины,платят по счёту,\"платим по счёту, сервис не берём\",F-002,L1,соседняя,,1,слова,2026\n"
             "Новые,Причины,команда: цена,клиенты уходят из-за цены,F-003,L1,соседняя,,не указано,утверждение команды,2024\n"
-            "Новые,Что вместо карты,кешбэк баллами,Кешбэк начисляется баллами программы лояльности,F-001,L5,соседняя,,5264,описание,2026-04\n")
+            "Новые,Что вместо сервиса,бонус баллами,Бонус начисляется баллами программы лояльности,F-001,L5,соседняя,,5264,описание,2026-04\n")
     cells = os.path.join(d, "00m-cells.csv")
     open(cells, "w", encoding="utf-8").write(head + good)
     r = run([bm, d, "--today", "2026-10-18"])
@@ -745,7 +1189,7 @@ def model_tests(root):
     open(cells, "w", encoding="utf-8").write(head + good.replace("Размер теста 5264 клиента", "Размер теста 9999 клиента"))
     r = run([bm, d])
     expect("модель: цитата не из строки поймана", r.returncode == 1 and "не найдена" in r.stdout, r.stdout)
-    open(cells, "w", encoding="utf-8").write(head + good.replace("Бросившие ИП,Причины", "Бросившие ООО,Причины"))
+    open(cells, "w", encoding="utf-8").write(head + good.replace("Малые команды,Причины", "Средние команды,Причины"))
     r = run([bm, d])
     expect("модель: строка вне схемы поймана", r.returncode == 1 and "вне схемы" in r.stdout, r.stdout)
     open(cells, "w", encoding="utf-8").write(head + good.replace("результат теста", "мнение"))
@@ -753,7 +1197,7 @@ def model_tests(root):
     expect("модель: недопустимый тип источника пойман", r.returncode == 1 and "type" in r.stdout, r.stdout)
     open(cells, "w", encoding="utf-8").write(head + good)
     run([bm, d, "--today", "2026-10-18"])
-    dos = ("### F-001 — тест\n- Тип: отчёт о тесте\n- Про кого: бросившие ИП\n- Про продукт: кешбэк баллами\n- Статус чтения: прочитан\n\n"
+    dos = ("### F-001 — тест\n- Тип: отчёт о тесте\n- Про кого: сегмент малых команд\n- Про продукт: бонус баллами\n- Статус чтения: прочитан\n\n"
            "### F-002 — интервью\n- Тип: интервью\n- Про кого: респондент\n- Про продукт: нет\n- Статус чтения: прочитан\n\n"
            "### F-003 — утверждение\n- Тип: утверждение команды\n- Про кого: не указано\n- Про продукт: нет\n- Статус чтения: не читается\n")
     open(os.path.join(d, "00d-map.md"), "w", encoding="utf-8").write(dos)
@@ -763,10 +1207,10 @@ def model_tests(root):
            r.returncode == 0 and "Углубить: F-001" in r.stdout and "F-003" in imp.split("Нужна расшифровка")[1].split("##")[0], r.stdout + imp[:300])
     lim = open(os.path.join(d, "00r-limits.md"), "w", encoding="utf-8")
     lim.write("| № | статус | что | доказательство | кто подтвердил |\n| --- | --- | --- | --- | --- |\n"
-              "| R-1 | есть | кешбэк баллами | «Кешбэк начисляется баллами программы лояльности» [F-001 L5] | документы |\n"
-              "| R-2 | нет | рублёвого кешбэка нет | — | человек |\n")
+              "| R-1 | есть | бонус баллами | «Бонус начисляется баллами программы лояльности» [F-001 L5] | документы |\n"
+              "| R-2 | нет | денежного бонуса нет | — | человек |\n")
     lim.close()
-    hyp = ("### Г-1. Сообщение о баллах\n- **Клетка:** Бросившие ИП × Причины\n- **Рамка продукта:** R-1\n- **Размер группы:** 5264 [F-001]\n\n"
+    hyp = ("### Г-1. Сообщение о баллах\n- **Клетка:** Малые команды × Причины\n- **Рамка продукта:** R-1\n- **Размер группы:** 5264 [F-001]\n\n"
            "### Г-2. Другая\n- **Клетка:** Новые × Размер группы\n- **Рамка продукта:** R-1\n- **Размер группы:** 3000 [допущение: оценка]\n")
     hp = os.path.join(d, "02-hypotheses.md")
     open(hp, "w", encoding="utf-8").write(hyp)
@@ -777,8 +1221,8 @@ def model_tests(root):
     expect("цепочка: механики нет в продукте — ошибка", r.returncode == 1 and "нет в продукте" in r.stdout, r.stdout)
     open(hp, "w", encoding="utf-8").write(hyp.replace("- **Рамка продукта:** R-1\n- **Размер группы:** 5264 [F-001]", "- **Размер группы:** 5264 [F-001]"))
     r = run([cc, d])
-    expect("цепочка: нет рамки продукта — ошибка", r.returncode == 1 and "Рамка продукта" in r.stdout, r.stdout)
-    open(hp, "w", encoding="utf-8").write(hyp.replace("Бросившие ИП × Причины", "Бросившие ООО × Причины"))
+    expect("цепочка: нет рамки продукта — ошибка", r.returncode == 1 and "рамка продукта" in r.stdout, r.stdout)
+    open(hp, "w", encoding="utf-8").write(hyp.replace("Малые команды × Причины", "Средние команды × Причины"))
     r = run([cc, d])
     expect("цепочка: клетки нет в модели — ошибка", r.returncode == 1 and "нет в модели" in r.stdout, r.stdout)
     open(hp, "w", encoding="utf-8").write(hyp.replace("5264 [F-001]", "по оценке"))
@@ -790,9 +1234,9 @@ def model_tests(root):
     r = run([cc, d])
     expect("цепочка: рамка с цитатой не из строки — ошибка", r.returncode == 1 and "R-3" in r.stdout, r.stdout)
     tr = os.path.join(d, "02e-trace.md")
-    good_tr = ("1. Клетка: Бросившие ИП × Размер группы; надёжность: значение; гипотеза: Г-1\n"
-               "2. Клетка: Новые × Что вместо карты; надёжность: версия; гипотеза: Г-2\n"
-               "3. Клетка: Бросившие ИП × Причины; надёжность: идея; гипотеза: Г-3\n"
+    good_tr = ("1. Клетка: Малые команды × Размер группы; надёжность: значение; гипотеза: Г-1\n"
+               "2. Клетка: Новые × Что вместо сервиса; надёжность: версия; гипотеза: Г-2\n"
+               "3. Клетка: Малые команды × Причины; надёжность: идея; гипотеза: Г-3\n"
                "4. Клетка: Новые × Размер группы; надёжность: нет данных; гипотеза: Г-4; не ранжируется\n")
     open(tr, "w", encoding="utf-8").write(good_tr)
     r = run([cr, d])
@@ -1137,6 +1581,15 @@ def main():
         polygon_tests(root)
         sensitivity_tests(root)
         path_tests(root)
+        trace_tests()
+        roles_tests()
+        route_tests()
+        data_block_tests(root)
+        rules_tests()
+        audit_tests(root)
+        message_tests()
+        polygon_more_tests(root)
+        effort_tests(root)
         knowledge_tests(root)
         map_tests(root)
         model_tests(root)

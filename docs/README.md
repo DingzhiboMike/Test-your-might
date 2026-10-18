@@ -10,6 +10,6 @@
   --screenshot=docs/architecture-1-roles.png "file://$PWD/docs/src/architecture-1-roles.html"
 ```
 
-Высота окна и имя файла для остальных схем: маршруты — `952,592` и `architecture-2-routes`; пример прогона (валидация идеи) — `952,544` и `architecture-3-example`; картография документов — `952,424` и `architecture-4-document-mapping`.
+Высота окна и имя файла для остальных схем: маршруты — `952,592` и `architecture-2-routes`; пример прогона (валидация идеи) — `952,544` и `architecture-3-example`; картография документов — `952,592` и `architecture-4-document-mapping`.
 
-Предложение по картографии документов — `proposal-document-dossiers.md` в этой папке. Актуальное описание системы — `AGENTS.md` в корне; контракты скиллов — `.claude/skills/orchestrator/registry.md`.
+Предложение по картографии документов — `proposal-document-dossiers.md` в этой папке. Актуальное описание системы — `AGENTS.md` в корне; указатель исполнителей — `.claude/skills/orchestrator/registry.md`, контракт каждого — в конце его `SKILL.md`, маршруты оркестратора — `.claude/skills/orchestrator/routes/`.

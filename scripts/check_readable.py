@@ -23,7 +23,7 @@
 Если тип выхода «гипотезы» и есть 02e-position.md, а 03-backlog.md нет — ошибка.
 
 Лимиты: 07a — до 1600 слов и до 10 задач, 07b — до 1600 слов, 07c — до 500 слов и до 10 пунктов,
-02e — до 450 слов, 06-validation — до 5000 слов, 03-backlog — до 1500 слов и до 12 тестов, 08-handoff (часть для
+02e — до 450 слов, 06-validation — до 5000 слов, 03-backlog — до 1500 слов и до ЁМКОСТЬ + 1 тестов (строка ЁМКОСТЬ в ТЗ; нет строки — до 12), 08-handoff (часть для
 человека) — до 900 слов.
 Каждая цитата «…» длиннее 20 знаков в 07b должна дословно стоять в 07d-trace.md (там её проверяет check_quotes).
 
@@ -32,6 +32,9 @@
 import os
 import re
 import sys
+
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from check_effort import capacity  # noqa: E402
 
 FILES = ("07a-analyst.md", "07b-editor.md", "07c-decisions.md")
 POSITION = "02e-position.md"
@@ -132,8 +135,12 @@ def main():
             rows = backlog_rows(text)
             if not rows:
                 errors.append("%s: нет таблицы тестов (строки, начинающиеся с номера)" % f)
-            if len(rows) > 12:
-                errors.append("%s: %d тестов при лимите 12" % (f, len(rows)))
+            cap = capacity(open(os.path.join(task, "00-tz.md"), encoding="utf-8").read()
+                           if os.path.exists(os.path.join(task, "00-tz.md")) else "")
+            limit = 12 if cap is None else cap + 1
+            if len(rows) > limit:
+                errors.append("%s: %d тестов при лимите %d%s — остальные кандидаты одной строкой «В очереди»" % (
+                    f, len(rows), limit, "" if cap is None else " (ёмкость %d + 1)" % cap))
             for r in rows:
                 if len(r) < 9 or any(not c.strip(" —-–") for c in r[:9]):
                     errors.append("%s: тест %s — не заполнены все колонки (кому, что говорим, где, метрика, "

@@ -110,7 +110,7 @@ def lenses(text, tz, heads, errors):
     for name in LENSES:
         lm = re.search(r"^\s*[-*]?\s*%s\s*[—:-]\s*(.*)$" % re.escape(name), block, re.M | re.I)
         if not lm:
-            errors.append("ЛИНЗЫ: нет строки «%s» — зову <источник> или не нужно: <причина>" % name)
+            errors.append("ЛИНЗЫ: нет решения по линзе «%s»" % name)
             continue
         val = lm.group(1).strip()
         if re.match(r"зов\w*\s+[\w-]+", val, re.I):
@@ -123,7 +123,7 @@ def lenses(text, tz, heads, errors):
                 errors.append("ЛИНЗЫ: «%s — не нужно: %s» — не причина: линза ищет сырьё в открытом поле, а не ответ "
                               "во внутренних данных" % (name, reason[:60]))
         else:
-            errors.append("ЛИНЗЫ: «%s» — ни «зову <источник>», ни «не нужно: <причина>»" % name)
+            errors.append("ЛИНЗЫ: по линзе «%s» нет решения — ни хода к источнику, ни причины отказа" % name)
     if called == 0 and re.search(r"^\**ВЕБ\**:\s*да", tz, re.M | re.I):
         errors.append("ЛИНЗЫ: при «ВЕБ: да» ни одна линза не вызвана — генератор построит всё из одного корня")
 

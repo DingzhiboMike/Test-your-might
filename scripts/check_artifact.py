@@ -79,6 +79,7 @@ def check_one(task, artifact, contains, review):
         else:
             blocking = rf.blocking_ids(open(rpath, encoding="utf-8").read())
             block = rf.answer_block(text)
+            problems += ["{}: {}".format(artifact, e) for e in rf.block_errors(text)]
             if blocking and block is None:
                 problems.append("{}: нет блока «ПО ПРОВЕРКЕ СМЫСЛА» с ответами на замечания".format(artifact))
             elif blocking:
@@ -88,7 +89,7 @@ def check_one(task, artifact, contains, review):
                         problems.append("{}: нет ответа на блокирующее замечание {}".format(artifact, fid))
                 for fid, (status, reason) in ans.items():
                     if status == "оспорено" and not reason:
-                        problems.append("{}: замечание {} оспорено без причины (нужно «{} — оспорено: причина»)".format(artifact, fid, fid))
+                        problems.append("{}: замечание {} оспорено без причины".format(artifact, fid))
     return problems
 
 

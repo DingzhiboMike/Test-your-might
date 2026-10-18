@@ -26,22 +26,25 @@ body{font-family:Inter,"SF Pro Text",-apple-system,"Helvetica Neue",Arial,sans-s
 
 <div class="row"><div class="lbl">Диспетчер</div><div class="flow">
 <div class="b t"><div class="h">Скрипт</div><div class="s">очистка, числа, срезы</div></div><div class="a"></div>
-<div class="b"><div class="h">Лёгкая модель</div><div class="s">поля по схеме</div></div><div class="a"></div>
-<div class="b t"><div class="h">Проверка карты</div><div class="s">цитаты, полнота</div></div><div class="a"></div>
-<div class="b"><div class="h">ТЗ</div><div class="s">группы, рамки</div></div><div class="a"></div>
+<div class="b t"><div class="h">Сводка карты</div><div class="s">без модели</div></div><div class="a"></div>
+<div class="b"><div class="h">ТЗ</div><div class="s">группы, рамки, цена</div></div><div class="a"></div>
 <div class="b o"><div class="h">Согласование</div></div></div></div>
 
 <div class="row"><div class="lbl">Оркестратор</div><div class="flow">
+<div class="b"><div class="h">Лёгкая модель</div><div class="s">досье по схеме</div></div><div class="a"></div>
+<div class="b t"><div class="h">Проверка карты</div><div class="s">цитаты, полнота</div></div><div class="a"></div>
 <div class="b t"><div class="h">Модель предмета</div><div class="s">группа × факт</div></div><div class="a"></div>
 <div class="b"><div class="h">Консультант</div><div class="s">путь от пробелов</div></div><div class="a"></div>
-<div class="b t"><div class="h">Источники</div><div class="s">и линзы</div></div><div class="a"></div>
+<div class="b t"><div class="h">Источники</div><div class="s">и линзы</div></div></div></div>
+
+<div class="row"><div class="lbl"></div><div class="flow">
 <div class="b"><div class="h">Генератор</div><div class="s">клетка и рамки</div></div><div class="a"></div>
-<div class="b t"><div class="h">Проверка цепочки</div><div class="s">клетка, рамка, размер</div></div></div></div>
+<div class="b t" style="width:180px"><div class="h">Проверка цепочки</div><div class="s">клетка, рамка, размер</div></div></div></div>
 
 <div class="row"><div class="lbl">Финиш</div><div class="flow">
-<div class="b t"><div class="h">Нострадамус</div><div class="s">и отсев идей</div></div><div class="a"></div>
+<div class="b t" style="width:180px"><div class="h">Нострадамус</div><div class="s">версии; идеи — по условию</div></div><div class="a"></div>
 <div class="b"><div class="h">Позиция</div><div class="s">по критерию ТЗ</div></div><div class="a"></div>
-<div class="b"><div class="h">Бэклог тестов</div><div class="s">что запускать</div></div><div class="a"></div>
+<div class="b"><div class="h">Бэклог тестов</div><div class="s">ёмкость + 1</div></div><div class="a"></div>
 <div class="b o"><div class="h">Сдача</div></div></div></div>
 
 <div class="row"><div class="lbl">По запросу</div><div class="flow">
@@ -49,6 +52,7 @@ body{font-family:Inter,"SF Pro Text",-apple-system,"Helvetica Neue",Arial,sans-s
 
 <div class="notes">
 <span class="leg"></span><b>Зелёная рамка</b> — делает скрипт, а не модель.<br>
+<b>До согласования</b> работают только скрипты: модель зовут после «да», чтобы смена цели не выбросила оплаченную работу.<br>
 <b>Лёгкая модель</b> описывает документы и цитирует по номерам строк; важность считает скрипт по формуле из ТЗ.<br>
 <b>Карта документов</b> хранится по хэшу файла и повторно не строится.<br>
 <b>Человек</b> подтверждает группы и рамки продукта: что в продукте есть и чего нет.<br>

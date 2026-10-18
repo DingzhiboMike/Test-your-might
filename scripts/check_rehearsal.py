@@ -11,6 +11,8 @@
    и на каждое следствие со статусом не «как есть» там ответ «применено», «человеку» или «отклонено» с текстом
    после двоеточия.
 
+Вместо текста — блоки данных «следствия» и «по_пробному_прогону» (data_block.py): проверяются по схеме.
+
 Ключ `--rehearsal-only` — сразу после прогона, до исправления бэклога. Ошибка — код возврата 1.
 Отчёт: tasks/<папка>/checks/rehearsal.md. Нет `03c-rehearsal.md` — проверять нечего (код 0).
 """
@@ -20,6 +22,7 @@ import sys
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from check_readable import backlog_rows  # noqa: E402
+import data_block  # noqa: E402
 
 UNIT = re.compile(r"^\s*[-*]?\s*\**(Строка\s+\d+|Карточка\s+[^—:\n]+?)\**\s*[—:-]\s*(?:статус\s*:\s*)?(.*)$", re.I | re.M)
 STATUS = re.compile(r"как есть|после правки|не запускать", re.I)
@@ -48,6 +51,10 @@ def check(task, rehearsal_only):
     if not reh:
         return None, []
     errors = []
+    canon, block_errors = data_block.canonical(reh, "следствия")
+    errors += block_errors
+    if canon is not None:
+        reh = canon
     m = re.search(r"^#{0,3}\s*СЛЕДСТВИЯ\s*$", reh, re.M)
     if not m:
         return {}, ["нет раздела «СЛЕДСТВИЯ»: прогон не сказал, что он меняет в эксперименте и решении"]
@@ -70,7 +77,7 @@ def check(task, rehearsal_only):
             continue
         units[key(um.group(1))] = (um.group(1).strip(), st.group(0).lower())
     if parts["Для эксперимента"] is not None and not units:
-        errors.append("СЛЕДСТВИЯ: в «Для эксперимента» нет ни одной строки «Строка N — статус: …»")
+        errors.append("СЛЕДСТВИЯ: в «Для эксперимента» нет ни одного теста со статусом")
 
     backlog = read(os.path.join(task, "03-backlog.md"))
     for row in backlog_rows(backlog):
@@ -80,6 +87,10 @@ def check(task, rehearsal_only):
     if not rehearsal_only:
         target_name = "03-backlog.md" if backlog else "03-plan.md"
         target = backlog or read(os.path.join(task, target_name))
+        canon, block_errors = data_block.canonical(target, "по_пробному_прогону")
+        errors += ["%s: %s" % (target_name, e) for e in block_errors]
+        if canon is not None:
+            target = canon
         block = part(target, r"ПО ПРОБНОМУ ПРОГОНУ", ["ПО ПРОВЕРКЕ СМЫСЛА", "Чего этот"]) if target else None
         pending = [(lab, st) for lab, st in units.values() if st != "как есть"]
         if pending and block is None:
@@ -92,8 +103,7 @@ def check(task, rehearsal_only):
                     answers[key(am.group(1))] = a
             for lab, st in pending:
                 if key(lab) not in answers:
-                    errors.append("%s (%s): в «ПО ПРОБНОМУ ПРОГОНУ» нет ответа «применено / человеку / отклонено: …»"
-                                  % (lab, st))
+                    errors.append("%s (%s): в «ПО ПРОБНОМУ ПРОГОНУ» нет ответа на следствие" % (lab, st))
     return units, errors
 
 

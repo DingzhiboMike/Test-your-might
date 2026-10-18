@@ -140,7 +140,7 @@ def main():
             m = ART_RE.search(text)
             target = os.path.join(task, m.group(1)) if m else None
             if not target or not os.path.exists(target):
-                problems.append("ОШИБКА нет строки «Артефакт: <файл>» или файла артефакта — цитаты [A] не с чем сверить")
+                problems.append("ОШИБКА не указан артефакт или его файла нет — цитаты [A] не с чем сверить")
             else:
                 art = norm(open(target, encoding="utf-8").read())
                 for q in a_quotes:
