@@ -16,6 +16,9 @@
 - WebSearch и WebFetch — не для известных ролей без сети (agent_type из таблицы). Подагент общего типа
   (agent_type не из таблицы) сеть не теряет: роль хук не знает.
 
+Если в задаче заведён маршрут (tasks/<задача>/state.json, его пишет scripts/route.py), подагент пишет в папку задачи
+только артефакт идущего шага и маски --allow этого шага; шага нет — запись блокируется: route.py start перед вызовом.
+
 Чтобы править саму систему, создай в корне пустой файл .polygon-dev (в git не попадает) и удали после.
 """
 import json
@@ -78,6 +81,20 @@ def bash_reason(cmd, agent_type):
             return "find с -delete или -exec"
     return None
 
+
+
+def step_masks(task_dir):
+    """Маски записи идущих шагов; None — маршрута в коде нет."""
+    try:
+        with open(os.path.join(task_dir, "state.json"), encoding="utf-8") as f:
+            st = json.load(f)
+    except (OSError, ValueError):
+        return None
+    masks = []
+    for step in st.get("steps", []):
+        if step.get("status") == "running":
+            masks += [step.get("artifact", "")] + list(step.get("allow", []))
+    return masks
 
 
 def project_root(data):
@@ -146,6 +163,13 @@ def main():
             reason = "реестр источников пишется только через scripts/add_source.py, отчёты проверок — только скриптами"
         elif sub in ("log.md", "00-tz.md") and data.get("agent_id"):
             reason = "log.md ведёт только оркестратор, 00-tz.md — диспетчер; исполнитель пишет только свой артефакт"
+        elif data.get("agent_id"):
+            import fnmatch
+            masks = step_masks(os.path.join(root, "tasks", parts[1]))
+            inner = "/".join(parts[2:])
+            if masks is not None and not any(m and fnmatch.fnmatch(inner, m) for m in masks):
+                reason = ("файл вне периметра идущего шага (%s)" % ", ".join(m for m in masks if m) if masks else
+                          "шаг не зарегистрирован: оркестратор запускает route.py start перед вызовом")
 
     if reason:
         sys.stderr.write("Запись в {} заблокирована: {}.\n".format(rel, reason))

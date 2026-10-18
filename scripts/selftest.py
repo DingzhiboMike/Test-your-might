@@ -428,6 +428,71 @@ def path_tests(root):
     expect("ТЗ: без строки ЦЕНА — поймано", r.returncode == 1 and "ЦЕНА" in r.stdout, r.stdout)
 
 
+def route_tests():
+    """Маршрут в коде: state.json, периметр шага по хэшам, хук записи по шагу, возврат ошибок исполнителю."""
+    proj = tempfile.mkdtemp(prefix="polygon-route-")
+    try:
+        open(os.path.join(proj, "AGENTS.md"), "w", encoding="utf-8").write("#\n")
+        t = os.path.join(proj, "tasks", "rt")
+        os.makedirs(t)
+        rt = os.path.join(HERE, "route.py")
+        open(os.path.join(t, "00-tz.md"), "w", encoding="utf-8").write("ТЗ\nТИП ВЫХОДА: вердикты по проверке\n")
+        r = run([rt, "init", t])
+        expect("маршрут: без СОГЛАСОВАНО не заводится", r.returncode == 1 and "СОГЛАСОВАНО" in r.stdout, r.stdout)
+        open(os.path.join(t, "00-tz.md"), "a", encoding="utf-8").write("СОГЛАСОВАНО: да\n")
+        r = run([rt, "init", t])
+        expect("маршрут: заведён по типу выхода", r.returncode == 0 and "вердикты по проверке" in r.stdout, r.stdout)
+        body = "# Вердикты\n\n" + "Гипотеза о письме малым командам: критерий успеха не достигнут, отсекаем. " * 8 + "\n"
+        hook = os.path.join(HERE, "hooks", "guard_writes.py")
+
+        def write_code(name):
+            d = {"cwd": proj, "tool_name": "Write", "agent_id": "a1", "agent_type": "results-reviewer",
+                 "tool_input": {"file_path": os.path.join(t, name)}}
+            return run([hook], json.dumps(d)).returncode
+
+        expect("хук: без зарегистрированного шага подагенту в задачу нельзя", write_code("04-results.md") == 2)
+        r = run([rt, "start", t, "results-reviewer", "04-results.md"])
+        expect("маршрут: шаг зарегистрирован", r.returncode == 0 and "Шаг 1" in r.stdout, r.stdout)
+        expect("хук: в артефакт идущего шага можно", write_code("04-results.md") == 0)
+        expect("хук: в чужой файл при идущем шаге нельзя", write_code("02-hypotheses.md") == 2)
+        open(os.path.join(t, "04-results.md"), "w", encoding="utf-8").write(body)
+        open(os.path.join(t, "02-hypotheses.md"), "w", encoding="utf-8").write("чужое\n")
+        r = run([rt, "done", t])
+        expect("маршрут: чужой файл пойман по хэшу", r.returncode == 1 and "02-hypotheses.md" in r.stdout and "Проверки:" in r.stdout, r.stdout)
+        r = run([rt, "ready", t])
+        expect("готовность: шаг с ошибками не даёт сдать", r.returncode == 1 and "закрыт с ошибками" in r.stdout, r.stdout)
+        os.remove(os.path.join(t, "02-hypotheses.md"))
+        r = run([rt, "start", t, "results-reviewer", "04-results.md"])
+        open(os.path.join(t, "04-results.md"), "a", encoding="utf-8").write("Дополнение.\n")
+        r = run([rt, "done", t])
+        expect("маршрут: только свой артефакт — шаг закрыт", r.returncode == 0 and "ок" in r.stdout, r.stdout)
+        st = json.load(open(os.path.join(t, "state.json"), encoding="utf-8"))
+        st["steps"][0]["status"] = "done"
+        open(os.path.join(t, "state.json"), "w", encoding="utf-8").write(json.dumps(st))
+        r = run([rt, "ready", t])
+        expect("готовность: артефакты и проверки типа на месте", r.returncode == 0, r.stdout)
+        r = run([rt, "status", t])
+        expect("маршрут: статус для продолжения после обрыва", "Шаг 2 — results-reviewer" in r.stdout and "Обязательные впереди" in r.stdout, r.stdout)
+
+        gate = os.path.join(HERE, "hooks", "step_gate.py")
+        tr = os.path.join(proj, "agent.jsonl")
+        open(tr, "w", encoding="utf-8").write(json.dumps({"type": "user", "timestamp": "2026-10-18T10:00:00Z",
+            "message": {"role": "user", "content": "Сверь результаты, артефакт tasks/rt/04-results.md"}}) + "\n")
+        run([rt, "start", t, "results-reviewer", "04-results.md"])
+        open(os.path.join(t, "04-results.md"), "w", encoding="utf-8").write("коротко\n")
+        ev = {"hook_event_name": "SubagentStop", "cwd": proj, "agent_id": "a2", "agent_type": "results-reviewer",
+              "agent_transcript_path": tr, "stop_hook_active": False}
+        g = run([gate], json.dumps(ev))
+        expect("ворота: артефакт с ошибками возвращается исполнителю", g.returncode == 2 and "04-results.md" in g.stderr, g.stderr)
+        ev["stop_hook_active"] = True
+        expect("ворота: второй раз подряд не держат", run([gate], json.dumps(ev)).returncode == 0)
+        ev["stop_hook_active"] = False
+        open(os.path.join(t, "04-results.md"), "w", encoding="utf-8").write(body)
+        expect("ворота: исправленный артефакт пропускают", run([gate], json.dumps(ev)).returncode == 0)
+    finally:
+        shutil.rmtree(proj, ignore_errors=True)
+
+
 def roles_tests():
     """Описания агентов совпадают с таблицей ролей; хук держит Bash и сеть подагентов."""
     r = run([os.path.join(HERE, "roles.py"), "--check"])
@@ -1358,6 +1423,7 @@ def main():
         path_tests(root)
         trace_tests()
         roles_tests()
+        route_tests()
         effort_tests(root)
         knowledge_tests(root)
         map_tests(root)

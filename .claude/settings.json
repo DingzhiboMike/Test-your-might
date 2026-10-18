@@ -31,6 +31,10 @@
           {
             "type": "command",
             "command": "sh -c 'for d in \"$CLAUDE_PROJECT_DIR\" \"$(git rev-parse --show-toplevel 2>/dev/null)\" \"$PWD\"; do f=\"$d/scripts/hooks/trace.py\"; [ -n \"$d\" ] && [ -f \"$f\" ] && exec python3 \"$f\"; done; exit 0'"
+          },
+          {
+            "type": "command",
+            "command": "sh -c 'for d in \"$CLAUDE_PROJECT_DIR\" \"$(git rev-parse --show-toplevel 2>/dev/null)\" \"$PWD\"; do f=\"$d/scripts/hooks/step_gate.py\"; [ -n \"$d\" ] && [ -f \"$f\" ] && exec python3 \"$f\"; done; exit 0'"
           }
         ]
       }
