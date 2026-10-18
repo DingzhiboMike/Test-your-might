@@ -1,0 +1,49 @@
+<!doctype html>
+<html lang="ru"><head><meta charset="utf-8">
+<style>
+:root{--bg:#141819;--box:#1d2223;--line:#e6e6e6;--teal:#4cc8a8;--tealbg:#17332d;--or:#e9955f;--orbg:#3b2a20;--muted:#a9adaf;}
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{background:var(--bg);width:952px}
+body{font-family:Inter,"SF Pro Text",-apple-system,"Helvetica Neue",Arial,sans-serif;color:#f2f2f2;padding:10px 10px 16px 10px}
+.row{display:flex;align-items:center;height:50px;margin-bottom:3px}
+.lbl{width:118px;font-weight:700;font-size:12.5px;flex:none}
+.flow{display:flex;align-items:center}
+.b{height:34px;border:1.5px solid var(--line);border-radius:5px;background:var(--box);display:flex;align-items:center;justify-content:center;text-align:center;font-size:11.5px;line-height:1.15;padding:0 6px;width:112px;flex:none}
+.t{border-color:var(--teal);background:var(--tealbg)}
+.o{border-color:var(--or);background:var(--orbg);color:var(--or);font-weight:600}
+.n{border-color:var(--teal);color:#bfeee0}
+.d{border-style:dashed}
+.a{width:18px;height:2px;background:var(--line);position:relative;flex:none;margin:0 1px}
+.a:after{content:"";position:absolute;right:-2px;top:-4px;border-left:7px solid var(--line);border-top:5px solid transparent;border-bottom:5px solid transparent}
+.notes{margin:12px 0 0 118px;color:var(--muted);font-size:10.6px;line-height:1.75}
+.notes b{color:#e6e6e6;font-weight:600}
+.leg{display:inline-block;width:10px;height:10px;border:1.5px solid var(--teal);border-radius:2px;vertical-align:-1px;margin-right:3px}
+.leg.dd{border-style:dashed;border-color:var(--line)}
+.leg.oo{border-color:var(--or)}
+.tag{margin:4px 0 8px 0;color:var(--or);font-size:11px;font-weight:600}
+</style></head><body>
+<div class="tag">Предложение, не внедрено: картография документов в диспетчере и модель предмета</div>
+
+<div class="row"><div class="lbl">Диспетчер</div><div class="flow">
+<div class="b t">Скрипт: очистка,<br>числа, срезы</div><div class="a"></div><div class="b">Лёгкая модель:<br>поля по схеме</div><div class="a"></div><div class="b t">Проверка карты:<br>цитаты, полнота</div><div class="a"></div><div class="b">ТЗ: группы,<br>критерий, рамки</div><div class="a"></div><div class="b o">Согласование</div></div></div>
+
+<div class="row"><div class="lbl">Оркестратор</div><div class="flow">
+<div class="b t">Модель<br>предмета</div><div class="a"></div><div class="b">Консультант:<br>путь от пробелов</div><div class="a"></div><div class="b n">Источники<br>· линзы</div><div class="a"></div><div class="b">Генератор:<br>клетка и рамки</div><div class="a"></div><div class="b t">Проверка<br>цепочки</div></div></div>
+
+<div class="row"><div class="lbl">Финиш</div><div class="flow">
+<div class="b n">Нострадамус<br>· отсев</div><div class="a"></div><div class="b">Позиция по<br>критерию ТЗ</div><div class="a"></div><div class="b">Бэклог<br>тестов</div><div class="a"></div><div class="b o">сдача</div></div></div>
+
+<div class="row"><div class="lbl">По запросу</div><div class="flow">
+<div class="b d">Углубление<br>документа</div></div></div>
+
+<div class="notes">
+<span class="leg"></span><b>Зелёная рамка</b> — делает скрипт, а не модель: очистка, числа и срезы, проверка карты, надёжность клеток, проверка цепочки.<br>
+<b>Лёгкая модель</b> описывает и тегирует документы, выбирает из списка кандидатов, цитирует дословно; «что важно» не решает: важность считает скрипт по формуле из ТЗ.<br>
+<b>Карта документов</b> не зависит от задачи и кэшируется по хэшу файла; повторные задачи по тем же файлам её не пересчитывают.<br>
+<b>Человек</b> подтверждает рамки продукта (что в продукте есть и чего нет) и определения групп: их не выводят из документов.<br>
+<b>Модель предмета</b> — матрица «группа × признак»: в клетке значение дословно, группа источника, n, тип, свежесть; пустые клетки остаются пустыми.<br>
+<span class="leg dd"></span><b>Углубление</b> — полное чтение документа по запросу модели предмета, консультанта, генератора или проверки; лимит по тиру.<br>
+Каждый документ читается целиком не более двух раз: при картографии и в углублении; остальные шаги работают с картой и моделью.<br>
+Качество картографии измеряет аудит: слепое сравнение сильной моделью на выборке, пороги записаны до проверки.
+</div>
+</body></html>
