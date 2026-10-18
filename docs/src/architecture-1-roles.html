@@ -3,7 +3,7 @@
 <style>
 :root{--bg:#141819;--box:#1d2223;--line:#e6e6e6;--teal:#4cc8a8;--tealbg:#17332d;--or:#e9955f;--orbg:#3b2a20;--muted:#a9adaf;--grp:#3b4043;--rbox:#1b2021;--rline:#3d4346}
 *{box-sizing:border-box;margin:0;padding:0}
-html,body{background:var(--bg);width:952px;height:1014px}
+html,body{background:var(--bg);width:952px;height:996px}
 body{font-family:Inter,"SF Pro Text",-apple-system,"Helvetica Neue",Arial,sans-serif;color:#f2f2f2;position:relative}
 .b{position:absolute;border:1.5px solid var(--line);border-radius:5px;background:var(--box);display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;line-height:1.3;padding:2px 6px}
 .b .h{font-size:12.5px;font-weight:700}
@@ -36,7 +36,7 @@ svg{position:absolute;left:0;top:0}
 <!-- top -->
 <div class="b" style="left:20px;top:26px;width:128px;height:58px"><div class="h">Человек</div><div class="s">заказчик</div></div>
 <div class="lab" style="left:154px;top:36px">запрос</div>
-<div class="b t" style="left:200px;top:14px;width:350px;height:96px"><div class="h">Диспетчер</div><div class="s">✱ 1) картография документов: скрипт → лёгкая модель → проверка</div><div class="s">2) ТЗ: GAP · РЕШЕНИЕ · ✱ ГРУППЫ · ✱ РАМКИ · КРИТЕРИЙ</div><div class="s">3 вопроса + 4-й · следующий раунд: идеи + данные</div></div>
+<div class="b t" style="left:200px;top:14px;width:350px;height:96px"><div class="h">Диспетчер</div><div class="s">1) картография документов: скрипт → лёгкая модель → проверка</div><div class="s">2) ТЗ: GAP · РЕШЕНИЕ · ГРУППЫ · РАМКИ · КРИТЕРИЙ</div><div class="s">3 вопроса + 4-й · следующий раунд: идеи + данные</div></div>
 <div class="b o" style="left:200px;top:128px;width:350px;height:42px"><div class="h" style="font-size:11.5px">Единственная пауза</div><div class="s">ответы и «да» одним сообщением</div></div>
 <div class="olab" style="left:22px;top:160px">ответы / правки / «да»</div>
 <div class="lab" style="left:384px;top:174px">СОГЛАСОВАНО</div>
@@ -46,11 +46,11 @@ svg{position:absolute;left:0;top:0}
 <!-- right column -->
 <div class="lab" style="left:553px;top:44px">читает</div>
 <div class="b r" style="left:592px;top:14px;width:340px;height:108px"><div class="h">methodology/</div><div class="s">tools-index — инструмент под пункт пути<br>модули: M0–M8, M11–M13 и Э Д К О П Ж С<br>эксперименты · данные · источники · оценки<br>оффер · жизненный цикл · сегменты<br>web-protocol — как ходить в веб</div></div>
-<div class="b r" style="left:592px;top:130px;width:340px;height:68px"><div class="h">context/</div><div class="s">кладёт человек до запуска<br>from-tasks/ — src-* и результаты живой проверки<br>✱ карта документов — кэш по хэшу файла</div></div>
+<div class="b r" style="left:592px;top:130px;width:340px;height:68px"><div class="h">context/</div><div class="s">кладёт человек до запуска<br>from-tasks/ — src-* и результаты живой проверки<br>карта документов — кэш по хэшу файла</div></div>
 <div class="lab" style="left:555px;top:222px">пишет</div>
 <div class="b r" style="left:592px;top:206px;width:340px;height:88px"><div class="h">tasks/‹задача›/</div><div class="s">00-tz · log · 00k · 01-review · src-*<br>02-hypotheses · 02c · 02f-forecast · 02g-ideas<br>02e-position · 03-backlog / 03-plan · 03b · 03c<br>06-* · 07a–07d · 08-handoff · checks/ · results/</div></div>
 
-<div class="b r" style="left:592px;top:304px;width:340px;height:176px"><div class="h">scripts/ и хуки</div><div class="s">реестры чисел и источников · sensitivity<br>сверка цитат и чисел — скрипт<br>check_step после каждого шага<br>check_log_sources — линзы и шаги-источники<br>check_forecast · check_ideas — идеи и отсев<br>check_rehearsal — следствия пробного прогона<br>Stop-хук не даёт сдать с ошибками<br>check_publish — перед отправкой<br>✱ map_docs · check_map · build_model · check_chain · check_rank</div></div>
+<div class="b r" style="left:592px;top:304px;width:340px;height:176px"><div class="h">scripts/ и хуки</div><div class="s">реестры чисел и источников · sensitivity<br>сверка цитат и чисел — скрипт<br>check_step после каждого шага<br>check_log_sources — линзы и шаги-источники<br>check_forecast · check_ideas — идеи и отсев<br>check_rehearsal — следствия пробного прогона<br>Stop-хук не даёт сдать с ошибками<br>check_publish — перед отправкой<br>map_docs · check_map · build_model · check_chain · check_rank</div></div>
 <div class="b r" style="left:592px;top:490px;width:340px;height:80px"><div class="h">Полигон · scripts/polygon.py</div><div class="s">выдуманные отчёты об экспериментах с ключом ответов<br>проверка навыка разбора экспериментов<br>без нейросети, ничего не хранит</div></div>
 <div class="b r" style="left:592px;top:580px;width:340px;height:52px"><div class="h">system-notes.md</div><div class="s">замечания к системе из сдач</div></div>
 <div class="b r" style="left:592px;top:642px;width:340px;height:66px"><div class="h">Веб</div><div class="s">за и против, запрос на опровержение, метки уверенности<br>линзы — внешнее сырьё для гипотез и идей</div></div>
@@ -58,10 +58,10 @@ svg{position:absolute;left:0;top:0}
 
 <!-- group 1 -->
 <div class="g" style="left:20px;top:304px;width:552px;height:66px"><div class="gt">1. Понять задачу</div></div>
-<div class="b plain" style="left:30px;top:324px;width:128px;height:40px"><div class="h" style="font-size:11.5px">Модель предмета</div><div class="tag">✱ группа × факт</div></div>
-<div class="b t plain" style="left:176px;top:324px;width:132px;height:40px"><div class="h" style="font-size:11.5px">Консультант · путь</div><div class="s" style="margin-top:0;font-size:8.8px">✱ от пустых клеток</div></div>
-<div class="b plain" style="left:326px;top:324px;width:112px;height:40px"><div class="h" style="font-size:10.5px">Итоговая позиция</div><div class="s" style="margin-top:0;font-size:8.8px">✱ по критерию ТЗ</div></div>
-<div class="b d plain" style="left:450px;top:324px;width:112px;height:40px"><div class="h" style="font-size:11.5px">Углубление</div><div class="s" style="margin-top:0;font-size:8.8px">✱ по запросу</div></div>
+<div class="b plain" style="left:30px;top:324px;width:128px;height:40px"><div class="h" style="font-size:11.5px">Модель предмета</div><div class="tag">группа × факт</div></div>
+<div class="b t plain" style="left:176px;top:324px;width:132px;height:40px"><div class="h" style="font-size:11.5px">Консультант · путь</div><div class="s" style="margin-top:0;font-size:8.8px">от пустых клеток</div></div>
+<div class="b plain" style="left:326px;top:324px;width:112px;height:40px"><div class="h" style="font-size:10.5px">Итоговая позиция</div><div class="s" style="margin-top:0;font-size:8.8px">по критерию ТЗ</div></div>
+<div class="b d plain" style="left:450px;top:324px;width:112px;height:40px"><div class="h" style="font-size:11.5px">Углубление</div><div class="s" style="margin-top:0;font-size:8.8px">по запросу</div></div>
 
 <!-- group 2 -->
 <div class="g" style="left:20px;top:380px;width:552px;height:128px"><div class="gt">2. Источники данных · линзы до генератора; остальное — вбок, если без ответа гадать</div></div>
@@ -76,8 +76,8 @@ svg{position:absolute;left:0;top:0}
 
 <!-- group 3 -->
 <div class="g" style="left:20px;top:518px;width:552px;height:184px"><div class="gt">3. Решить и проверить</div><div class="gf">пробный прогон — только если человек согласился на 4-й вопрос</div></div>
-<div class="b plain" style="left:30px;top:540px;width:112px;height:44px"><div class="h">Генератор</div><div class="m">02-hyp · ✱ клетка</div></div>
-<div class="b plain" style="left:164px;top:540px;width:112px;height:44px"><div class="h" style="font-size:11px">Проверка по сути</div><div class="m">02c · ✱ цепочка</div></div>
+<div class="b plain" style="left:30px;top:540px;width:112px;height:44px"><div class="h">Генератор</div><div class="m">02-hyp · клетка</div></div>
+<div class="b plain" style="left:164px;top:540px;width:112px;height:44px"><div class="h" style="font-size:11px">Проверка по сути</div><div class="m">02c · цепочка</div></div>
 <div class="b n plain" style="left:298px;top:540px;width:126px;height:44px"><div class="h">Нострадамус</div><div class="tag">02f · новые идеи, версии</div></div>
 <div class="b n plain" style="left:446px;top:540px;width:116px;height:44px"><div class="h">Отсев идей</div><div class="tag">02g · на убийство</div></div>
 <div class="b plain" style="left:30px;top:608px;width:150px;height:44px"><div class="h">Планировщик</div><div class="m">03-plan · 03-backlog</div></div>
@@ -103,8 +103,7 @@ svg{position:absolute;left:0;top:0}
 <div class="b x plain" style="left:672px;top:884px;width:114px;height:44px"><div class="h">Сверка</div><div class="s" style="margin-top:0">результатов · 04</div></div>
 <div class="b x plain" style="left:800px;top:884px;width:120px;height:44px"><div class="h">context/</div><div class="s" style="margin-top:0">для следующих задач</div></div>
 
-<div class="lab" style="left:20px;top:992px;color:#e9955f">✱ — предложение, в системе пока нет: docs/proposal-document-dossiers.md</div>
-<svg width="952" height="1014" viewBox="0 0 952 1014">
+<svg width="952" height="996" viewBox="0 0 952 996">
 <defs>
 <marker id="w" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto"><path d="M0,0 L8,4 L0,8 z" fill="#e6e6e6"/></marker>
 <marker id="or" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto"><path d="M0,0 L8,4 L0,8 z" fill="#e9955f"/></marker>
