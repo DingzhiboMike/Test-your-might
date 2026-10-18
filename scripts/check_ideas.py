@@ -15,11 +15,16 @@
    отсев проверяет на убийство, а не на доказательство.
 5. Предупреждение, если сняты все идеи, ни у одной не нашлось возражения или у живой идеи в «Убивает» стоит фрагмент.
 
+Вместо текста можно блок данных «отсев_идей» (data_block.py): он проверяется по схеме и разбирается так же.
+
 Ошибка — код возврата 1. Отчёт: tasks/<папка>/checks/ideas.md. Нет `02g-ideas-check.md` — проверять нечего (код 0).
 """
 import os
 import re
 import sys
+
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import data_block  # noqa: E402
 
 VERDICT = re.compile(r"кажется валидной|переделать первый шаг|снять", re.I)
 
@@ -66,6 +71,10 @@ def main():
         print("Отсева идей нет: проверять нечего.")
         return 0
     errors, warns, counts = [], [], {}
+    canon, block_errors = data_block.canonical(check, "отсев_идей")
+    errors += block_errors
+    if canon is not None:
+        check = canon
     ideas = idea_numbers(read(os.path.join(task, "02f-forecast.md")))
     if not ideas:
         errors.append("в 02f-forecast.md нет раздела «НОВЫЕ ИДЕИ» — отсеивать нечего")

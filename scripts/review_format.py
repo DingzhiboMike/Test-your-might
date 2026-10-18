@@ -8,9 +8,15 @@
 «С-02 — снято», «С-03 — оспорено: причина с фрагментом».
 
 Принимается как есть, без правки артефакта вручную: маркер списка («- », «* », «1. »), жирный шрифт,
-метка [блок] или [замечание] после номера, тире любого вида или двоеточие.
+метка [блок] или [замечание] после номера, тире любого вида или двоеточие. Ещё надёжнее — блок данных
+«по_проверке_смысла» (data_block.py): тогда формат не может разойтись.
 """
+import os
 import re
+import sys
+
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import data_block  # noqa: E402
 
 ID = r"[А-ЯA-Z]-\d{2,}"
 LEAD = r"^[ \t]*(?:[-*•][ \t]+|\d+[.)][ \t]+)?\**"
@@ -31,9 +37,17 @@ def remark_ids(review_text):
 
 
 def answer_block(artifact_text):
-    """Текст после «ПО ПРОВЕРКЕ СМЫСЛА» или None, если блока нет."""
+    """Текст после «ПО ПРОВЕРКЕ СМЫСЛА» или None, если блока нет. Блок данных главнее текста."""
+    canon, _ = data_block.canonical(artifact_text, "по_проверке_смысла")
+    if canon is not None:
+        return canon.split("ПО ПРОВЕРКЕ СМЫСЛА", 1)[1]
     parts = artifact_text.split("ПО ПРОВЕРКЕ СМЫСЛА", 1)
     return parts[1] if len(parts) == 2 else None
+
+
+def block_errors(artifact_text):
+    """Ошибки JSON и схемы в блоке данных с ответами."""
+    return data_block.find(artifact_text, "по_проверке_смысла")[1]
 
 
 def answers(block_text):

@@ -428,6 +428,58 @@ def path_tests(root):
     expect("ТЗ: без строки ЦЕНА — поймано", r.returncode == 1 and "ЦЕНА" in r.stdout, r.stdout)
 
 
+def data_block_tests(root):
+    """Блоки данных: проверяются по схеме и разбираются теми же проверками, что и текст."""
+    d = os.path.join(root, "tasks", "dbk")
+    os.makedirs(d)
+    blk = lambda obj: "Текст для людей.\n\n```данные\n" + json.dumps(obj, ensure_ascii=False, indent=1) + "\n```\n"
+    open(os.path.join(d, "02f-forecast.md"), "w", encoding="utf-8").write(
+        "## НОВЫЕ ИДЕИ\n1. Писать бухгалтеру\n   Суть: …\n2. Календарь\n   Суть: …\n\nРАМКА\nСовпадает: да\n")
+    idea = lambda n, v: {"n": n, "суть": "идея %d" % n, "вердикт": v, "убивает": "нет",
+                         "возражения": "«бухгалтер не заходит в банк» [F-003] — ослабляет", "новая": "да",
+                         "первый_шаг_различает": "да — поддержит: треть звонков; убьёт: ни одного",
+                         "первый_шаг_выполним": "да — поле роли в реестре", "один_источник": "нет",
+                         "данные_следующего_раунда": "роль пользователя"}
+    ci = os.path.join(HERE, "check_ideas.py")
+    open(os.path.join(d, "02g-ideas-check.md"), "w", encoding="utf-8").write(blk({"отсев_идей": [idea(1, "кажется валидной"), idea(2, "кажется валидной")]}))
+    r = run([ci, d])
+    expect("блок данных: отсев идей по схеме проходит", r.returncode == 0, r.stdout)
+    open(os.path.join(d, "02g-ideas-check.md"), "w", encoding="utf-8").write(blk({"отсев_идей": [idea(1, "кажется валидной"), idea(2, "наверное да")]}))
+    r = run([ci, d])
+    expect("блок данных: вердикт не из списка пойман по полю", r.returncode == 1 and "отсев_идей[2].вердикт" in r.stdout, r.stdout)
+    open(os.path.join(d, "02g-ideas-check.md"), "w", encoding="utf-8").write("```данные\n{\"отсев_идей\": [\n```\n")
+    r = run([ci, d])
+    expect("блок данных: битый JSON — ошибка, а не тишина", r.returncode == 1 and "не JSON" in r.stdout, r.stdout)
+
+    ca = os.path.join(HERE, "check_artifact.py")
+    open(os.path.join(d, "review-src-x.md"), "w", encoding="utf-8").write("С-01 [блок] Вывод сильнее фрагмента — …\nС-02 [блок] Круг — …\n")
+    art = "# Разбор\n\n" + "Разрыв логики между первым запуском и регулярным использованием продукта. " * 8 + "\n\n"
+    ans = [{"замечание": "С-01", "ответ": "исправлено", "что": "сузил вывод до группы"},
+           {"замечание": "С-02", "ответ": "оспорено", "что": "второй фрагмент из другого корня [F-004]"}]
+    open(os.path.join(d, "src-x.md"), "w", encoding="utf-8").write(art + blk({"по_проверке_смысла": ans}))
+    r = run([ca, d, "src-x.md", "--review", "review-src-x.md"])
+    expect("блок данных: ответы на проверку смысла засчитаны", r.returncode == 0, r.stdout)
+    open(os.path.join(d, "src-x.md"), "w", encoding="utf-8").write(art + blk({"по_проверке_смысла": ans[:1]}))
+    r = run([ca, d, "src-x.md", "--review", "review-src-x.md"])
+    expect("блок данных: нет ответа на блокирующее — поймано", r.returncode == 1 and "С-02" in r.stdout, r.stdout)
+
+    cr = os.path.join(HERE, "check_rehearsal.py")
+    row = "| %d | новые клиенты | «вот что проверяет банк» | пуш, CRM | переходы | ≥20%% | <10%% | 6 недель | берём ли |\n"
+    backlog = ("| № | Кому | Что говорим | Где | Метрика | Успех | Отсечение | Срок | Что решит |\n"
+               "| --- | --- | --- | --- | --- | --- | --- | --- | --- |\n" + row % 1 + row % 2)
+    sl = {"для_эксперимента": [{"тест": "Строка 1", "статус": "как есть"},
+                               {"тест": "Строка 2", "статус": "после правки", "что": "убрать наводящий вопрос"}],
+          "для_решения": "решение не меняется, но тест 2 короче", "что_подсказали_персоны": "путают выписку и отчёт"}
+    open(os.path.join(d, "03c-rehearsal.md"), "w", encoding="utf-8").write(blk({"следствия": sl}))
+    open(os.path.join(d, "03-backlog.md"), "w", encoding="utf-8").write(backlog + "\n" + blk({"по_пробному_прогону": [
+        {"тест": "Строка 2", "ответ": "применено", "что": "вопрос переписан"}]}))
+    r = run([cr, d])
+    expect("блок данных: следствия пробного прогона и ответы на них проходят", r.returncode == 0, r.stdout)
+    open(os.path.join(d, "03-backlog.md"), "w", encoding="utf-8").write(backlog)
+    r = run([cr, d])
+    expect("блок данных: следствие без ответа в бэклоге поймано", r.returncode == 1 and "ПО ПРОБНОМУ ПРОГОНУ" in r.stdout, r.stdout)
+
+
 def route_tests():
     """Маршрут в коде: state.json, периметр шага по хэшам, хук записи по шагу, возврат ошибок исполнителю."""
     proj = tempfile.mkdtemp(prefix="polygon-route-")
@@ -1424,6 +1476,7 @@ def main():
         trace_tests()
         roles_tests()
         route_tests()
+        data_block_tests(root)
         effort_tests(root)
         knowledge_tests(root)
         map_tests(root)
