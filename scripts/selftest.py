@@ -428,6 +428,44 @@ def path_tests(root):
     expect("ТЗ: без строки ЦЕНА — поймано", r.returncode == 1 and "ЦЕНА" in r.stdout, r.stdout)
 
 
+def rules_tests():
+    """Реестр правил: id в тексте и в реестре совпадают; новое правило без прогона не проходит; срабатывания по логам."""
+    r = run([os.path.join(HERE, "rules.py"), "--check"])
+    expect("правила: id в тексте системы и реестр совпадают", r.returncode == 0, r.stdout[-600:])
+    proj = tempfile.mkdtemp(prefix="polygon-rules-")
+    try:
+        os.makedirs(os.path.join(proj, ".claude", "skills", "orchestrator", "routes"))
+        os.makedirs(os.path.join(proj, "methodology"))
+        open(os.path.join(proj, "AGENTS.md"), "w", encoding="utf-8").write(
+            "# А\n\n## Принципы\n\n- **Знание не аксиома.** Проверяется.\n- **Мало данных — не ответ.** Версия нужна.\n\n## Где\n\n- не правило\n")
+        open(os.path.join(proj, ".claude", "skills", "orchestrator", "SKILL.md"), "w", encoding="utf-8").write(
+            "# Ядро\n\n**Без повтора на том же входе.** Нельзя.\n\n**Кто:** не правило\n")
+        rp = [os.path.join(HERE, "rules.py"), "--root", proj]
+        r = run(rp + ["--check"])
+        expect("правила: правило без id поймано", r.returncode == 1 and "без id" in r.stdout, r.stdout)
+        r = run(rp + ["--assign"])
+        expect("правила: id расставлены только правилам", "Новых правил с id: 3" in r.stdout, r.stdout)
+        expect("правила: после расстановки всё сходится", run(rp + ["--check"]).returncode == 0)
+        reg = os.path.join(proj, "methodology", "rules.csv")
+        lines = open(reg, encoding="utf-8").read().splitlines()
+        cells = lines[1].split(",")
+        cells[3] = "2099-01-01"
+        lines[1] = ",".join(cells)
+        open(reg, "w", encoding="utf-8").write("\n".join(lines) + "\n")
+        r = run(rp + ["--check"])
+        expect("правила: новое правило без прогона и регрессии не проходит", r.returncode == 1 and "R-001" in r.stdout and "прогон" in r.stdout, r.stdout)
+        for i in range(5):
+            t = os.path.join(proj, "tasks", "t%d" % i)
+            os.makedirs(t)
+            open(os.path.join(t, "00-tz.md"), "w", encoding="utf-8").write("ТИП ВЫХОДА: гипотезы\n")
+            open(os.path.join(t, "log.md"), "w", encoding="utf-8").write("ШАГ 1\nПравило:  R-002 — сходил за данными вместо сдачи\n" if i == 0 else "ШАГ 1\n")
+        r = run(rp + ["--usage"])
+        expect("правила: без срабатываний за пять прогонов — кандидат на удаление, сработавшее — нет",
+               "Кандидаты на удаление" in r.stdout and "R-003" in r.stdout.split("Кандидаты")[1] and "R-002" not in r.stdout.split("Кандидаты")[1], r.stdout)
+    finally:
+        shutil.rmtree(proj, ignore_errors=True)
+
+
 def data_block_tests(root):
     """Блоки данных: проверяются по схеме и разбираются теми же проверками, что и текст."""
     d = os.path.join(root, "tasks", "dbk")
@@ -1479,6 +1517,7 @@ def main():
         roles_tests()
         route_tests()
         data_block_tests(root)
+        rules_tests()
         effort_tests(root)
         knowledge_tests(root)
         map_tests(root)
