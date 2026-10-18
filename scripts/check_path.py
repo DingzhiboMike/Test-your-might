@@ -21,6 +21,7 @@
 6. У каждого пункта GAP есть пометка, где ответ: `{ответ: контекст, данные, веб, живая}` — одно или несколько.
 7. Строка ВЕБ согласована с пометками: «да» — хотя бы у одного пункта есть «веб»; «нет» — ни у одного.
 Эти же проверки идут и в `--plan`.
+8. Только в `--tz`: есть строка ЦЕНА с числом вызовов, резервом и потолком (её печатает scripts/cost_estimate.py).
 
 Нет `01-review.md` — проверять нечего. Есть разбор, но в логе нет раздела «ПУТЬ — ИСХОДЫ» — ошибка: его пишут
 перед сдачей. Код возврата 1 — есть ошибки. Отчёт: tasks/<папка>/checks/path.md.
@@ -93,6 +94,14 @@ def check_tz(tz, errors):
         errors.append("ВЕБ: да, но ни у одного пункта GAP нет «веб» в пометке, где ответ")
     if web.startswith("нет") and web_items:
         errors.append("ВЕБ: нет, но у пунктов GAP %s ответ помечен «веб»" % ", ".join(map(str, web_items)))
+
+
+def check_price(tz, errors):
+    m = re.search(r"^\**ЦЕНА\**:?\**[ \t]*(.*)$", tz, re.M)
+    if not m:
+        errors.append("нет строки ЦЕНА — человек согласует ТЗ, не видя цены маршрута (scripts/cost_estimate.py)")
+    elif not all(re.search(p, m.group(1)) for p in (r"~\d+", r"резерв \d+", r"потолок \d+")):
+        errors.append("в строке ЦЕНА нет числа вызовов, резерва или потолка — она не из scripts/cost_estimate.py")
 
 
 def gap_refs(review):
@@ -186,10 +195,11 @@ def main():
     if "--tz" in sys.argv:
         errors = []
         check_tz(tz, errors)
+        check_price(tz, errors)
         for e in errors:
             print("ТЗ: " + e)
         if not errors:
-            print("ТЗ: пунктов GAP %d, у каждого есть пометка, где ответ; ВЕБ согласован." % len(gap_numbers(tz)))
+            print("ТЗ: пунктов GAP %d, у каждого есть пометка, где ответ; ВЕБ согласован; ЦЕНА есть." % len(gap_numbers(tz)))
         return 1 if errors else 0
     review = read(os.path.join(task, "01-review.md"))
     if not review:

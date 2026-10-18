@@ -9,6 +9,7 @@
 """
 import json
 import os
+import re
 import shutil
 import subprocess
 import sys
@@ -333,7 +334,8 @@ def path_tests(root):
     os.makedirs(d)
     open(os.path.join(d, "00-tz.md"), "w", encoding="utf-8").write(
         "ТЗ\n\nGAP:\n  1. Держится ли идея чек-листа [ключевой] {ответ: контекст, живая}\n  2. Кто бросает пробный период {ответ: данные}\n"
-        "  3. Сколько таких компаний {ответ: веб}\n\nНА ВХОДЕ: идея\nВЕБ: да — пункт 3\n")
+        "  3. Сколько таких компаний {ответ: веб}\n\nНА ВХОДЕ: идея\nВЕБ: да — пункт 3\n"
+        "ЦЕНА:       ~20 вызовов исполнителей (свободная часть 8, резерв 12, потолок 26), ~1,7 млн токенов\n")
     review = ("ПУТЬ\nП-1. Что должно стать известно: почему бросают пробный период\n     Закрывает GAP: 1, 2  [ключевой] [проверка допущения]\n"
               "     Сдвигает: А, Б\n     Чего не хватает в карте: причин ухода нет\n"
               "П-2. Что должно стать известно: хватит ли компаний\n     Закрывает GAP: 3\n     Сдвигает: Б\n     Чего не хватает в карте: числа компаний нет\n")
@@ -371,6 +373,107 @@ def path_tests(root):
     open(os.path.join(d, "00-tz.md"), "w", encoding="utf-8").write(tz.replace("ВЕБ: да — пункт 3", "ВЕБ: нет — сеть закрыта"))
     r = run([cp, d, "--tz"])
     expect("ТЗ: «ВЕБ: нет» при пункте с ответом в вебе — пойман", r.returncode == 1 and "ВЕБ: нет" in r.stdout, r.stdout)
+    open(os.path.join(d, "00-tz.md"), "w", encoding="utf-8").write(re.sub(r"ЦЕНА:.*\n", "", tz))
+    r = run([cp, d, "--tz"])
+    expect("ТЗ: без строки ЦЕНА — поймано", r.returncode == 1 and "ЦЕНА" in r.stdout, r.stdout)
+
+
+def trace_tests():
+    """Хук трассы, сводка расхода, цена маршрута и остаток — на выдуманных транскриптах."""
+    proj = tempfile.mkdtemp(prefix="polygon-trace-")
+    try:
+        open(os.path.join(proj, "AGENTS.md"), "w", encoding="utf-8").write("#\n")
+        for sk in ("hypothesis-validator", "document-mapper", "nostradamus"):
+            os.makedirs(os.path.join(proj, ".claude", "skills", sk))
+            open(os.path.join(proj, ".claude", "skills", sk, "SKILL.md"), "w", encoding="utf-8").write("#\n")
+        task = os.path.join(proj, "tasks", "trc")
+        os.makedirs(task)
+        open(os.path.join(task, "log.md"), "w", encoding="utf-8").write("# Лог задачи: trc\n")
+
+        def line(**kw):
+            return json.dumps(kw, ensure_ascii=False) + "\n"
+
+        def asst(mid, ts, out, model="model-strong"):
+            u = {"input_tokens": 10, "cache_creation_input_tokens": 1000, "cache_read_input_tokens": 50000,
+                 "output_tokens": out}
+            return line(type="assistant", timestamp=ts, message={"id": mid, "model": model, "usage": u})
+
+        call = ("Прочитай .claude/skills/hypothesis-validator/SKILL.md, режим «отсев идей». "
+                "Вход: tasks/trc/02f-forecast.md, ТЗ, nostradamus не передавать.")
+        sub = os.path.join(proj, "agent-a1.jsonl")
+        open(sub, "w", encoding="utf-8").write(
+            line(type="user", timestamp="2026-10-18T10:00:00Z", message={"role": "user", "content": call})
+            + asst("m1", "2026-10-18T10:00:30Z", 200) + asst("m1", "2026-10-18T10:00:31Z", 200)
+            + asst("m2", "2026-10-18T10:03:00Z", 300))
+        hook = os.path.join(HERE, "hooks", "trace.py")
+        ev = {"hook_event_name": "SubagentStop", "cwd": proj, "agent_id": "a1", "agent_transcript_path": sub,
+              "agent_type": "general-purpose"}
+        r = run([hook], json.dumps(ev))
+        rows = [json.loads(x) for x in open(os.path.join(task, "trace.jsonl"), encoding="utf-8")]
+        rec = rows[0] if rows else {}
+        expect("трасса: подагент записан, ответ с одним id посчитан один раз",
+               r.returncode == 0 and len(rows) == 1 and rec.get("out") == 500 and rec.get("responses") == 2, str(rows))
+        expect("трасса: роль по пути к SKILL.md, режим и фактическая модель",
+               rec.get("role") == "hypothesis-validator" and rec.get("mode") == "отсев идей"
+               and rec.get("model") == "model-strong" and rec.get("sec") == 180, str(rec))
+        run([hook], json.dumps(ev))
+        rows = open(os.path.join(task, "trace.jsonl"), encoding="utf-8").read().splitlines()
+        expect("трасса: повторное событие того же агента заменяет строку", len(rows) == 1, str(rows))
+        expect("трасса: битый вход хука — молча выход 0", run([hook], "не json").returncode == 0)
+
+        main = os.path.join(proj, "main.jsonl")
+        open(main, "w", encoding="utf-8").write(
+            asst("p0", "2026-10-18T09:00:00Z", 999)
+            + line(type="user", timestamp="2026-10-18T09:10:00Z", message={"role": "user", "content": "диспетчер, задача tasks/trc"})
+            + asst("p1", "2026-10-18T09:11:00Z", 100)
+            + line(type="assistant", timestamp="2026-10-18T09:12:00Z", isSidechain=True,
+                   message={"id": "p2", "model": "x", "usage": {"output_tokens": 7777}}))
+        run([hook], json.dumps({"hook_event_name": "Stop", "cwd": proj, "session_id": "s1", "transcript_path": main}))
+        m = json.load(open(os.path.join(task, "trace-main.json"), encoding="utf-8")).get("s1", {})
+        expect("трасса: основная сессия — с первого упоминания задачи и без побочных веток", m.get("out") == 100, str(m))
+
+        ts = os.path.join(HERE, "trace_summary.py")
+        r = run([ts, task, "--since", "0"])
+        expect("сводка: строка «Расход» за шаг", r.stdout.startswith("Расход: 1 вызов,") and "model-strong" in r.stdout, r.stdout)
+        r = run([ts, task])
+        expect("сводка: таблица по ролям с основной сессией", "hypothesis-validator · отсев идей" in r.stdout
+               and "основная сессия" in r.stdout, r.stdout)
+
+        cst = os.path.join(proj, "tasks", "cst")
+        os.makedirs(cst)
+        open(os.path.join(cst, "sources.csv"), "w", encoding="utf-8").write(
+            "id,kind\n" + "".join("F-%03d,context\n" % i for i in range(14)) + "F-100,interview\nF-101,interview\nF-102,interview\nF-200,web\n")
+        open(os.path.join(cst, "00d-map.md"), "w", encoding="utf-8").write("#\n")
+        tz = "ТИР:        Tier 1 — и бюджет шагов: 8\nТИП ВЫХОДА: гипотезы\nРЕЖИМ:      обычный\n            пробный прогон: нет\n"
+        open(os.path.join(cst, "00-tz.md"), "w", encoding="utf-8").write(tz)
+        ce = os.path.join(HERE, "cost_estimate.py")
+        r = run([ce, cst, "--detail"])
+        expect("цена: вызовы по структуре маршрута — свободная часть 10, резерв 26, потолок 47",
+               r.returncode == 0 and "~36 вызовов" in r.stdout and "резерв 26" in r.stdout and "потолок 47" in r.stdout, r.stdout)
+        expect("цена: токены по трассе прошлой задачи, основная сессия оценена",
+               "по 1 прогону" in r.stdout and "основная сессия — ещё" in r.stdout, r.stdout)
+        open(os.path.join(cst, "00-tz.md"), "w", encoding="utf-8").write(tz.replace("ТИП ВЫХОДА: гипотезы", "ТИП ВЫХОДА: разбор / гипотезы"))
+        r = run([ce, cst])
+        expect("цена: тип выхода не выбран — отказ, а не догадка", r.returncode == 1 and "ТИП ВЫХОДА" in r.stdout, r.stdout)
+        open(os.path.join(cst, "00-tz.md"), "w", encoding="utf-8").write(tz)
+        price = run([ce, cst]).stdout
+        open(os.path.join(cst, "00-tz.md"), "w", encoding="utf-8").write(tz + price)
+        open(os.path.join(cst, "trace.jsonl"), "w", encoding="utf-8").write(
+            "".join(line(ts=1, agent_id="d%d" % i, role="document-mapper", out=10) for i in range(3)))
+        r = run([ce, cst, "--left"])
+        expect("остаток: потрачено 3, резерв впереди 23, свободных 21",
+               "Потрачено: 3 вызова" in r.stdout and "резерв впереди 23" in r.stdout and "до потолка 21" in r.stdout, r.stdout + price)
+        r = run([os.path.join(HERE, "trace_summary.py"), cst, "--save"])
+        c = json.load(open(os.path.join(cst, "checks", "cost.json"), encoding="utf-8"))
+        expect("сдача: cost.json с оценкой и фактом", c.get("estimate_calls") == 36 and c.get("calls") == 3
+               and "из ~36" in r.stdout, r.stdout)
+        open(os.path.join(cst, "01-review.md"), "w", encoding="utf-8").write("# Разбор\n\n" + "Разрыв логики между первым запуском и использованием. " * 10 + "\n")
+        r = run([os.path.join(HERE, "check_step.py"), cst, "01-review.md", "--since", "0"])
+        expect("шаг: под строкой проверок — строка «Расход»", "\nРасход: 3 вызова" in r.stdout, r.stdout)
+        r = run([os.path.join(HERE, "trace_summary.py"), "--version"])
+        expect("версия системы для шапки лога", r.stdout.startswith("Система: "), r.stdout)
+    finally:
+        shutil.rmtree(proj, ignore_errors=True)
 
 
 def forecast_tests(root):
@@ -1137,6 +1240,7 @@ def main():
         polygon_tests(root)
         sensitivity_tests(root)
         path_tests(root)
+        trace_tests()
         knowledge_tests(root)
         map_tests(root)
         model_tests(root)

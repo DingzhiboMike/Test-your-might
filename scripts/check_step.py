@@ -8,7 +8,8 @@
 - check_quotes.py — по каждому файлу артефакта (маска раскрывается);
 - check_fresh.py — старые веб-источники в артефакте стоят с годом в тексте;
 - check_private.py — по задаче;
-- check_numbers.py — по задаче, если есть numbers.csv.
+- check_numbers.py — по задаче, если есть numbers.csv;
+- trace_summary.py --since — строка «Расход: …» за шаг из трассы (хук scripts/hooks/trace.py).
 
 Печатает строку «Проверки: …» — её и пиши в лог. У check_quotes в строке счётчики: цитат, без id, источников,
 независимых корней — по ним видно, на скольких независимых опорах стоит артефакт. Ниже — полный вывод только тех
@@ -63,6 +64,11 @@ def main():
             detail.append(last)
         parts.append(part + (" (%s)" % "; ".join(detail) if detail else ""))
     print("Проверки: " + "; ".join(parts))
+    if os.path.exists(os.path.join(task, "trace.jsonl")) and "--since" in rest:
+        since = rest[rest.index("--since") + 1]
+        print(run("trace_summary.py", [task, "--since", since])[1])
+    elif "--since" in rest:
+        print("Расход: трассы нет (хук scripts/hooks/trace.py не подключён или задача шла без подагентов)")
     failed = [(n, out) for n, (code, _, out) in checks if code != 0]
     for n, out in failed:
         print("\n== %s\n%s" % (n, out))
