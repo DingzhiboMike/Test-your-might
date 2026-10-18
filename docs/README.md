@@ -10,6 +10,6 @@
   --screenshot=docs/architecture-1-roles.png "file://$PWD/docs/src/architecture-1-roles.html"
 ```
 
-Для схемы маршрутов — `--window-size=952,572` и `architecture-2-routes`. Для четвёртой схемы — `--window-size=952,450` и `architecture-4-document-mapping`. У третьей схемы (пример валидации) исходника нет: маршрут валидации не менялся.
+Для схемы маршрутов — `--window-size=952,592` и `architecture-2-routes`. Для четвёртой схемы — `--window-size=952,450` и `architecture-4-document-mapping`. У третьей схемы (пример валидации) исходника нет: маршрут валидации не менялся.
 
 Предложение по картографии документов — `proposal-document-dossiers.md` в этой папке. Актуальное описание системы — `AGENTS.md` в корне; контракты скиллов — `.claude/skills/orchestrator/registry.md`.
