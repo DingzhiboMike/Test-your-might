@@ -6,10 +6,10 @@
 
 ```
 "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome" --headless=new --hide-scrollbars \
-  --force-device-scale-factor=2 --window-size=952,996 \
+  --force-device-scale-factor=2 --window-size=952,1060 \
   --screenshot=docs/architecture-1-roles.png "file://$PWD/docs/src/architecture-1-roles.html"
 ```
 
-Высота окна и имя файла для остальных схем: маршруты — `952,592` и `architecture-2-routes`; пример прогона (валидация идеи) — `952,544` и `architecture-3-example`; картография документов — `952,592` и `architecture-4-document-mapping`.
+Высота окна и имя файла для остальных схем: маршруты — `952,680` и `architecture-2-routes`; пример прогона (валидация идеи) — `952,600` и `architecture-3-example`; картография документов — `952,552` и `architecture-4-document-mapping`. Для роли и хранилищ (`architecture-1-roles`) — `952,1060`. Chromium под Linux съедает около 88 px высоты на рамку окна: добавь их к высоте, а пустое поле снизу обрежь.
 
 Предложение по картографии документов — `proposal-document-dossiers.md` в этой папке. Актуальное описание системы — `AGENTS.md` в корне; указатель исполнителей — `.claude/skills/orchestrator/registry.md`, контракт каждого — в конце его `SKILL.md`, маршруты оркестратора — `.claude/skills/orchestrator/routes/`.
