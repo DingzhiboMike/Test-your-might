@@ -617,6 +617,204 @@ def readers_tests(root):
     expect("check_env печатает отчёт", e.returncode == 0 and "Чтение PDF с текстом" in e.stdout, e.stdout + e.stderr)
 
 
+def map_tests(root):
+    import json as _json
+    md = os.path.join(HERE, "map_docs.py")
+    ck = os.path.join(HERE, "check_map.py")
+    d = os.path.join(root, "tasks", "mapd")
+    os.makedirs(os.path.join(d, "sources", "raw"))
+    open(os.path.join(d, "sources.csv"), "w", encoding="utf-8").write(
+        "id,kind,location,read\nF-001,context,context/a.md,full\nF-002,interview,context/b.md,full\nF-003,web,https://x.ru,full\n")
+    raw1 = ("Тест кешбэка среди бросивших ИП\nГруппа A: 331 / 1733 = 19.09%\nГруппа B: 337 / 1757 = 19.18%\n"
+            "p-value 0.95, различий нет\nКешбэк начисляется баллами программы лояльности\n"
+            "Ограничение: мощность теста низкая\nКонверсия 4,5% против 3,9%\nОтток 12% за 2 недели\n"
+            "В тесте 120 клиентов\n<table><tr><td>Группа C</td><td>9 / 5 264 = 0.17%</td></tr></table>\n")
+    open(os.path.join(d, "sources", "raw", "F-001.txt"), "w", encoding="utf-8").write(raw1)
+    open(os.path.join(d, "sources", "raw", "F-002.txt"), "w", encoding="utf-8").write(
+        "Респондент 1: Мы платим по счёту, карту не берём.\nИнтервьюер: Почему?\n")
+    r = run([md, d])
+    expect("карта: строится для context и interview, web пропущен", r.returncode == 0 and "документов 2" in r.stdout, r.stdout + r.stderr)
+    data = _json.load(open(os.path.join(d, "map", "F-001.json"), encoding="utf-8"))
+    byt = {l["text"]: l["tags"] for l in data["lines"]}
+    expect("карта: теги число, продукт, срез", "число" in byt.get("Группа A: 331 / 1733 = 19.09%", [])
+           and "продукт" in byt.get("Кешбэк начисляется баллами программы лояльности", [])
+           and "срез" in byt.get("Тест кешбэка среди бросивших ИП", []), str(byt))
+    expect("карта: строка HTML-таблицы собрана по ячейкам", "Группа C | 9 / 5 264 = 0.17%" in byt, str(list(byt)))
+    r = run([md, d])
+    expect("карта: неизменившийся документ берётся из кэша", "из кэша 2" in r.stdout, r.stdout)
+    num = [l["n"] for l in data["lines"] if "число" in l["tags"]]
+    n = {l["text"]: l["n"] for l in data["lines"]}
+    la, lb = n["Группа A: 331 / 1733 = 19.09%"], n["Кешбэк начисляется баллами программы лояльности"]
+    lr = n["Респондент 1: Мы платим по счёту, карту не берём."] if "Респондент 1: Мы платим по счёту, карту не берём." in n else 1
+    d2 = os.path.join(d, "..")
+    f2 = _json.load(open(os.path.join(d, "map", "F-002.json"), encoding="utf-8"))["lines"][0]["n"]
+    cover = ", ".join("L%d" % x for x in num)
+
+    def dossier(num_refs=cover, key="L%d: «Кешбэк начисляется баллами программы лояльности»" % lb, extra="", f2status="прочитан",
+                drop_field=None, second=True):
+        b1 = ("### F-001 — тест кешбэка\n- Тип: отчёт о тесте\n- Про кого: бросившие ИП, L1\n- Сколько: 120 клиентов, L%d\n"
+              "- Что измерено: результат теста\n- Дата: не указана\n- Выводы документа:\n  - различий нет, L%d\n"
+              "- Числа и срезы: %s\n- Про продукт: кешбэк баллами, L%d\n- Риски и ограничения команды: мощность низкая\n"
+              "- Ключевая цитата: %s\n- Сверх схемы: нет\n- Отброшено: нет\n- Статус чтения: прочитан\n%s" % (
+                  n["В тесте 120 клиентов"], n["p-value 0.95, различий нет"], num_refs, lb, key, extra))
+        if drop_field:
+            b1 = "\n".join(x for x in b1.split("\n") if not x.startswith("- " + drop_field + ":")) + "\n"
+        b2 = ("### F-002 — интервью\n- Тип: интервью\n- Про кого: респондент\n- Сколько: 1\n- Что измерено: слова\n"
+              "- Дата: не указана\n- Выводы документа: платит по счёту, L%d\n- Числа и срезы: в документе нет\n"
+              "- Про продукт: нет\n- Риски и ограничения команды: нет\n- Ключевая цитата: L%d: «Мы платим по счёту»\n"
+              "- Сверх схемы: нет\n- Отброшено: нет\n- Статус чтения: %s\n" % (f2, f2, f2status)) if second else ""
+        open(os.path.join(d, "00d-map.md"), "w", encoding="utf-8").write(b1 + "\n" + b2)
+
+    dossier()
+    r = run([ck, d])
+    expect("досье: верное проходит", r.returncode == 0, r.stdout)
+    dossier(second=False)
+    r = run([ck, d])
+    expect("досье: пропущенный документ пойман", r.returncode == 1 and "F-002" in r.stdout, r.stdout)
+    dossier(key="L%d: «Кешбэк начисляется рублями на счёт»" % lb)
+    r = run([ck, d])
+    expect("досье: цитата не из строки поймана", r.returncode == 1 and "не найдена" in r.stdout, r.stdout)
+    dossier(key="«Кешбэк начисляется баллами программы лояльности»")
+    r = run([ck, d])
+    expect("досье: цитата без адреса строки поймана", r.returncode == 1 and "без адреса" in r.stdout, r.stdout)
+    dossier(key="L999: «Кешбэк начисляется баллами программы лояльности»")
+    r = run([ck, d])
+    expect("досье: несуществующая строка поймана", r.returncode == 1 and "нет строки" in r.stdout, r.stdout)
+    dossier(drop_field="Про продукт")
+    r = run([ck, d])
+    expect("досье: пропущенное поле поймано", r.returncode == 1 and "нет поля" in r.stdout and "Про продукт" in r.stdout, r.stdout)
+    dossier(extra="- Влияние: Г=да\n")
+    r = run([ck, d])
+    expect("досье: оценка важности запрещена", r.returncode == 1 and "Влияние" in r.stdout, r.stdout)
+    dossier(num_refs="L%d" % la)
+    r = run([ck, d])
+    expect("досье: неучтённые числа пойманы", r.returncode == 1 and "не учтено" in r.stdout, r.stdout)
+    dossier(num_refs="L%d" % la, extra="")
+    txt = open(os.path.join(d, "00d-map.md"), encoding="utf-8").read().replace("- Отброшено: нет\n- Статус чтения: прочитан\n\n### F-002",
+                                                                              "- Отброшено: L1-L%d (оговорки)\n- Статус чтения: прочитан\n\n### F-002" % max(num + [1]), 1)
+    open(os.path.join(d, "00d-map.md"), "w", encoding="utf-8").write(txt)
+    r = run([ck, d])
+    expect("досье: «Отброшено» закрывает числа", r.returncode == 0, r.stdout)
+    open(os.path.join(d, "sources", "raw", "F-001.txt"), "a", encoding="utf-8").write("Группа A: 331 / 1733 = 19.09%\nГруппа B: 337 / 1757 = 19.18%\n")
+    run([md, d, "--force"])
+    dd = _json.load(open(os.path.join(d, "map", "F-001.json"), encoding="utf-8"))
+    n = {}
+    for l in dd["lines"]:
+        n.setdefault(l["text"], l["n"])
+    cover = ", ".join("L%d" % x for x in sorted(set(n[l["text"]] for l in dd["lines"] if "число" in l["tags"])))
+    dossier(num_refs=cover)
+    r = run([ck, d])
+    expect("досье: дубль блока считается учтённым", r.returncode == 0, r.stdout)
+    dossier(key="L%d: «Группа A: 331 / 1733 = 19.09%%»" % la)
+    r = run([ck, d])
+    expect("досье: ключевая цитата-строка с числами — предупреждение, не ошибка", r.returncode == 0, r.stdout)
+    dossier(f2status="не читается")
+    r = run([ck, d])
+    expect("досье: «не читается» принимается", r.returncode == 0, r.stdout)
+
+
+def model_tests(root):
+    md = os.path.join(HERE, "map_docs.py")
+    bm = os.path.join(HERE, "build_model.py")
+    ri = os.path.join(HERE, "rank_impact.py")
+    cc = os.path.join(HERE, "check_chain.py")
+    cr = os.path.join(HERE, "check_rank.py")
+    d = os.path.join(root, "tasks", "mdl")
+    os.makedirs(os.path.join(d, "sources", "raw"))
+    open(os.path.join(d, "sources.csv"), "w", encoding="utf-8").write(
+        "id,kind,location,read,root\nF-001,context,context/a.md,full,\nF-002,interview,context/b.md,full,\nF-003,context,context/c.md,full,\n")
+    open(os.path.join(d, "sources", "raw", "F-001.txt"), "w", encoding="utf-8").write(
+        "Тест кешбэка среди бросивших ИП\nГруппа A: 331 / 1733 = 19.09%\nГруппа B: 337 / 1757 = 19.18%\n"
+        "Размер теста 5264 клиента\nКешбэк начисляется баллами программы лояльности\n")
+    open(os.path.join(d, "sources", "raw", "F-002.txt"), "w", encoding="utf-8").write("Респондент 1: платим по счёту, карту не берём\n")
+    open(os.path.join(d, "sources", "raw", "F-003.txt"), "w", encoding="utf-8").write("Мы считаем, что клиенты уходят из-за цены.\n")
+    run([md, d])
+    open(os.path.join(d, "00m-schema.txt"), "w", encoding="utf-8").write(
+        "row: Бросившие ИП\nrow: Новые\nfeature: Размер группы\nfeature: Причины\nfeature: Что вместо карты\n")
+    head = "row,feature,value,quote,source,lines,group_match,group_note,n,type,date\n"
+    good = ("Бросившие ИП,Размер группы,5264 клиента,Размер теста 5264 клиента,F-001,L4,точная,,5264,результат теста,2026-04\n"
+            "Бросившие ИП,Причины,платят по счёту,\"платим по счёту, карту не берём\",F-002,L1,соседняя,,1,слова,2026\n"
+            "Новые,Причины,команда: цена,клиенты уходят из-за цены,F-003,L1,соседняя,,не указано,утверждение команды,2024\n"
+            "Новые,Что вместо карты,кешбэк баллами,Кешбэк начисляется баллами программы лояльности,F-001,L5,соседняя,,5264,описание,2026-04\n")
+    cells = os.path.join(d, "00m-cells.csv")
+    open(cells, "w", encoding="utf-8").write(head + good)
+    r = run([bm, d, "--today", "2026-10-18"])
+    expect("модель: надёжность посчитана по правилам", r.returncode == 0 and "значение 1, версия 1, идея 2, нет данных 2" in r.stdout, r.stdout)
+    mdl = open(os.path.join(d, "00m-model.md"), encoding="utf-8").read()
+    expect("модель: пустые клетки и старые данные перечислены", "Новые × Размер группы" in mdl and "Новые × Причины" in mdl.split("старше года")[-1], mdl[-400:])
+    open(cells, "w", encoding="utf-8").write(head + good.replace("Размер теста 5264 клиента", "Размер теста 9999 клиента"))
+    r = run([bm, d])
+    expect("модель: цитата не из строки поймана", r.returncode == 1 and "не найдена" in r.stdout, r.stdout)
+    open(cells, "w", encoding="utf-8").write(head + good.replace("Бросившие ИП,Причины", "Бросившие ООО,Причины"))
+    r = run([bm, d])
+    expect("модель: строка вне схемы поймана", r.returncode == 1 and "вне схемы" in r.stdout, r.stdout)
+    open(cells, "w", encoding="utf-8").write(head + good.replace("результат теста", "мнение"))
+    r = run([bm, d])
+    expect("модель: недопустимый тип источника пойман", r.returncode == 1 and "type" in r.stdout, r.stdout)
+    open(cells, "w", encoding="utf-8").write(head + good)
+    run([bm, d, "--today", "2026-10-18"])
+    dos = ("### F-001 — тест\n- Тип: отчёт о тесте\n- Про кого: бросившие ИП\n- Про продукт: кешбэк баллами\n- Статус чтения: прочитан\n\n"
+           "### F-002 — интервью\n- Тип: интервью\n- Про кого: респондент\n- Про продукт: нет\n- Статус чтения: прочитан\n\n"
+           "### F-003 — утверждение\n- Тип: утверждение команды\n- Про кого: не указано\n- Про продукт: нет\n- Статус чтения: не читается\n")
+    open(os.path.join(d, "00d-map.md"), "w", encoding="utf-8").write(dos)
+    r = run([ri, d, "--limit", "1"])
+    imp = open(os.path.join(d, "00i-impact.md"), encoding="utf-8").read()
+    expect("важность: кандидат на углубление выбран по формуле, нечитаемый — в расшифровку",
+           r.returncode == 0 and "Углубить: F-001" in r.stdout and "F-003" in imp.split("Нужна расшифровка")[1].split("##")[0], r.stdout + imp[:300])
+    lim = open(os.path.join(d, "00r-limits.md"), "w", encoding="utf-8")
+    lim.write("| № | статус | что | доказательство | кто подтвердил |\n| --- | --- | --- | --- | --- |\n"
+              "| R-1 | есть | кешбэк баллами | «Кешбэк начисляется баллами программы лояльности» [F-001 L5] | документы |\n"
+              "| R-2 | нет | рублёвого кешбэка нет | — | человек |\n")
+    lim.close()
+    hyp = ("### Г-1. Сообщение о баллах\n- **Клетка:** Бросившие ИП × Причины\n- **Рамка продукта:** R-1\n- **Размер группы:** 5264 [F-001]\n\n"
+           "### Г-2. Другая\n- **Клетка:** Новые × Размер группы\n- **Рамка продукта:** R-1\n- **Размер группы:** 3000 [допущение: оценка]\n")
+    hp = os.path.join(d, "02-hypotheses.md")
+    open(hp, "w", encoding="utf-8").write(hyp)
+    r = run([cc, d])
+    expect("цепочка: верная проходит, пустая клетка — предупреждение", r.returncode == 0 and "пуста" in r.stdout, r.stdout)
+    open(hp, "w", encoding="utf-8").write(hyp.replace("R-1\n- **Размер группы:** 3000", "R-2\n- **Размер группы:** 3000"))
+    r = run([cc, d])
+    expect("цепочка: механики нет в продукте — ошибка", r.returncode == 1 and "нет в продукте" in r.stdout, r.stdout)
+    open(hp, "w", encoding="utf-8").write(hyp.replace("- **Рамка продукта:** R-1\n- **Размер группы:** 5264 [F-001]", "- **Размер группы:** 5264 [F-001]"))
+    r = run([cc, d])
+    expect("цепочка: нет рамки продукта — ошибка", r.returncode == 1 and "Рамка продукта" in r.stdout, r.stdout)
+    open(hp, "w", encoding="utf-8").write(hyp.replace("Бросившие ИП × Причины", "Бросившие ООО × Причины"))
+    r = run([cc, d])
+    expect("цепочка: клетки нет в модели — ошибка", r.returncode == 1 and "нет в модели" in r.stdout, r.stdout)
+    open(hp, "w", encoding="utf-8").write(hyp.replace("5264 [F-001]", "по оценке"))
+    r = run([cc, d])
+    expect("цепочка: размер группы без числа — ошибка", r.returncode == 1 and "Размер группы" in r.stdout, r.stdout)
+    open(hp, "w", encoding="utf-8").write(hyp)
+    limp = os.path.join(d, "00r-limits.md")
+    open(limp, "a", encoding="utf-8").write("| R-3 | есть | лимит | «Лимит 50 тыс.» [F-001 L5] | документы |\n")
+    r = run([cc, d])
+    expect("цепочка: рамка с цитатой не из строки — ошибка", r.returncode == 1 and "R-3" in r.stdout, r.stdout)
+    tr = os.path.join(d, "02e-trace.md")
+    good_tr = ("1. Клетка: Бросившие ИП × Размер группы; надёжность: значение; гипотеза: Г-1\n"
+               "2. Клетка: Новые × Что вместо карты; надёжность: версия; гипотеза: Г-2\n"
+               "3. Клетка: Бросившие ИП × Причины; надёжность: идея; гипотеза: Г-3\n"
+               "4. Клетка: Новые × Размер группы; надёжность: нет данных; гипотеза: Г-4; не ранжируется\n")
+    open(tr, "w", encoding="utf-8").write(good_tr)
+    r = run([cr, d])
+    expect("порядок: следующий из надёжности проходит", r.returncode == 0, r.stdout)
+    open(tr, "w", encoding="utf-8").write(good_tr.replace("надёжность: версия", "надёжность: значение"))
+    r = run([cr, d])
+    expect("порядок: надёжность не по модели — ошибка", r.returncode == 1 and "по модели" in r.stdout, r.stdout)
+    lines = good_tr.splitlines()
+    open(tr, "w", encoding="utf-8").write("\n".join([lines[0], lines[2], lines[1], lines[3]]) + "\n")
+    r = run([cr, d])
+    expect("порядок: надёжность растёт вниз без причины — ошибка", r.returncode == 1 and "выше" in r.stdout, r.stdout)
+    open(tr, "w", encoding="utf-8").write("\n".join([lines[0], lines[2], lines[1] + "; расхождение: быстрый тест", lines[3]]) + "\n")
+    r = run([cr, d])
+    expect("порядок: «расхождение» с причиной разрешает", r.returncode == 0, r.stdout)
+    open(tr, "w", encoding="utf-8").write(good_tr.replace("; не ранжируется", ""))
+    r = run([cr, d])
+    expect("порядок: «нет данных» без «не ранжируется» — ошибка", r.returncode == 1 and "не ранжируется" in r.stdout, r.stdout)
+    open(tr, "w", encoding="utf-8").write("\n".join([lines[3], lines[0], lines[1], lines[2]]) + "\n")
+    r = run([cr, d])
+    expect("порядок: ранжированное после «не ранжируется» — ошибка", r.returncode == 1 and "после" in r.stdout, r.stdout)
+
+
 def main():
     root = tempfile.mkdtemp(prefix="polygon-selftest-")
     try:
@@ -940,6 +1138,8 @@ def main():
         sensitivity_tests(root)
         path_tests(root)
         knowledge_tests(root)
+        map_tests(root)
+        model_tests(root)
         knowledge_links_tests(root)
         forecast_tests(root)
         rehearsal_tests(root)
