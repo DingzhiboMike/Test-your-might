@@ -13,6 +13,14 @@ score: читает блок «СВЕРКА» из ответа навыка, с
 и сравнивает с ключом: исход (допустимые варианты из ключа), поле мощности, флаги (F1). Печатает таблицу и итог;
 с --min код возврата 1, если точность по исходу ниже порога.
 
+Ещё три режима:
+  python3 scripts/polygon.py map-recall --seed 1 [--min 0.9]      # полнота тегов map_docs.py на выдуманных строках
+  python3 scripts/polygon.py make-interviews --seed 1 --out DIR --key-out FILE   # транскрипты с заложенными сигналами
+  python3 scripts/polygon.py score-interviews --key FILE --answer FILE [--min 0.7]
+map-recall — без нейросети, входит в CI: ловит регрессию разметки (часть форм нарочно трудная — числа словами,
+«в два раза» — полнота ниже 1 честно). make-interviews — сигналы: обход, триггер, слова против поведения,
+альтернатива, цена, барьер; ответ навыка — блок «СВЕРКА», строки «И-01 | сигналы=обход,триггер».
+
 Синтетика ничего не подтверждает: полигон проверяет навык, а не мир.
 """
 import argparse
@@ -369,6 +377,135 @@ def score(a):
     return 1 if (a.min and acc < a.min) else 0
 
 
+
+# ---------- карта документов: полнота тегов map_docs.py ----------
+# Строки с заранее известным тегом. Часть форм нарочно трудная (числа словами, таблицы, «в два раза»): полигон
+# меряет, сколько ловит скрипт, а не подгоняет шаблоны под него.
+MAP_LINES = {
+    "число": ["Конверсия {p}% против {q}%", "В опросе {n} респондентов", "Ответили {a} / {b}",
+              "p-value 0.{x}, различий нет", "Средний чек {n} тыс. руб", "Отток {p}% за квартал",
+              "Выручка выросла на {p} п.п.", "<table><tr><td>Группа {g}</td><td>{a} / {b}</td></tr></table>",
+              "Каждый третий клиент ушёл", "Отток вырос в два раза"],
+    "срез": ["Среди новичков картина другая", "Для ИП с оборотом до {n} млн", "Сегмент малых команд",
+             "Активные клиенты ведут себя иначе", "Портрет: владелец сам ведёт учёт", "У ООО доля выше"],
+    "продукт": ["Тариф включает выгрузку в 1С", "Лимит на переводы — {n} тыс.", "Подписка продлевается сама",
+                "Комиссия за перевод не взимается", "Виртуальная карта выпускается за минуту"],
+    "риск": ["Ограничение: выборка мала", "Мощность теста низкая", "Эффект не значим", "Риск: самовозврат",
+             "Акция может не окупиться"],
+}
+MAP_NEUTRAL = ["Документ подготовила команда продукта", "Ниже — описание процесса", "Встреча прошла в среду",
+               "Вопросы обсуждали по очереди", "Итоги записаны в протокол"]
+
+
+def map_recall(a):
+    sys.path.insert(0, HERE)
+    from map_docs import clean, tags
+    rng = random.Random(a.seed)
+    stats = {t: [0, 0] for t in MAP_LINES}
+    false_pos, neutral = 0, 0
+    missed = []
+    for _ in range(a.docs):
+        for tag, forms in MAP_LINES.items():
+            for form in forms:
+                raw = form.format(p=rng.randint(2, 60), q=rng.randint(2, 60), n=rng.randint(12, 900),
+                                  a=rng.randint(10, 400), b=rng.randint(500, 6000), x=rng.randint(10, 99),
+                                  g=rng.choice("ABCD"))
+                for line in clean(raw) or [raw]:
+                    stats[tag][1] += 1
+                    if tag in tags(line):
+                        stats[tag][0] += 1
+                    elif form not in missed:
+                        missed.append(form)
+        for line in MAP_NEUTRAL:
+            neutral += 1
+            false_pos += bool(tags(line))
+    hit = sum(h for h, _ in stats.values())
+    total = sum(n for _, n in stats.values())
+    print("| Тег | Поймано | Из | Полнота |\n| --- | --- | --- | --- |")
+    for t, (h, n) in stats.items():
+        print("| %s | %d | %d | %.2f |" % (t, h, n, h / n))
+    print("\nПолнота всего: %.2f; ложных тегов на нейтральных строках: %d из %d." % (hit / total, false_pos, neutral))
+    if missed:
+        print("Не ловит формы: " + "; ".join(missed[:8]))
+    return 1 if a.min and hit / total < a.min else 0
+
+
+# ---------- интервью: заложенные сигналы и сверка разбора ----------
+SIGNALS = {
+    "обход": ["Сейчас мы всё сводим в таблицу вручную, раз в неделю, по вечерам.",
+              "Пока выкручиваемся: бухгалтер пересылает выписки в мессенджер, я переношу руками."],
+    "триггер": ["Искать начали, когда ушёл бухгалтер и мы сорвали срок отчёта.",
+                "Всё поменялось после проверки: штраф был, и тогда решили, что так нельзя."],
+    "слова_против_поведения": ["Пользуемся каждый день, очень удобно.|Если честно, последний раз открывали в прошлом месяце.",
+                               "Для нас это важнейший инструмент.|Ну, отчёт оттуда мы так ни разу и не выгрузили."],
+    "альтернатива": ["Смотрели ещё одну систему, но там надо всё настраивать самим.",
+                     "Думали нанять человека на полставки вместо всего этого."],
+    "цена": ["Больше трёх тысяч в месяц за такое платить не готовы.",
+             "Если будет дороже нынешнего тарифа, директор не подпишет."],
+    "барьер": ["Боимся, что сотрудники не перейдут и будут вести по-старому.",
+               "Главное — чтобы не пришлось переносить архив за пять лет."],
+}
+FILLER_Q = ["Расскажите, чем занимается компания?", "Кто у вас отвечает за учёт?", "Как устроен обычный месяц?",
+            "Что было дальше?", "А как сейчас?"]
+FILLER_A = ["Мы небольшая команда, человек двенадцать.", "В основном я сам, иногда помогает партнёр.",
+            "В начале месяца закрываем документы, потом спокойнее.", "Да как обычно, ничего особенного.",
+            "Работаем, клиенты есть, растём понемногу."]
+
+
+def make_interviews(a):
+    rng = random.Random(a.seed)
+    os.makedirs(a.out, exist_ok=True)
+    key = {}
+    for i in range(1, a.n + 1):
+        iid = "И-%02d" % i
+        chosen = sorted(rng.sample(sorted(SIGNALS), rng.randint(2, 4)))
+        lines = []
+        for _ in range(rng.randint(2, 3)):
+            lines += ["Интервьюер: " + rng.choice(FILLER_Q), "Респондент: " + rng.choice(FILLER_A)]
+        late = []
+        for s in chosen:
+            phrase = rng.choice(SIGNALS[s])
+            if "|" in phrase:  # слова в начале, поведение — позже, через несколько реплик
+                first, second = phrase.split("|")
+                lines += ["Интервьюер: Как часто пользуетесь?", "Респондент: " + first]
+                late.append(second)
+            else:
+                lines += ["Интервьюер: " + rng.choice(FILLER_Q), "Респондент: " + phrase]
+        for _ in range(rng.randint(1, 2)):
+            lines += ["Интервьюер: " + rng.choice(FILLER_Q), "Респондент: " + rng.choice(FILLER_A)]
+        for j, said in enumerate(late):
+            q = "Когда последний раз что-то выгружали?" if j == 0 else "А ещё?"
+            lines += ["Интервьюер: " + q, "Респондент: " + said]
+        open(os.path.join(a.out, iid + ".md"), "w", encoding="utf-8").write(
+            "# Интервью %s (выдуманное, полигон)\n\n" % iid + "\n".join(lines) + "\n")
+        key[iid] = chosen
+    os.makedirs(os.path.dirname(os.path.abspath(a.key_out)), exist_ok=True)
+    json.dump(key, open(a.key_out, "w", encoding="utf-8"), ensure_ascii=False, indent=1)
+    print("интервью: %d, папка: %s, ключ: %s; сигналы: %s" % (len(key), a.out, a.key_out, ", ".join(sorted(SIGNALS))))
+    return 0
+
+
+def score_interviews(a):
+    key = json.load(open(a.key, encoding="utf-8"))
+    text = open(a.answer, encoding="utf-8").read()
+    got = {}
+    block = text.split("СВЕРКА", 1)[1] if "СВЕРКА" in text else ""
+    for line in block.splitlines():
+        parts = [x.strip() for x in line.split("|")]
+        if len(parts) >= 2 and parts[0].startswith("И-") and "=" in parts[1]:
+            got[parts[0]] = {s.strip() for s in parts[1].split("=", 1)[1].split(",") if s.strip()}
+    scores = []
+    print("| Интервью | Ключ | Ответ | F1 |\n| --- | --- | --- | --- |")
+    for iid in sorted(key):
+        want, have = set(key[iid]), got.get(iid, set())
+        tp = len(want & have)
+        f = 2 * tp / (len(want) + len(have)) if want or have else 1.0
+        scores.append(f)
+        print("| %s | %s | %s | %.2f |" % (iid, ", ".join(sorted(want)), ", ".join(sorted(have)) or "—", f))
+    avg = sum(scores) / len(scores) if scores else 0
+    print("\nСредний F1 по сигналам: %.2f" % avg)
+    return 1 if a.min and avg < a.min else 0
+
 def main():
     p = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     sub = p.add_subparsers(dest="cmd", required=True)
@@ -381,10 +518,29 @@ def main():
     s.add_argument("--key", required=True)
     s.add_argument("--answer", required=True)
     s.add_argument("--min", type=float, default=0.0)
+    mr = sub.add_parser("map-recall")
+    mr.add_argument("--seed", type=int, default=1)
+    mr.add_argument("--docs", type=int, default=5)
+    mr.add_argument("--min", type=float, default=0.0)
+    mi = sub.add_parser("make-interviews")
+    mi.add_argument("--seed", type=int, default=1)
+    mi.add_argument("--n", type=int, default=8)
+    mi.add_argument("--out", required=True, help="папка для транскриптов")
+    mi.add_argument("--key-out", required=True, help="файл ключа (вне папки транскриптов)")
+    si = sub.add_parser("score-interviews")
+    si.add_argument("--key", required=True)
+    si.add_argument("--answer", required=True)
+    si.add_argument("--min", type=float, default=0.0)
     a = p.parse_args()
     if a.cmd == "make":
         make(a)
         return 0
+    if a.cmd == "map-recall":
+        return map_recall(a)
+    if a.cmd == "make-interviews":
+        return make_interviews(a)
+    if a.cmd == "score-interviews":
+        return score_interviews(a)
     return score(a)
 
 

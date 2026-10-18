@@ -428,6 +428,24 @@ def path_tests(root):
     expect("ТЗ: без строки ЦЕНА — поймано", r.returncode == 1 and "ЦЕНА" in r.stdout, r.stdout)
 
 
+def polygon_more_tests(root):
+    """Полигон: полнота тегов карты и сверка разбора интервью по заложенным сигналам."""
+    pg = os.path.join(HERE, "polygon.py")
+    r = run([pg, "map-recall", "--seed", "1", "--min", "0.9"])
+    expect("полигон карты: полнота тегов не ниже порога CI, ложных тегов нет", r.returncode == 0 and "ложных тегов на нейтральных строках: 0" in r.stdout, r.stdout)
+    out, key = os.path.join(root, "iv"), os.path.join(root, "iv-key.json")
+    r = run([pg, "make-interviews", "--seed", "3", "--n", "4", "--out", out, "--key-out", key])
+    k = json.load(open(key, encoding="utf-8"))
+    expect("полигон интервью: транскрипты и ключ отдельно", r.returncode == 0 and len(k) == 4 and len(os.listdir(out)) == 4, r.stdout)
+    ans = os.path.join(root, "iv-answer.md")
+    open(ans, "w", encoding="utf-8").write("СВЕРКА\n" + "".join("%s | сигналы=%s\n" % (i, ",".join(v)) for i, v in k.items()))
+    r = run([pg, "score-interviews", "--key", key, "--answer", ans, "--min", "0.99"])
+    expect("полигон интервью: точный ответ — F1 1,00", r.returncode == 0 and "1.00" in r.stdout.split("Средний")[1], r.stdout)
+    open(ans, "w", encoding="utf-8").write("СВЕРКА\nИ-01 | сигналы=цена\n")
+    r = run([pg, "score-interviews", "--key", key, "--answer", ans, "--min", "0.7"])
+    expect("полигон интервью: пропуски сигналов снижают F1 ниже порога", r.returncode == 1, r.stdout)
+
+
 def message_tests():
     """Сообщения проверок называют нарушение и место, а не текст, которым его закрыть (защита от подгонки)."""
     import re as _re
@@ -1561,6 +1579,7 @@ def main():
         rules_tests()
         audit_tests(root)
         message_tests()
+        polygon_more_tests(root)
         effort_tests(root)
         knowledge_tests(root)
         map_tests(root)

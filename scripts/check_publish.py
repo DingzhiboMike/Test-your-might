@@ -6,7 +6,8 @@
 
 Слова берутся из локальных файлов, которые в репозиторий не попадают:
 - tasks/*/private.txt и tasks/*/closed-web.txt — имена, партнёры, коды из задач;
-- .publish-stopwords в корне — свои слова, по одному в строке (названия продуктов, компаний); строки с # — комментарии.
+- .publish-stopwords в корне — свои слова, по одному в строке (названия продуктов, компаний); строки с # — комментарии;
+- переменная окружения PUBLISH_STOPWORDS — те же слова построчно: так их получает CI из секрета репозитория.
 
 Совпадение — без учёта регистра и ё/е, целым словом с падежным окончанием: у имён ищется основа без окончания
 (как в check_private.py), поэтому падежная форма имени найдётся, а обычное слово, которое начинается с той же основы, — нет.
@@ -50,6 +51,10 @@ def load_terms(root):
             t = line.strip()
             if t and not t.startswith("#"):
                 terms.add(stem(t))
+    for line in os.environ.get("PUBLISH_STOPWORDS", "").splitlines():
+        t = line.strip()
+        if t and not t.startswith("#"):
+            terms.add(stem(t))
     rx = []
     for t in sorted(terms, key=len, reverse=True):
         body = re.escape(norm(t))

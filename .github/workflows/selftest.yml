@@ -1,0 +1,30 @@
+name: selftest
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  checks:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Самопроверка скриптов
+        run: python3 scripts/selftest.py
+      - name: Размер инструкций
+        run: python3 scripts/check_size.py
+      - name: Реестр правил
+        run: python3 scripts/rules.py --check
+      - name: Описания агентов
+        run: python3 scripts/roles.py --check
+      - name: Полигон без нейросети
+        run: python3 scripts/polygon.py map-recall --seed 1 --min 0.9
+      - name: Данные проектов не уходят в репозиторий
+        env:
+          PUBLISH_STOPWORDS: ${{ secrets.PUBLISH_STOPWORDS }}
+        run: python3 scripts/check_publish.py --all
