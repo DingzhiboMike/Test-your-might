@@ -547,6 +547,8 @@ def route_tests():
 
 def roles_tests():
     """Описания агентов совпадают с таблицей ролей; хук держит Bash и сеть подагентов."""
+    r = run([os.path.join(HERE, "check_size.py")])
+    expect("размер: ядро, маршруты, скиллы и загрузка оркестратора на тип в пределах порогов", r.returncode == 0, r.stdout[-800:])
     r = run([os.path.join(HERE, "roles.py"), "--check"])
     expect("роли: описания агентов в .claude/agents совпадают с таблицей", r.returncode == 0, r.stdout)
     proj = tempfile.mkdtemp(prefix="polygon-roles-")
