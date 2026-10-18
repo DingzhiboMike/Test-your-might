@@ -81,7 +81,7 @@ def main():
         hid = m.group(1)
         cell = field(b, "Клетка")
         if not cell:
-            errors.append("%s: нет строки «Клетка: <группа> × <признак>»" % hid)
+            errors.append("%s: не названа клетка модели" % hid)
         elif model is not None:
             key = re.sub(r"\s*[×xх]\s*", " × ", cell.strip(), count=1)
             c = model["cells"].get(key)
@@ -91,7 +91,7 @@ def main():
                 warnings.append("%s: клетка «%s» пуста — гипотеза стоит на пробеле, опора только идея" % (hid, key))
         fr = field(b, "Рамка продукта")
         if not fr:
-            errors.append("%s: нет строки «Рамка продукта: R-… или не требует: причина»" % hid)
+            errors.append("%s: не названа рамка продукта" % hid)
         elif fr.lower().startswith("не требует"):
             if len(fr) < len("не требует: ") + 5:
                 errors.append("%s: «не требует» без причины" % hid)
@@ -115,7 +115,7 @@ def main():
         elif not re.search(r"\[(F-\d+|N-\d+|допущение)", sz):
             warnings.append("%s: размер группы без источника ([F-…], [N-…] или [допущение: причина])" % hid)
     if n == 0:
-        errors.append("в 02-hypotheses.md нет блоков «### Г-<номер>»")
+        errors.append("в 02-hypotheses.md нет блоков гипотез")
     os.makedirs(os.path.join(task, "checks"), exist_ok=True)
     open(os.path.join(task, "checks", "chain.md"), "w", encoding="utf-8").write(
         "# Проверка цепочки: %s\n\nГипотез: %d, рамок: %d.\n\n## Ошибки\n%s\n\n## Предупреждения\n%s\n" % (

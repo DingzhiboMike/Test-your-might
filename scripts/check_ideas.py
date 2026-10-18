@@ -96,7 +96,7 @@ def main():
             errors.append("идея %d: пустое «Убивает» — фрагмент, который убивает идею, или «нет»" % n)
         objs = field(b, "Возражения")
         if not meaningful(objs):
-            errors.append("идея %d: нет «Возражения:» — что ослабляет идею, с фрагментами, или «не найдено — искал: …»" % n)
+            errors.append("идея %d: возражения не указаны" % n)
         elif not re.match(r"\W*не найден", objs, re.I):
             objections += 1
         elif not re.search(r"искал", objs, re.I):
@@ -118,8 +118,7 @@ def main():
         if v == "снять":
             repeat = re.match(r"\W*нет\b", field(b, "Новая"), re.I)
             if not killing and not repeat:
-                errors.append("идея %d: снята без причины — нужен фрагмент «…» [F-id] в «Убивает» или «Новая: нет»; "
-                              "«нет опор» в отсеве не причина" % n)
+                errors.append("идея %d: снята без причины, которую держит материал; «нет опор» в отсеве не причина" % n)
     extra = sorted(set(got) - set(ideas))
     if extra and ideas:
         warns.append("вердикты по идеям, которых нет в 02f-forecast.md: %s" % ", ".join(map(str, extra)))

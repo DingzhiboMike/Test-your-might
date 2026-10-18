@@ -134,7 +134,7 @@ def check_block(task, fid, block, errors, warnings):
             if len(q) < 12:
                 continue
             if not any(x[0] == q for x in quotes(val)):
-                errors.append("%s: цитата без адреса строки (L<номер>): «%s…»" % (fid, q[:50]))
+                errors.append("%s: цитата без адреса строки: «%s…»" % (fid, q[:50]))
     for key, val in f.items():
         for q, a, b in quotes(val):
             if a not in lines or b not in lines:
@@ -161,7 +161,7 @@ def check_block(task, fid, block, errors, warnings):
         miss = [n for n in numeric if n not in covered and squeeze(lines[n]["text"]) not in seen]
         ratio = len(miss) / len(numeric)
         if ratio > UNCOVERED_ERROR:
-            errors.append("%s: не учтено строк с числами: %d из %d (%.0f%%): L%s … — процитируй или внеси в «Отброшено»"
+            errors.append("%s: не учтено строк с числами: %d из %d (%.0f%%): L%s …"
                           % (fid, len(miss), len(numeric), 100 * ratio, ", L".join(str(n) for n in miss[:6])))
         elif miss:
             warnings.append("%s: не учтено строк с числами: %d из %d: L%s" % (fid, len(miss), len(numeric),

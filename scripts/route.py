@@ -39,6 +39,7 @@ SERVICE = ("log.md", "state.json", "state.json.tmp", "trace.jsonl", "trace.jsonl
 
 # Обязательные шаги по типу выхода: (роль, артефакт, условие). Условие: None — всегда; "ideas" — если новые идеи
 # нужны (check_effort.ideas_required); "rehearsal" — если в РЕЖИМЕ «пробный прогон: да».
+AUDIT = ("meaning-review", "audit.md", None)  # выборочный аудит итоговых артефактов (audit_sample.py)
 TAIL_IDEAS = [("nostradamus", "02f-forecast.md", None), ("hypothesis-validator", "02g-ideas-check.md", "ideas")]
 REQUIRED = {
     "разбор": [("b2b-consultant", "01-review.md", None)],
@@ -46,24 +47,25 @@ REQUIRED = {
                  ("hypothesis-validator", "02c-validation.md", None),
                  ("meaning-review", "review-02c-validation.md", None)] + TAIL_IDEAS +
                 [("b2b-consultant", "02e-position.md", None), ("project-analyst", "03-backlog.md", None),
-                 ("synthetic-interviews", "03c-rehearsal.md", "rehearsal")],
+                 ("synthetic-interviews", "03c-rehearsal.md", "rehearsal"), AUDIT],
     "план проверки": [("b2b-consultant", "01-review.md", None), ("hypothesis-generator", "02-hypotheses.md", None),
                       ("hypothesis-validator", "02c-validation.md", None),
                       ("meaning-review", "review-02c-validation.md", None)] + TAIL_IDEAS +
                      [("project-analyst", "03-plan.md", None), ("test-kit", "03b-test-kit.md", None),
-                      ("synthetic-interviews", "03c-rehearsal.md", "rehearsal")],
+                      ("synthetic-interviews", "03c-rehearsal.md", "rehearsal"), AUDIT],
     "ТЗ на доработку": [("b2b-consultant", "01-review.md", None), ("hypothesis-generator", "02-hypotheses.md", None),
                         ("hypothesis-validator", "02c-validation.md", None),
                         ("meaning-review", "review-02c-validation.md", None)] + TAIL_IDEAS +
                        [("b2b-consultant", "02e-position.md", None), ("brief-writer", "07a-analyst.md", None),
-                        ("brief-writer", "07b-editor.md", None), ("brief-writer", "07c-decisions.md", None)],
+                        ("brief-writer", "07b-editor.md", None), ("brief-writer", "07c-decisions.md", None), AUDIT],
     "валидация": [("b2b-consultant", "01-review.md", None), ("hypothesis-validator", "02c-validation.md", None),
                   ("meaning-review", "review-02c-validation.md", None),
                   ("hypothesis-generator", "02b-reinforced.md", None), ("project-analyst", "03-plan.md", None),
                   ("research-report", "06-validation.md", None),
-                  ("meaning-review", "review-06-validation.md", None)],
+                  ("meaning-review", "review-06-validation.md", None), AUDIT],
     "исследование": [("b2b-consultant", "01-review.md", None)] + TAIL_IDEAS +
-                    [("research-report", "06-research.md", None), ("meaning-review", "review-06-research.md", None)],
+                    [("research-report", "06-research.md", None), ("meaning-review", "review-06-research.md", None),
+                     AUDIT],
     "вердикты по проверке": [("results-reviewer", "04-results.md", None)],
 }
 # Проверки готовности по типу: скрипт и аргументы после папки задачи.
@@ -82,6 +84,8 @@ READY_CHECKS = {
     "вердикты по проверке": [],
 }
 COMMON_CHECKS = [("check_quotes.py", []), ("check_private.py", [])]
+for _kind in ("гипотезы", "план проверки", "ТЗ на доработку", "валидация", "исследование"):
+    READY_CHECKS[_kind].append(("audit_sample.py", ["--check"]))
 
 
 def read(path):

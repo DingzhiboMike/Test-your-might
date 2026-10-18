@@ -77,7 +77,7 @@ def check(task, rehearsal_only):
             continue
         units[key(um.group(1))] = (um.group(1).strip(), st.group(0).lower())
     if parts["Для эксперимента"] is not None and not units:
-        errors.append("СЛЕДСТВИЯ: в «Для эксперимента» нет ни одной строки «Строка N — статус: …»")
+        errors.append("СЛЕДСТВИЯ: в «Для эксперимента» нет ни одного теста со статусом")
 
     backlog = read(os.path.join(task, "03-backlog.md"))
     for row in backlog_rows(backlog):
@@ -103,8 +103,7 @@ def check(task, rehearsal_only):
                     answers[key(am.group(1))] = a
             for lab, st in pending:
                 if key(lab) not in answers:
-                    errors.append("%s (%s): в «ПО ПРОБНОМУ ПРОГОНУ» нет ответа «применено / человеку / отклонено: …»"
-                                  % (lab, st))
+                    errors.append("%s (%s): в «ПО ПРОБНОМУ ПРОГОНУ» нет ответа на следствие" % (lab, st))
     return units, errors
 
 

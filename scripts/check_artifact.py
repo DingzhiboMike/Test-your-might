@@ -89,7 +89,7 @@ def check_one(task, artifact, contains, review):
                         problems.append("{}: нет ответа на блокирующее замечание {}".format(artifact, fid))
                 for fid, (status, reason) in ans.items():
                     if status == "оспорено" and not reason:
-                        problems.append("{}: замечание {} оспорено без причины (нужно «{} — оспорено: причина»)".format(artifact, fid, fid))
+                        problems.append("{}: замечание {} оспорено без причины".format(artifact, fid))
     return problems
 
 
