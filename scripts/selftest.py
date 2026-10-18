@@ -488,6 +488,11 @@ def trace_tests():
         r = run([ts, task])
         expect("сводка: таблица по ролям с основной сессией", "hypothesis-validator · отсев идей" in r.stdout
                and "основная сессия" in r.stdout, r.stdout)
+        expect("сводка: вызов подагента до согласования ТЗ виден", "до согласования ТЗ — 1 вызов" in r.stdout, r.stdout)
+        open(os.path.join(task, "00-tz.md"), "w", encoding="utf-8").write("ТЗ\nСОГЛАСОВАНО: да\n")
+        run([hook], json.dumps(ev))
+        r = run([ts, task])
+        expect("сводка: после согласования предупреждения нет", "до согласования" not in r.stdout, r.stdout)
 
         cst = os.path.join(proj, "tasks", "cst")
         os.makedirs(cst)
@@ -820,6 +825,12 @@ def map_tests(root):
     expect("карта: строка HTML-таблицы собрана по ячейкам", "Группа C | 9 / 5 264 = 0.17%" in byt, str(list(byt)))
     r = run([md, d])
     expect("карта: неизменившийся документ берётся из кэша", "из кэша 2" in r.stdout, r.stdout)
+    ms = os.path.join(HERE, "map_summary.py")
+    r = run([ms, d])
+    expect("сводка карты: строка на документ, срезы и строки про продукт без модели",
+           r.returncode == 0 and "| F-001 | a.md |" in r.stdout and "- ип — 1" in r.stdout and "F-001 L" in r.stdout
+           and "Кешбэк начисляется баллами" in r.stdout and os.path.exists(os.path.join(d, "map", "summary.md")), r.stdout)
+    expect("сводка карты: прочитанные целиком не попадают в «не читается»", "## Не читается или частично\n- нет" in r.stdout, r.stdout)
     num = [l["n"] for l in data["lines"] if "число" in l["tags"]]
     n = {l["text"]: l["n"] for l in data["lines"]}
     la, lb = n["Группа A: 331 / 1733 = 19.09%"], n["Кешбэк начисляется баллами программы лояльности"]

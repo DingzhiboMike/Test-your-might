@@ -151,6 +151,15 @@ def system_version(root):
     return h + ("+правки" if dirty else "")
 
 
+def approved(task):
+    """В 00-tz.md есть строка СОГЛАСОВАНО — оркестратор может начинать."""
+    try:
+        with open(os.path.join(task, "00-tz.md"), encoding="utf-8") as f:
+            return bool(re.search(r"^\W*СОГЛАСОВАНО", f.read(), re.M))
+    except OSError:
+        return False
+
+
 def load_trace(task):
     return list(read_jsonl(os.path.join(task, "trace.jsonl")))
 

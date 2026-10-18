@@ -59,6 +59,10 @@ def table(task):
             ", ".join(sorted({v.get("model") for v in main.values() if v.get("model")}))))
     tot = sum(tl.total(r) for r in rows) + mt
     print("\nВсего: %s исполнителей, %s токенов вместе с основной сессией." % (ce.calls_word(len(rows)), tl.k(tot)))
+    early = [r for r in rows if r.get("approved") is False]
+    if early:
+        print("Внимание: до согласования ТЗ — %s (%s): дорогая работа шла раньше единственного решения человека." % (
+            ce.calls_word(len(early)), ", ".join(sorted({r.get("role", "?") for r in early}))))
     versions = sorted({r.get("system") for r in rows if r.get("system")} |
                       {v.get("system") for v in main.values() if v.get("system")})
     if len(versions) > 1:

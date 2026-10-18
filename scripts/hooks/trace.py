@@ -2,7 +2,8 @@
 """Хук трассы Claude Code: расход каждого исполнителя и основной сессии — со слов транскрипта, а не модели.
 
 SubagentStop — подагент закончил: по его транскрипту (agent_transcript_path) считает токены, фактическую
-модель и время и пишет строку в tasks/<задача>/trace.jsonl. Задача — первая папка tasks/<имя>/, названная
+модель и время и пишет строку в tasks/<задача>/trace.jsonl; approved — было ли ТЗ уже согласовано
+(строка СОГЛАСОВАНО в 00-tz.md): до согласования подагентов быть не должно. Задача — первая папка tasks/<имя>/, названная
 в вызове подагента; не названа — задача, где за последние 12 часов менялся log.md. Повторное событие того же
 агента (его продолжили) заменяет строку, а не добавляет вторую.
 
@@ -71,6 +72,7 @@ def on_subagent(data, root):
         "role": tl.detect_role(text, data.get("agent_type", ""), tl.skill_names(root)),
         "mode": tl.detect_mode(text),
         "system": tl.system_version(root),
+        "approved": tl.approved(task),
     }
     rec.update(u)
     rows = [r for r in tl.load_trace(task) if not (rec["agent_id"] and r.get("agent_id") == rec["agent_id"])]
