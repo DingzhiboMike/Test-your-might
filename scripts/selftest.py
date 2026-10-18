@@ -278,6 +278,56 @@ def backlog_tests(root):
     open(os.path.join(d, "08-handoff.md"), "w", encoding="utf-8").write("# Сдача\n\nСм. D-4 и Г-3.\n\n## Служебное\n")
     r = run([cr, d])
     expect("сдача: номера в части для человека пойманы", r.returncode == 1 and "D-4" in r.stdout and "номер гипотезы" in r.stdout, r.stdout)
+    open(os.path.join(d, "00-tz.md"), "w", encoding="utf-8").write("ТИП ВЫХОДА: гипотезы\nЁМКОСТЬ:    2 проверки за 2 недели\n")
+    os.remove(os.path.join(d, "08-handoff.md"))
+    open(os.path.join(d, "03-backlog.md"), "w", encoding="utf-8").write(head + "".join(
+        (row % "запускать ли письмо всем").replace("| 1 |", "| %d |" % i) for i in range(1, 5)))
+    r = run([cr, d])
+    expect("бэклог: тестов больше, чем ёмкость + 1, — поймано", r.returncode == 1 and "лимите 3" in r.stdout, r.stdout)
+    open(os.path.join(d, "03-backlog.md"), "w", encoding="utf-8").write(head + "".join(
+        (row % "запускать ли письмо всем").replace("| 1 |", "| %d |" % i) for i in range(1, 4)) + "\nВ очереди: письмо бухгалтерам.\n")
+    r = run([cr, d])
+    expect("бэклог: ёмкость + 1 тестов и строка «В очереди» проходят", r.returncode == 0, r.stdout)
+
+
+def effort_tests(root):
+    ce = os.path.join(HERE, "check_effort.py")
+    d = os.path.join(root, "tasks", "eff")
+    os.makedirs(d)
+    tz = ("ТЗ\n\nGAP:\n  1. Как выбрать момент письма [ключевой] {ответ: контекст, веб}\n  2. Что пишут конкуренты {ответ: веб}\n\n"
+          "ВЕБ:        да — пункты 1, 2\nТИП ВЫХОДА: гипотезы\nЁМКОСТЬ:    2 проверки за 2 недели\n")
+    open(os.path.join(d, "00-tz.md"), "w", encoding="utf-8").write(tz)
+    log = lambda t: open(os.path.join(d, "log.md"), "w", encoding="utf-8").write("# Лог задачи: eff\n\n" + t)
+    log("ШАГ 1 — b2b-consultant\n")
+    r = run([ce, d])
+    expect("усилие: ключевой пункт с ответом в вебе без хода — поймано", r.returncode == 1 and "GAP 1" in r.stdout and "GAP 2" not in r.stdout, r.stdout)
+    log("ШАГ 1 — b2b-consultant\nБез хода: GAP 1 — мало данных в открытых источниках\n")
+    r = run([ce, d])
+    expect("усилие: «мало данных» причиной не считается", r.returncode == 1 and "не принимается" in r.stdout, r.stdout)
+    log("ШАГ 1 — b2b-consultant\nБез хода: GAP 1 — момент виден целиком в выгрузке событий, которую человек приложил\n")
+    r = run([ce, d])
+    expect("усилие: пропуск с содержательной причиной принят", r.returncode == 0, r.stdout)
+    log("ШАГ 2 — customer-path\nПункт GAP: GAP 1 — Как выбрать момент письма\n")
+    r = run([ce, d])
+    expect("усилие: ход к источнику по ключевому пункту засчитан", r.returncode == 0, r.stdout)
+    log("ШАГ 5 — hypothesis-validator\nОстаток: свободных вызовов нет: дальше только резерв и финиш\n")
+    r = run([ce, d])
+    expect("усилие: без свободных вызовов пропуск — предупреждение, не ошибка", r.returncode == 0 and "предупреждение" in r.stdout, r.stdout)
+    open(os.path.join(d, "02c-validation.md"), "w", encoding="utf-8").write("ГИПОТЕЗА 1 — а\nВердикт:    сузить\n")
+    hand = lambda t: open(os.path.join(d, "08-handoff.md"), "w", encoding="utf-8").write(t)
+    hand("# Сдача\n\n## Что запускать\nПисьмо.\n\n## Служебное\n")
+    r = run([ce, d])
+    expect("усилие: всё «сузить», а сдача не с запроса данных — поймано", r.returncode == 1 and "двигаться дальше" in r.stdout, r.stdout)
+    more = "## А ещё есть идеи\n1. Бухгалтеру\n2. Календарь\n3. Кнопка\n4. Чат\n"
+    hand("# Сдача\n\n## Что нужно, чтобы двигаться дальше\nВыгрузка событий.\n\n" + more + "\n## Служебное\n")
+    r = run([ce, d])
+    expect("усилие: идей в сдаче больше ёмкости + 1 — поймано", r.returncode == 1 and "4 идей" in r.stdout, r.stdout)
+    hand("# Сдача\n\n## Что нужно, чтобы двигаться дальше\nВыгрузка событий.\n\n" + more.replace("4. Чат\n", "В очереди: чат.\n") + "\n## Служебное\n")
+    r = run([ce, d])
+    expect("усилие: сдача с запроса данных и ёмкостью + 1 идей проходит", r.returncode == 0, r.stdout)
+    open(os.path.join(d, "00-tz.md"), "w", encoding="utf-8").write(tz.replace("ТИП ВЫХОДА: гипотезы", "ТИП ВЫХОДА: валидация"))
+    r = run([ce, d])
+    expect("усилие: валидация не проверяется", r.returncode == 0 and "не из проверяемых" in r.stdout, r.stdout)
 
 
 def knowledge_links_tests(root):
@@ -448,10 +498,14 @@ def trace_tests():
         open(os.path.join(cst, "00-tz.md"), "w", encoding="utf-8").write(tz)
         ce = os.path.join(HERE, "cost_estimate.py")
         r = run([ce, cst, "--detail"])
-        expect("цена: вызовы по структуре маршрута — свободная часть 10, резерв 26, потолок 47",
-               r.returncode == 0 and "~36 вызовов" in r.stdout and "резерв 26" in r.stdout and "потолок 47" in r.stdout, r.stdout)
+        expect("цена: вызовы по структуре маршрута — свободная часть 10, резерв 25, потолок 46",
+               r.returncode == 0 and "~35 вызовов" in r.stdout and "резерв 25" in r.stdout and "потолок 46" in r.stdout, r.stdout)
         expect("цена: токены по трассе прошлой задачи, основная сессия оценена",
                "по 1 прогону" in r.stdout and "основная сессия — ещё" in r.stdout, r.stdout)
+        open(os.path.join(cst, "00-tz.md"), "w", encoding="utf-8").write(tz.replace("ТИП ВЫХОДА: гипотезы", "ТИП ВЫХОДА: разбор / гипотезы"))
+        open(os.path.join(cst, "00-tz.md"), "w", encoding="utf-8").write(tz + "            новые идеи: да\n")
+        r = run([ce, cst])
+        expect("цена: с заказом новых идей — плюс вызов на отсев", "~36 вызовов" in r.stdout and "резерв 26" in r.stdout, r.stdout)
         open(os.path.join(cst, "00-tz.md"), "w", encoding="utf-8").write(tz.replace("ТИП ВЫХОДА: гипотезы", "ТИП ВЫХОДА: разбор / гипотезы"))
         r = run([ce, cst])
         expect("цена: тип выхода не выбран — отказ, а не догадка", r.returncode == 1 and "ТИП ВЫХОДА" in r.stdout, r.stdout)
@@ -461,12 +515,12 @@ def trace_tests():
         open(os.path.join(cst, "trace.jsonl"), "w", encoding="utf-8").write(
             "".join(line(ts=1, agent_id="d%d" % i, role="document-mapper", out=10) for i in range(3)))
         r = run([ce, cst, "--left"])
-        expect("остаток: потрачено 3, резерв впереди 23, свободных 21",
-               "Потрачено: 3 вызова" in r.stdout and "резерв впереди 23" in r.stdout and "до потолка 21" in r.stdout, r.stdout + price)
+        expect("остаток: потрачено 3, резерв впереди 22, свободных 21",
+               "Потрачено: 3 вызова" in r.stdout and "резерв впереди 22" in r.stdout and "до потолка 21" in r.stdout, r.stdout + price)
         r = run([os.path.join(HERE, "trace_summary.py"), cst, "--save"])
         c = json.load(open(os.path.join(cst, "checks", "cost.json"), encoding="utf-8"))
-        expect("сдача: cost.json с оценкой и фактом", c.get("estimate_calls") == 36 and c.get("calls") == 3
-               and "из ~36" in r.stdout, r.stdout)
+        expect("сдача: cost.json с оценкой и фактом", c.get("estimate_calls") == 35 and c.get("calls") == 3
+               and "из ~35" in r.stdout, r.stdout)
         open(os.path.join(cst, "01-review.md"), "w", encoding="utf-8").write("# Разбор\n\n" + "Разрыв логики между первым запуском и использованием. " * 10 + "\n")
         r = run([os.path.join(HERE, "check_step.py"), cst, "01-review.md", "--since", "0"])
         expect("шаг: под строкой проверок — строка «Расход»", "\nРасход: 3 вызова" in r.stdout, r.stdout)
@@ -482,7 +536,7 @@ def forecast_tests(root):
     os.makedirs(d)
     open(os.path.join(d, "00-tz.md"), "w", encoding="utf-8").write(
         "ТЗ\n\nGAP:\n  1. Как разделить клиентов для рассылок [ключевой] {ответ: контекст}\n  2. Каким признаком определить группу [ключевой] {ответ: данные}\n"
-        "  3. Что делают другие сервисы {ответ: веб}\n\nНА ВХОДЕ: идея\n")
+        "  3. Что делают другие сервисы {ответ: веб}\n\nНА ВХОДЕ: идея\nРЕЖИМ:      обычный\n            новые идеи: да\n")
     sec = ("## GAP %d — вопрос\nЛучшая версия [оценка]: делить по тому, как часто клиент выводит деньги\n"
            "Уверенность: низкая — опор: 1\nНа чём стоит:\n  - рассуждение: так говорили в звонках\nАльтернативы:\n  - делить по стажу в банке\n"
            "Что различит: доля повторных выводов за 90 дней\nСледующий шаг: менеджер — 10 звонков — неделя — бесплатно\n"
@@ -494,7 +548,8 @@ def forecast_tests(root):
     idea = ("%d. Идея %d\n   Суть: делить по тому, кто проводит платежи\n   Почему может сработать: рассуждение: решает бухгалтер\n"
             "   Не повторяет: срок в банке — другая ось\n   Уточнит: вопрос «кто проводит платежи» в интерфейсе\n"
             "   Первый шаг: 10 звонков\n   На чём: новый сбор: 10 звонков клиентам\n   Убьёт: везде платит владелец\n")
-    good = "## НОВЫЕ ИДЕИ\n" + "".join(idea % (i, i) for i in range(1, 6)) + "\n" + good
+    versions = "РЕЖИМ: только версии\n\n" + good
+    good = "РЕЖИМ: версии и новые идеи\n\n## НОВЫЕ ИДЕИ\n" + "".join(idea % (i, i) for i in range(1, 6)) + "\n" + good
     w = lambda t: open(os.path.join(d, "02f-forecast.md"), "w", encoding="utf-8").write(t)
     r = run([cf, d])
     expect("нострадамус: нет файла — проверять нечего", r.returncode == 0, r.stdout)
@@ -534,6 +589,26 @@ def forecast_tests(root):
     w(good.replace("   На чём: новый сбор: 10 звонков клиентам\n", "   На чём: «Сегмент» [F-007]\n", 1))
     r = run([cf, d])
     expect("нострадамус: «На чём» с полем из источника проходит", r.returncode == 0, r.stdout)
+    w(versions)
+    r = run([cf, d])
+    expect("нострадамус: новые идеи заказаны, а режим «только версии» — поймано", r.returncode == 1 and "заказаны" in r.stdout, r.stdout)
+    tz = open(os.path.join(d, "00-tz.md"), encoding="utf-8").read()
+    open(os.path.join(d, "00-tz.md"), "w", encoding="utf-8").write(tz.replace("новые идеи: да", "новые идеи: нет"))
+    r = run([cf, d])
+    expect("нострадамус: «только версии» без заказа проходит", r.returncode == 0, r.stdout)
+    w(good)
+    r = run([cf, d])
+    expect("нострадамус: новые идеи без заказа и без сплошного «сузить» — пойманы", r.returncode == 1 and "не заказаны" in r.stdout, r.stdout)
+    open(os.path.join(d, "02c-validation.md"), "w", encoding="utf-8").write(
+        "ГИПОТЕЗА 1 — а\nВердикт:    сузить\n\nГИПОТЕЗА 2 — б\nВердикт:    не держится\n")
+    r = run([cf, d])
+    expect("нострадамус: все вердикты «сузить / не держится» — новые идеи обязательны и проходят", r.returncode == 0, r.stdout)
+    w(versions)
+    r = run([cf, d])
+    expect("нострадамус: все «сузить», а режим «только версии» — поймано", r.returncode == 1 and "сузить" in r.stdout, r.stdout)
+    open(os.path.join(d, "02d-validation2.md"), "w", encoding="utf-8").write("ГИПОТЕЗА 1 — а\nВердикт:    держится на бумаге\n")
+    r = run([cf, d])
+    expect("нострадамус: условие берётся по второму проходу проверки", r.returncode == 0, r.stdout)
 
 
 def rehearsal_tests(root):
@@ -1241,6 +1316,7 @@ def main():
         sensitivity_tests(root)
         path_tests(root)
         trace_tests()
+        effort_tests(root)
         knowledge_tests(root)
         map_tests(root)
         model_tests(root)
