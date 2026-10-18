@@ -428,6 +428,36 @@ def path_tests(root):
     expect("ТЗ: без строки ЦЕНА — поймано", r.returncode == 1 and "ЦЕНА" in r.stdout, r.stdout)
 
 
+def roles_tests():
+    """Описания агентов совпадают с таблицей ролей; хук держит Bash и сеть подагентов."""
+    r = run([os.path.join(HERE, "roles.py"), "--check"])
+    expect("роли: описания агентов в .claude/agents совпадают с таблицей", r.returncode == 0, r.stdout)
+    proj = tempfile.mkdtemp(prefix="polygon-roles-")
+    try:
+        open(os.path.join(proj, "AGENTS.md"), "w", encoding="utf-8").write("#\n")
+        hook = os.path.join(HERE, "hooks", "guard_writes.py")
+
+        def code(tool, agent_type, command=None, agent_id="a1"):
+            d = {"cwd": proj, "tool_name": tool, "tool_input": {"command": command} if command else {}}
+            if agent_id:
+                d.update(agent_id=agent_id, agent_type=agent_type)
+            return run([hook], json.dumps(d)).returncode
+
+        expect("хук: скрипт системы подагенту разрешён", code("Bash", "document-mapper", "python3 scripts/check_map.py tasks/x") == 0)
+        expect("хук: python3 -c подагенту запрещён", code("Bash", "document-mapper", "python3 -c 'import os'") == 2)
+        expect("хук: запись перенаправлением запрещена", code("Bash", "nostradamus", "cat a > tasks/x/02f.md") == 2)
+        expect("хук: чтение с 2>/dev/null разрешено", code("Bash", "nostradamus", "ls tasks 2>/dev/null | head") == 0)
+        expect("хук: rm подагенту запрещён", code("Bash", "meaning-review", "rm -rf tasks") == 2)
+        expect("хук: curl роли без сети запрещён", code("Bash", "nostradamus", "curl -s https://example.com") == 2)
+        expect("хук: curl роли с сетью разрешён", code("Bash", "customer-path", "curl -s https://example.com | trafilatura") == 0)
+        expect("хук: WebSearch роли без сети запрещён", code("WebSearch", "meaning-review") == 2)
+        expect("хук: WebSearch источнику данных разрешён", code("WebSearch", "market-analyze") == 0)
+        expect("хук: агент общего типа сеть не теряет", code("WebSearch", "general-purpose") == 0)
+        expect("хук: основная сессия Bash не ограничена", code("Bash", "", "rm -rf x", agent_id=None) == 0)
+    finally:
+        shutil.rmtree(proj, ignore_errors=True)
+
+
 def trace_tests():
     """Хук трассы, сводка расхода, цена маршрута и остаток — на выдуманных транскриптах."""
     proj = tempfile.mkdtemp(prefix="polygon-trace-")
@@ -1327,6 +1357,7 @@ def main():
         sensitivity_tests(root)
         path_tests(root)
         trace_tests()
+        roles_tests()
         effort_tests(root)
         knowledge_tests(root)
         map_tests(root)
