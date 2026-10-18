@@ -6,7 +6,7 @@
 
 ```
 "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome" --headless=new --hide-scrollbars \
-  --force-device-scale-factor=2 --window-size=952,996 \
+  --force-device-scale-factor=2 --window-size=952,1014 \
   --screenshot=docs/architecture-1-roles.png "file://$PWD/docs/src/architecture-1-roles.html"
 ```
 
