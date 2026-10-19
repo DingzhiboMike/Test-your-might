@@ -83,6 +83,7 @@ def tz_modes(tz):
     return {
         "rehearsal": bool(re.search(r"пробный прогон:\s*да", v)),
         "width": bool(re.search(r"генерация:\s*ширина", v)),
+        "narrow": bool(re.search(r"генерация:\s*обычн", v)),
         "ideas": bool(re.search(r"новые идеи:\s*да", v, re.I)),
     }
 
@@ -124,7 +125,9 @@ def structure(kind, tier, docs, interviews, modes, mapped):
             "валидация": ("усиление, методы, сборка документа", 3)}
     if kind in plus:
         items.append((plus[kind][0], plus[kind][1], "резерв"))
-    if modes.get("width") and kind in ("гипотезы", "план проверки", "ТЗ на доработку"):
+    # ширина — по умолчанию в «гипотезах» и «плане проверки», в «ТЗ на доработку» — только по строке РЕЖИМ
+    width = modes.get("width") or (kind in ("гипотезы", "план проверки") and not modes.get("narrow"))
+    if width and kind in ("гипотезы", "план проверки", "ТЗ на доработку"):
         items.append(("длинный список", 1, "резерв"))
     if modes.get("rehearsal") and kind in ("гипотезы", "план проверки"):
         items.append(("пробный прогон и исправление по нему", 2, "резерв"))

@@ -251,6 +251,52 @@ def long_list_tests(root):
     expect("длинный список: меньше 15 строк — ошибка", r.returncode == 1 and "15–25" in r.stdout, r.stdout)
 
 
+def diversity_tests(root):
+    cd = os.path.join(HERE, "check_diversity.py")
+    d = os.path.join(root, "tasks", "dvs")
+    os.makedirs(d)
+    open(os.path.join(d, "01-review.md"), "w", encoding="utf-8").write("# Разбор\n\nВектор: малые команды\n")
+    head = ("| № | Ход | Кому | Вариант решения | Опора | Дешёвая проверка | Дней до сигнала | Слой | Рамка |\n"
+            "| --- | --- | --- | --- | --- | --- | --- | --- | --- |\n")
+    layers = ["клиент", "конкуренция", "сообщение и цена", "канал", "рост"]
+    words = ["письмо", "звонок", "скидка", "партнёр", "отчёт", "пауза", "чат", "форма", "напоминание", "вебинар",
+             "шаблон", "пробник", "рейтинг", "бонус", "кейс", "обучение"]
+    good = "".join("| %d | %s %s для группы %d | все | А | нет | звонки | 7 | %s | — |\n" % (
+        i, words[i - 1], "[контрольный]" if i <= 3 else "", i, layers[i % 5]) for i in range(1, 17))
+    open(os.path.join(d, "02-long-list.md"), "w", encoding="utf-8").write(head + good)
+    r = run([cd, d])
+    expect("разброс: длинный список по пяти слоям с контрольными — ок", r.returncode == 0 and "слоёв 5" in r.stdout, r.stdout)
+    bad = "".join("| %d | %s для группы %d | все | А | нет | звонки | 7 | %s | — |\n" % (
+        i, words[i - 1], i, "клиент" if i <= 12 else ("рост" if i % 2 else "канал")) for i in range(1, 17))
+    open(os.path.join(d, "02-long-list.md"), "w", encoding="utf-8").write(head + bad)
+    r = run([cd, d])
+    expect("разброс: один слой у большинства и нет контрольных — ошибки",
+           r.returncode == 1 and "больше половины" in r.stdout and "контрольных ходов 0" in r.stdout, r.stdout)
+    os.remove(os.path.join(d, "02-long-list.md"))
+    hyp = ("### Г-%d. Х\nМеханизм: %s\nСлой: %s\nРамка: %s\nКонтроль: %s\n\n")
+    mech = ["владелец видит отчёт о записях и понимает пользу", "напоминание за день снижает пропуски занятий",
+            "перенос базы в первый день наполняет расписание", "совет преподавателя снимает недоверие к новому сервису"]
+    good_h = "".join(hyp % (i + 1, mech[i], layers[i], ["push", "anxiety", "точка слома", "pull"][i],
+                            "[контрольная]" if i == 3 else "—") for i in range(4))
+    open(os.path.join(d, "02-hypotheses.md"), "w", encoding="utf-8").write(good_h)
+    r = run([cd, d])
+    expect("разброс: четыре гипотезы в разных слоях и рамках — ок", r.returncode == 0, r.stdout)
+    bad_h = "".join(hyp % (i + 1, "владелец видит отчёт о записях и понимает пользу сервиса" if i < 2 else mech[i],
+                           "клиент", "push", "—") for i in range(4))
+    open(os.path.join(d, "02-hypotheses.md"), "w", encoding="utf-8").write(bad_h)
+    r = run([cd, d])
+    expect("разброс: одна рамка, один слой, одинаковый механизм, нет контрольной — четыре ошибки",
+           r.returncode == 1 and "все 4 в одном слое" in r.stdout and "рамка «push» у 4 из 4" in r.stdout
+           and "Г-1 и Г-2: механизм" in r.stdout and "контрольной гипотезы нет" in r.stdout, r.stdout)
+    open(os.path.join(d, "02-hypotheses.md"), "w", encoding="utf-8").write(good_h.replace("Слой: канал\n", ""))
+    r = run([cd, d])
+    expect("разброс: гипотеза без слоя — ошибка", r.returncode == 1 and "Г-4: слой не назван" in r.stdout, r.stdout)
+    open(os.path.join(d, "00-hypotheses-in.md"), "w", encoding="utf-8").write("гипотезы человека\n")
+    open(os.path.join(d, "02-hypotheses.md"), "w", encoding="utf-8").write(bad_h)
+    r = run([cd, d])
+    expect("разброс: гипотезы человека не проверяются", r.returncode == 0 and "гипотезы человека" in r.stdout, r.stdout)
+
+
 def backlog_tests(root):
     cr = os.path.join(HERE, "check_readable.py")
     d = os.path.join(root, "tasks", "bkl")
@@ -444,6 +490,32 @@ def polygon_more_tests(root):
     open(ans, "w", encoding="utf-8").write("СВЕРКА\nИ-01 | сигналы=цена\n")
     r = run([pg, "score-interviews", "--key", key, "--answer", ans, "--min", "0.7"])
     expect("полигон интервью: пропуски сигналов снижают F1 ниже порога", r.returncode == 1, r.stdout)
+    out, key = os.path.join(root, "gen"), os.path.join(root, "gen-key.json")
+    task = os.path.join(root, "tasks", "_polygon-gen")
+    seeds_ok = all(run([pg, "make-gen", "--seed", str(sd), "--out", os.path.join(root, "gen-%d" % sd),
+                        "--key-out", os.path.join(root, "gen-key-%d.json" % sd)]).returncode == 0 for sd in range(1, 16))
+    expect("полигон генерации: на 15 seed признаки незаложенных направлений в документах не всплывают", seeds_ok)
+    r = run([pg, "make-gen", "--seed", "4", "--out", out, "--key-out", key, "--task", task])
+    k = json.load(open(key, encoding="utf-8"))
+    tz = open(os.path.join(task, "00-tz.md"), encoding="utf-8").read()
+    expect("полигон генерации: 8 документов, 6 направлений, наперекор брифу всегда, задача с ТЗ и реестром",
+           r.returncode == 0 and len(os.listdir(out)) == 8 and len(k) == 6 and k.get("Н-04", {}).get("contrarian")
+           and "генерация: ширина" in tz and os.path.exists(os.path.join(task, "sources.csv")), r.stdout)
+    sys.path.insert(0, HERE)
+    import polygon as _pg
+    full = os.path.join(root, "gen-full.md")
+    open(full, "w", encoding="utf-8").write("| № | Ход |\n| --- | --- |\n" + "".join(
+        "| %d | %s |\n" % (i, " ".join(_pg.GEN_DIRECTIONS[d]["snippets"].values()).replace("|", " ").replace("\n", " "))
+        for i, d in enumerate(sorted(k), 1)))
+    r = run([pg, "score-gen", "--key", key, "--answer", full, "--min", "0.99"])
+    expect("полигон генерации: ответ по всем направлениям — полнота 1,00", r.returncode == 0 and "полнота 1.00" in r.stdout, r.stdout)
+    narrow = os.path.join(root, "gen-narrow.md")
+    open(narrow, "w", encoding="utf-8").write("| № | Ход |\n| --- | --- |\n| 1 | Сделать интеграцию с кассой |\n"
+                                              "| 2 | Касса в мобильном приложении |\n| 3 | Новая форма записи |\n")
+    r = run([pg, "score-gen", "--key", key, "--answer", narrow, "--min", "0.5"])
+    expect("полигон генерации: список про веру брифа — полнота 0, ходы про кассу посчитаны, код 1",
+           r.returncode == 1 and "полнота 0.00" in r.stdout and "Про веру брифа (касса): 2" in r.stdout
+           and "наперекор брифу: нет" in r.stdout and "Вне ключа: 1" in r.stdout, r.stdout)
 
 
 def message_tests():
@@ -745,7 +817,8 @@ def trace_tests():
         open(os.path.join(cst, "sources.csv"), "w", encoding="utf-8").write(
             "id,kind\n" + "".join("F-%03d,context\n" % i for i in range(14)) + "F-100,interview\nF-101,interview\nF-102,interview\nF-200,web\n")
         open(os.path.join(cst, "00d-map.md"), "w", encoding="utf-8").write("#\n")
-        tz = "ТИР:        Tier 1 — и бюджет шагов: 8\nТИП ВЫХОДА: гипотезы\nРЕЖИМ:      обычный\n            пробный прогон: нет\n"
+        tz = ("ТИР:        Tier 1 — и бюджет шагов: 8\nТИП ВЫХОДА: гипотезы\nРЕЖИМ:      обычный\n            пробный прогон: нет\n"
+              "            генерация: обычная\n")
         open(os.path.join(cst, "00-tz.md"), "w", encoding="utf-8").write(tz)
         ce = os.path.join(HERE, "cost_estimate.py")
         r = run([ce, cst, "--detail"])
@@ -753,7 +826,10 @@ def trace_tests():
                r.returncode == 0 and "~36 вызовов" in r.stdout and "резерв 26" in r.stdout and "потолок 47" in r.stdout, r.stdout)
         expect("цена: токены по трассе прошлой задачи, основная сессия оценена",
                "по 1 прогону" in r.stdout and "основная сессия — ещё" in r.stdout, r.stdout)
-        open(os.path.join(cst, "00-tz.md"), "w", encoding="utf-8").write(tz.replace("ТИП ВЫХОДА: гипотезы", "ТИП ВЫХОДА: разбор / гипотезы"))
+        open(os.path.join(cst, "00-tz.md"), "w", encoding="utf-8").write(tz.replace("            генерация: обычная\n", ""))
+        r = run([ce, cst])
+        expect("цена: в «гипотезах» ширина по умолчанию — плюс вызов на длинный список",
+               "~37 вызовов" in r.stdout and "резерв 27" in r.stdout, r.stdout)
         open(os.path.join(cst, "00-tz.md"), "w", encoding="utf-8").write(tz + "            новые идеи: да\n")
         r = run([ce, cst])
         expect("цена: с заказом новых идей — плюс вызов на отсев", "~37 вызовов" in r.stdout and "резерв 27" in r.stdout, r.stdout)
@@ -1599,6 +1675,7 @@ def main():
         ideas_tests(root)
         fresh_tests(root)
         long_list_tests(root)
+        diversity_tests(root)
         backlog_tests(root)
         publish_tests(root)
         readers_tests(root)

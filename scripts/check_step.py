@@ -9,6 +9,7 @@
 - check_fresh.py — старые веб-источники в артефакте стоят с годом в тексте;
 - check_private.py — по задаче;
 - check_numbers.py — по задаче, если есть numbers.csv;
+- check_diversity.py — после генератора (`02-long-list.md`, `02-hypotheses.md`): разброс по слоям, рамкам, механизмам;
 - trace_summary.py --since — строка «Расход: …» за шаг из трассы (хук scripts/hooks/trace.py).
 
 Печатает строку «Проверки: …» — её и пиши в лог. У check_quotes в строке счётчики: цитат, без id, источников,
@@ -55,6 +56,8 @@ def main():
     checks.append(("check_private", run("check_private.py", [task])))
     if os.path.exists(os.path.join(task, "numbers.csv")):
         checks.append(("check_numbers", run("check_numbers.py", [task])))
+    if set(files) & {"02-long-list.md", "02-hypotheses.md"}:
+        checks.append(("check_diversity", run("check_diversity.py", [task])))
 
     parts = []
     for n, (code, last, out) in checks:
