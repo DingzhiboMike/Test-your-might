@@ -6,7 +6,8 @@
 Длинный список `02-long-list.md` (режим ширины) — колонки «Слой» и «Рамка» после семи обязательных:
 1. Слой — один из пяти слоёв GTM: клиент, конкуренция, сообщение и цена, канал, рост. Пусто или не слой — ошибка.
 2. Слоёв не меньше трёх, и ни на один слой не приходится больше половины ходов.
-3. Если у консультанта есть вектор (`01-review.md`) — ходов с пометкой «[контрольный]» не меньше трёх.
+3. Если у консультанта есть вектор (`01-review.md`) — ходов с пометкой «[контрольный]» не меньше трёх; если в реестре
+   есть утверждение команды (ctx_type claim) — ходов с пометкой «[наперекор]» не меньше двух.
 4. Почти одинаковые ходы (общих основ слов 60% и больше) — предупреждение: дословные повторы ловит check_long_list.
 
 Гипотезы `02-hypotheses.md` — блоки «### Г-N» со слотами «Слой:», «Рамка:», «Механизм:»:
@@ -20,6 +21,7 @@
 Отчёт — tasks/<папка>/checks/diversity.md. Код возврата 1 — есть ошибки.
 """
 import argparse
+import csv
 import os
 import re
 import sys
@@ -64,7 +66,15 @@ def table(text):
     return head or [], rows
 
 
-def long_list(text, vector, errors, warns):
+def has_claim(task):
+    try:
+        with open(os.path.join(task, "sources.csv"), encoding="utf-8", newline="") as f:
+            return any(r.get("ctx_type") == "claim" for r in csv.DictReader(f))
+    except OSError:
+        return False
+
+
+def long_list(text, vector, claim, errors, warns):
     head, rows = table(text)
     if not rows:
         return "длинный список: строк нет"
@@ -72,7 +82,7 @@ def long_list(text, vector, errors, warns):
         errors.append("длинный список: нет колонки «Слой»")
         return "длинный список: %d ходов, слоёв не видно" % len(rows)
     li, mi = head.index("слой"), head.index("ход")
-    count, controls = {}, 0
+    count, controls, contra = {}, 0, 0
     for r in rows:
         name = layer(r[li]) if li < len(r) else None
         if not name:
@@ -80,6 +90,9 @@ def long_list(text, vector, errors, warns):
             continue
         count[name] = count.get(name, 0) + 1
         controls += "[контрольн" in r[mi].lower()
+        contra += "[наперекор]" in r[mi].lower()
+    if claim and contra < 2:
+        errors.append("длинный список: ходов наперекор %d, при утверждениях команды в реестре нужно не меньше двух" % contra)
     if len(count) < 3:
         errors.append("длинный список: слоёв %d, нужно не меньше трёх" % len(count))
     top = max(count.items(), key=lambda x: x[1]) if count else ("", 0)
@@ -92,8 +105,8 @@ def long_list(text, vector, errors, warns):
         for j in range(i + 1, len(st)):
             if jaccard(st[i][1], st[j][1]) >= 0.6:
                 warns.append("длинный список: ходы %s и %s почти совпадают по словам" % (st[i][0], st[j][0]))
-    return "длинный список: %d ходов, слоёв %d (%s), контрольных %d" % (
-        len(rows), len(count), ", ".join("%s %d" % kv for kv in sorted(count.items())), controls)
+    return "длинный список: %d ходов, слоёв %d (%s), контрольных %d, наперекор %d" % (
+        len(rows), len(count), ", ".join("%s %d" % kv for kv in sorted(count.items())), controls, contra)
 
 
 def field(block, name):
@@ -145,7 +158,7 @@ def main():
     errors, warns, lines = [], [], []
     ll = read(os.path.join(task, "02-long-list.md"))
     if ll:
-        lines.append(long_list(ll, vector, errors, warns))
+        lines.append(long_list(ll, vector, has_claim(task), errors, warns))
     hyp = read(os.path.join(task, "02-hypotheses.md"))
     if hyp and os.path.exists(os.path.join(task, "00-hypotheses-in.md")):
         lines.append("гипотезы человека — разброс не проверяется")

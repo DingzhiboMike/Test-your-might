@@ -15,20 +15,46 @@
 4. Дней до сигнала больше 30 или не число — отсеян «дороже месяца».
 5. Ход дословно повторяет предыдущий (после нормализации) — отсеян «повтор».
 
-Прошедшие сортируются: больше разных опор [F-id] — выше; при равенстве — меньше дней до сигнала; при равенстве —
-порядок в списке. Первые `--top` (по умолчанию 5) идут в глубину, остальные прошедшие — «в запасе».
-Опора здесь только считается; цитаты сверяет check_quotes, держится ли ход — проверка по сути.
+Вес опоры — по типу источника в `sources.csv`: прямая речь, данные, результат — 2; веб и прочее — 1; утверждение
+команды (claim) — 0: бриф опорой не служит. Ход стоит на сумме весов разных источников.
+
+В глубину (`--top`, по умолчанию 5) — по покрытию, а не по числу цитат, иначе дешёвые мелочи с одной цитатой
+вытесняют направления:
+1. лучший ход с пометкой «[наперекор]» — против утверждения команды;
+2. лучший «[контрольный]» — вне вектора консультанта;
+3. по одному лучшему ходу на каждый ещё не занятый слой (колонка «Слой»), слои — по весу их лучшего хода;
+4. остаток — по весу.
+«Лучший» — больше вес опоры, при равенстве меньше дней до сигнала, при равенстве раньше в списке. Ход, который
+почти повторяет уже отобранный (общих основ слов 60% и больше), пропускается и идёт «в запас». Остальные
+прошедшие — «в запасе». Опора здесь только взвешивается; цитаты сверяет check_quotes, держится ли ход — проверка
+по сути.
 
 Отчёт: tasks/<папка>/checks/long-list.md — таблица «в глубину / в запасе / отсеян — причина». Его оркестратор
 передаёт генератору как вход второго вызова. Код возврата 1 — строк не 15–25 или прошло меньше трёх.
 """
 import argparse
+import csv
 import os
 import re
 import sys
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from check_path import decision_variants  # noqa: E402
+from check_diversity import jaccard, layer, stems  # noqa: E402
+
+WEIGHT = {"voice": 2, "data": 2, "result": 2, "claim": 0}
+
+
+def weights(task):
+    """Вес источника по реестру: прямая речь и данные — 2, утверждение команды — 0, остальное — 1."""
+    out = {}
+    try:
+        with open(os.path.join(task, "sources.csv"), encoding="utf-8", newline="") as f:
+            for r in csv.DictReader(f):
+                out[r["id"]] = WEIGHT.get(r.get("ctx_type") or "", 1)
+    except OSError:
+        pass
+    return out
 
 
 def read(path):
@@ -68,6 +94,10 @@ def main():
     tz = read(os.path.join(task, "00-tz.md"))
     variants = decision_variants(tz)
     table = rows(text)
+    head = next(([c.strip().lower() for c in l.strip().strip("|").split("|")] for l in text.splitlines()
+                 if l.strip().startswith("|") and "ход" in l.lower() and "кому" in l.lower()), [])
+    li = head.index("слой") if "слой" in head else None
+    w = weights(task)
     errors = []
     if not 15 <= len(table) <= 25:
         errors.append("строк в списке %d, нужно 15–25" % len(table))
@@ -91,24 +121,44 @@ def main():
         if reason:
             dropped.append((num, move, reason))
         else:
-            passed.append((-len(refs), int(d.group(1)), idx, num, move, len(refs)))
-    passed.sort()
-    deep, spare = passed[:a.top], passed[a.top:]
+            weight = sum(w.get(r, 1) for r in refs)
+            lay = layer(c[li]) if li is not None and li < len(c) else None
+            passed.append({"key": (-weight, int(d.group(1)), idx), "num": num, "move": move, "w": weight,
+                           "days": int(d.group(1)), "layer": lay, "stems": stems(move), "why": ""})
+    passed.sort(key=lambda r: r["key"])
+    deep = []
+
+    def take(r, why):
+        if len(deep) >= a.top or r in deep or any(jaccard(r["stems"], x["stems"]) >= 0.6 for x in deep):
+            return
+        r["why"] = why
+        deep.append(r)
+
+    for mark, why in (("[наперекор]", "наперекор"), ("[контрольн", "контрольный")):
+        best = next((r for r in passed if mark in r["move"].lower()), None)
+        if best:
+            take(best, why)
+    for r in passed:
+        if r["layer"] and r["layer"] not in {x["layer"] for x in deep}:
+            take(r, "слой: " + r["layer"])
+    for r in passed:
+        take(r, "по опоре")
+    spare = [r for r in passed if r not in deep]
     if len(passed) < 3:
         errors.append("прошли отсев %d ходов, нужно хотя бы 3" % len(passed))
 
     os.makedirs(os.path.join(task, "checks"), exist_ok=True)
     out = ["# Отсев длинного списка: " + os.path.basename(task), "",
            "Строк: %d, прошли: %d, в глубину: %d, отсеяно: %d" % (len(table), len(passed), len(deep), len(dropped)), "",
-           "| № | Ход | Итог | Опор | Дней |", "| --- | --- | --- | --- | --- |"]
-    out += ["| %s | %s | в глубину | %d | %d |" % (r[3], r[4], r[5], r[1]) for r in deep]
-    out += ["| %s | %s | в запасе | %d | %d |" % (r[3], r[4], r[5], r[1]) for r in spare]
-    out += ["| %s | %s | отсеян — %s | | |" % r for r in dropped]
+           "| № | Ход | Итог | Вес опоры | Дней | Почему |", "| --- | --- | --- | --- | --- | --- |"]
+    out += ["| %s | %s | в глубину | %d | %d | %s |" % (r["num"], r["move"], r["w"], r["days"], r["why"]) for r in deep]
+    out += ["| %s | %s | в запасе | %d | %d | |" % (r["num"], r["move"], r["w"], r["days"]) for r in spare]
+    out += ["| %s | %s | отсеян — %s | | | |" % r for r in dropped]
     out += ["", "## Ошибки"] + (["- " + e for e in errors] or ["- нет"])
     open(os.path.join(task, "checks", "long-list.md"), "w", encoding="utf-8").write("\n".join(out) + "\n")
     for e in errors:
         print("длинный список: " + e)
-    print("Длинный список: строк %d, прошли %d, в глубину %s." % (len(table), len(passed), ", ".join(r[3] for r in deep) or "—"))
+    print("Длинный список: строк %d, прошли %d, в глубину %s." % (len(table), len(passed), ", ".join(r["num"] for r in deep) or "—"))
     return 1 if errors else 0
 
 

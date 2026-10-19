@@ -237,8 +237,9 @@ def long_list_tests(root):
     body = ""
     for i in range(1, 17):
         support = "«жалоба» [F-00%d] [F-01%d]" % (i % 9 + 1, i % 9) if i % 3 == 0 else "нет"
-        body += "| %d | Ход номер %d для малых команд | малые команды | %s | %s | 10 звонков | %d |\n" % (
-            i, i, "А" if i % 2 else "Б", support, 7 + i)
+        body += "| %d | %s для малых команд | малые команды | %s | %s | 10 звонков | %d |\n" % (
+            i, ["письмо", "звонок", "скидка", "партнёр", "отчёт", "пауза", "чат", "форма", "напоминание", "вебинар",
+                "шаблон", "пробник", "рейтинг", "бонус", "кейс", "обучение"][i - 1], "А" if i % 2 else "Б", support, 7 + i)
     body += "| 17 | Ход без варианта | все | — | нет | опрос | 5 |\n"
     body += "| 18 | Долгий ход | все | А | нет | пилот | 60 |\n"
     open(os.path.join(d, "02-long-list.md"), "w", encoding="utf-8").write(head + body)
@@ -249,6 +250,28 @@ def long_list_tests(root):
     open(os.path.join(d, "02-long-list.md"), "w", encoding="utf-8").write(head + body.split("| 6 |")[0])
     r = run([cl, d])
     expect("длинный список: меньше 15 строк — ошибка", r.returncode == 1 and "15–25" in r.stdout, r.stdout)
+    # покрытие: слой «рост» у всех ходов с опорами, кроме одного; наперекор и контрольный — без опоры
+    open(os.path.join(d, "sources.csv"), "w", encoding="utf-8").write(
+        "id,kind,location,level,ctx_type\nF-001,context,a,,claim\nF-002,context,b,,voice\nF-003,context,c,,data\n")
+    head2 = head.replace("| Дней до сигнала |", "| Дней до сигнала | Слой | Рамка |").replace("| --- |\n", "| --- | --- | --- |\n", 1)
+    words = ["письмо", "звонок", "скидка", "партнёр", "отчёт", "пауза", "чат", "форма", "напоминание", "вебинар",
+             "шаблон", "пробник", "рейтинг", "бонус", "кейс", "обучение"]
+    body2 = ""
+    for i in range(1, 17):
+        move, sup, lay = "%s для группы %d" % (words[i - 1], i), "«ф» [F-002] [F-003]", "рост"
+        if i == 14:
+            move, sup = "[наперекор] касса не нужна, группа %d" % i, "нет"
+        if i == 15:
+            move, sup, lay = "[контрольный] %s группе %d" % (words[i - 1], i), "нет", "канал"
+        if i == 16:
+            lay, sup = "клиент", "«ф» [F-001]"
+        body2 += "| %d | %s | все | А | %s | звонки | %d | %s | — |\n" % (i, move, sup, 7 + i, lay)
+    open(os.path.join(d, "02-long-list.md"), "w", encoding="utf-8").write(head2 + body2)
+    r = run([cl, d])
+    rep = open(os.path.join(d, "checks", "long-list.md"), encoding="utf-8").read()
+    expect("длинный список: в глубину по покрытию — наперекор, контрольный, лучший на слой, бриф весит 0",
+           r.returncode == 0 and "в глубину 14, 15, 16, 1, 2" in r.stdout and "| наперекор |" in rep
+           and "| слой: клиент |" in rep, r.stdout + rep)
 
 
 def diversity_tests(root):
@@ -266,6 +289,10 @@ def diversity_tests(root):
     open(os.path.join(d, "02-long-list.md"), "w", encoding="utf-8").write(head + good)
     r = run([cd, d])
     expect("разброс: длинный список по пяти слоям с контрольными — ок", r.returncode == 0 and "слоёв 5" in r.stdout, r.stdout)
+    open(os.path.join(d, "sources.csv"), "w", encoding="utf-8").write("id,kind,location,level,ctx_type\nF-001,context,a,,claim\n")
+    r = run([cd, d])
+    expect("разброс: бриф в реестре, ходов наперекор нет — ошибка", r.returncode == 1 and "наперекор 0" in r.stdout, r.stdout)
+    os.remove(os.path.join(d, "sources.csv"))
     bad = "".join("| %d | %s для группы %d | все | А | нет | звонки | 7 | %s | — |\n" % (
         i, words[i - 1], i, "клиент" if i <= 12 else ("рост" if i % 2 else "канал")) for i in range(1, 17))
     open(os.path.join(d, "02-long-list.md"), "w", encoding="utf-8").write(head + bad)
