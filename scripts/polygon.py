@@ -23,7 +23,9 @@ map-recall — без нейросети, входит в CI: ловит рег�
 
 Генерация — сколько заложенных направлений нашёл генератор:
   python3 scripts/polygon.py make-gen --seed 1 --out DIR --key-out FILE [--n 6] [--weak 2] [--task tasks/_polygon-gen-1]
-  python3 scripts/polygon.py score-gen --key FILE --answer tasks/<папка>/02-long-list.md tasks/<папка>/02-hypotheses.md [--min 0.6]
+  python3 scripts/polygon.py score-gen --key FILE --answer tasks/<папка>/02-long-list.md tasks/<папка>/checks/long-list.md \
+      tasks/<папка>/02-hypotheses.md [--min 0.6]
+(отчёт отсева checks/long-list.md считается по ходам «в глубину» — видно, что теряется на отборе)
 make-gen — выдуманный кейс (бриф с ложной верой команды, интервью, поддержка, опрос при отмене, воронка) и ключ:
 направления, их сила (сильный — в двух документах, слабый — одной строкой) и слова-признаки. Направление «наперекор
 брифу» заложено всегда. score-gen — по каждому файлу ответа: какие направления найдены, полнота, сильные и слабые
@@ -688,9 +690,11 @@ def make_gen(a):
 
 
 def gen_units(text):
-    """Ходы ответа: строки таблицы длинного списка, блоки «### Г-N», иначе абзацы."""
+    """Ходы ответа: строки таблицы длинного списка (в отчёте отсева — только «в глубину»), блоки «### Г-N», иначе абзацы."""
     import re as _re
     rows = [l for l in text.splitlines() if _re.match(r"^\s*\|\s*\d+\s*\|", l)]
+    if any("| в глубину |" in l for l in rows):
+        rows = [l for l in rows if "| в глубину |" in l]
     if rows:
         return [(_re.match(r"^\s*\|\s*(\d+)", l).group(1), l) for l in rows]
     blocks = _re.split(r"(?m)^#{2,4}\s*(?=Г-\d+)", text)
