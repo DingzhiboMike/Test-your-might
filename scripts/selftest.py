@@ -444,6 +444,43 @@ def polygon_more_tests(root):
     open(ans, "w", encoding="utf-8").write("СВЕРКА\nИ-01 | сигналы=цена\n")
     r = run([pg, "score-interviews", "--key", key, "--answer", ans, "--min", "0.7"])
     expect("полигон интервью: пропуски сигналов снижают F1 ниже порога", r.returncode == 1, r.stdout)
+    out, key = os.path.join(root, "gen"), os.path.join(root, "gen-key.json")
+    task = os.path.join(root, "tasks", "_polygon-gen")
+    seeds_ok = all(run([pg, "make-gen", "--seed", str(sd), "--out", os.path.join(root, "gen-%d" % sd),
+                        "--key-out", os.path.join(root, "gen-key-%d.json" % sd)]).returncode == 0 for sd in range(1, 16))
+    expect("полигон генерации: на 15 seed признаки незаложенных направлений в документах не всплывают", seeds_ok)
+    r = run([pg, "make-gen", "--seed", "4", "--out", out, "--key-out", key, "--task", task])
+    k = json.load(open(key, encoding="utf-8"))
+    tz = open(os.path.join(task, "00-tz.md"), encoding="utf-8").read()
+    expect("полигон генерации: 8 документов, 6 направлений, наперекор брифу всегда, задача с ТЗ и реестром",
+           r.returncode == 0 and len(os.listdir(out)) == 8 and len(k) == 6 and k.get("Н-04", {}).get("contrarian")
+           and "генерация: ширина" in tz and os.path.exists(os.path.join(task, "sources.csv")), r.stdout)
+    sys.path.insert(0, HERE)
+    import polygon as _pg
+    full = os.path.join(root, "gen-full.md")
+    open(full, "w", encoding="utf-8").write("| № | Ход |\n| --- | --- |\n" + "".join(
+        "| %d | %s |\n" % (i, " ".join(_pg.GEN_DIRECTIONS[d]["snippets"].values()).replace("|", " ").replace("\n", " "))
+        for i, d in enumerate(sorted(k), 1)))
+    r = run([pg, "score-gen", "--key", key, "--answer", full, "--min", "0.99"])
+    expect("полигон генерации: ответ по всем направлениям — полнота 1,00", r.returncode == 0 and "полнота 1.00" in r.stdout, r.stdout)
+    quoted = os.path.join(root, "gen-quoted.md")
+    open(quoted, "w", encoding="utf-8").write("| № | Ход | Опора |\n| --- | --- | --- |\n| 1 | Новая форма записи | «%s» [F-002] |\n"
+                                              % _pg.GEN_DIRECTIONS["Н-03"]["snippets"]["интервью"])
+    r = run([pg, "score-gen", "--key", key, "--answer", quoted])
+    expect("полигон генерации: признак только в цитате не засчитывается", "Найдено направлений: 0" in r.stdout, r.stdout)
+    narrow = os.path.join(root, "gen-narrow.md")
+    open(narrow, "w", encoding="utf-8").write("| № | Ход |\n| --- | --- |\n| 1 | Сделать интеграцию с кассой |\n"
+                                              "| 2 | Касса в мобильном приложении |\n| 3 | Новая форма записи |\n")
+    r = run([pg, "score-gen", "--key", key, "--answer", narrow, "--min", "0.5"])
+    expect("полигон генерации: список про веру брифа — полнота 0, ходы про кассу посчитаны, код 1",
+           r.returncode == 1 and "полнота 0.00" in r.stdout and "Про веру брифа (касса): 2" in r.stdout
+           and "наперекор брифу: нет" in r.stdout and "Вне ключа: 1" in r.stdout, r.stdout)
+    rep = os.path.join(root, "gen-report.md")
+    open(rep, "w", encoding="utf-8").write("| № | Ход | Итог | Опор | Дней |\n| --- | --- | --- | --- | --- |\n"
+                                           "| 3 | Своя форма записи | в глубину | 1 | 5 |\n| 7 | Писать в мессенджере | в запасе | 1 | 9 |\n")
+    r = run([pg, "score-gen", "--key", key, "--answer", rep])
+    expect("полигон генерации: в отчёте отсева считаются только ходы «в глубину»", "ходов: 1" in r.stdout
+           and "Найдено направлений: 0" in r.stdout, r.stdout)
 
 
 def message_tests():
