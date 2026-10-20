@@ -16,7 +16,9 @@
 5. Ход дословно повторяет предыдущий (после нормализации) — отсеян «повтор».
 
 Прошедшие сортируются: больше разных опор [F-id] — выше; при равенстве — меньше дней до сигнала; при равенстве —
-порядок в списке. Первые `--top` (по умолчанию 5) идут в глубину, остальные прошедшие — «в запасе».
+порядок в списке. В глубину идут `--top` ходов (по умолчанию 5): сначала лучший ход каждого варианта решения из
+ТЗ (по этому порядку), потом остальные по порядку; остальные прошедшие — «в запасе». Так выбор не схлопывается в один
+вариант, когда опоры и сроки у ходов одинаковые.
 Опора здесь только считается; цитаты сверяет check_quotes, держится ли ход — проверка по сути.
 
 Отчёт: tasks/<папка>/checks/long-list.md — таблица «в глубину / в запасе / отсеян — причина». Его оркестратор
@@ -29,6 +31,24 @@ import sys
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from check_path import decision_variants  # noqa: E402
+
+
+def pick_deep(passed, top, by_variant):
+    """В глубину: сначала лучший ход каждого варианта решения (по порядку ранга), затем остальные по рангу.
+    Так выбор не схлопывается в один вариант, когда опоры и сроки у ходов одинаковые."""
+    chosen, seen_letters = [], set()
+    if by_variant:
+        for x in passed:
+            new = [l for l in x[6] if l not in seen_letters]
+            if new and len(chosen) < top:
+                chosen.append(x)
+                seen_letters.update(x[6])
+    for x in passed:
+        if len(chosen) >= top:
+            break
+        if x not in chosen:
+            chosen.append(x)
+    return sorted(chosen)
 
 
 def read(path):
@@ -91,9 +111,11 @@ def main():
         if reason:
             dropped.append((num, move, reason))
         else:
-            passed.append((-len(refs), int(d.group(1)), idx, num, move, len(refs)))
+            passed.append((-len(refs), int(d.group(1)), idx, num, move, len(refs),
+                           tuple(sorted(letters & set(variants)))))
     passed.sort()
-    deep, spare = passed[:a.top], passed[a.top:]
+    deep = pick_deep(passed, a.top, bool(variants))
+    spare = [x for x in passed if x not in deep]
     if len(passed) < 3:
         errors.append("прошли отсев %d ходов, нужно хотя бы 3" % len(passed))
 

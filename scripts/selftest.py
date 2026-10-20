@@ -246,6 +246,17 @@ def long_list_tests(root):
     rep = open(os.path.join(d, "checks", "long-list.md"), encoding="utf-8").read()
     expect("длинный список: отсев по правилам, опоры выше", r.returncode == 0 and "отсеян — не сдвигает решение" in rep
            and "отсеян — дороже месяца" in rep and "в глубину 3, 6, 9, 12, 15" in r.stdout, r.stdout + rep)
+    # все опоры и сроки одинаковы: выбор «в глубину» не схлопывается в один вариант решения
+    open(os.path.join(d, "00-tz.md"), "w", encoding="utf-8").write(
+        "ТЗ\n\nРЕШЕНИЕ: что запускать; варианты: А — письмо; Б — звонок; В — пост; критерий: ответы\n")
+    tie = ""
+    for i in range(1, 19):
+        tie += "| %d | Ход номер %d для малых команд | малые команды | %s | нет | 10 звонков | 10 |\n" % (
+            i, i, "А" if i <= 12 else ("Б" if i <= 15 else "В"))
+    open(os.path.join(d, "02-long-list.md"), "w", encoding="utf-8").write(head + tie)
+    r = run([cl, d])
+    expect("длинный список: при равных опорах и сроках в глубину попадают все три варианта решения",
+           r.returncode == 0 and "в глубину 1, 2, 3, 13, 16" in r.stdout, r.stdout)
     open(os.path.join(d, "02-long-list.md"), "w", encoding="utf-8").write(head + body.split("| 6 |")[0])
     r = run([cl, d])
     expect("длинный список: меньше 15 строк — ошибка", r.returncode == 1 and "15–25" in r.stdout, r.stdout)
