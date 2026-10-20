@@ -757,6 +757,14 @@ def profile_tests():
                r.returncode == 0 and "b2b-consultant" in r.stdout and "01-review.md" in r.stdout, r.stdout)
         r = run([rt, "retry", t])
         expect("перезапрос: при идущем шаге — отказ, сначала дождаться исполнителя", r.returncode == 1, r.stdout)
+        # упавший шаг, повторённый успешно, не мешает готовности; waive требует причину и виден
+        open(os.path.join(t, "01-review.md"), "w", encoding="utf-8").write("# Разбор\n" + "Слабое место: сроки. " * 30 + "\n")
+        r = run([rt, "done", t])
+        r2 = run([rt, "ready", t])
+        expect("готовность: повторно сданный артефакт снимает упавший шаг", "шаг 2 (b2b-consultant) закрыт с ошибками" not in r2.stdout
+               and "шаг 1 (b2b-consultant) закрыт с ошибками" not in r2.stdout, r2.stdout)
+        r = run([rt, "waive", t, "1", "коротко"])
+        expect("waive: короткая причина — отказ", r.returncode in (1, 2), r.stdout)
         open(os.path.join(t, "08-handoff.md"), "w", encoding="utf-8").write("# Сдача\n\nСм. D-4.\n")
         r = run([os.path.join(HERE, "check_readable.py"), os.path.join(t, "08-handoff.md")])
         expect("читаемость: принимает путь к файлу и проверяет только его", r.returncode == 1 and "D-4" in r.stdout, r.stdout)
@@ -774,6 +782,25 @@ def profile_tests():
         open(os.path.join(tzd, "00-tz.md"), "w", encoding="utf-8").write(body + "РЕШЕНИЕ:    варианты: А — раз; Б — два\n")
         r = run([os.path.join(HERE, "check_path.py"), tzd, "--tz"])
         expect("ТЗ: со строкой РЕШЕНИЕ проходит", "РЕШЕНИЕ" not in r.stdout, r.stdout)
+        code = ("import sys; sys.path.insert(0, " + repr(HERE) + "); import map_docs as m; "
+                "s = ' '.join('Предложение номер ' + str(i) + ' про клиентов и цены.' for i in range(120)); "
+                "c = m.chunks(s); "
+                "print(len(c), max(len(x) for x in c), ' '.join(c) == s)")
+        r = run(["-c", code])
+        expect("карта документов: длинная строка режется на куски до 1000 знаков, ничего не теряется",
+               r.returncode == 0 and r.stdout.split()[-1] == "True" and int(r.stdout.split()[0]) >= 4 and
+               int(r.stdout.split()[1]) <= 1000, r.stdout + r.stderr)
+        mt = os.path.join(proj, "tasks", "mm")
+        os.makedirs(mt)
+        open(os.path.join(mt, "00d-map-a.md"), "w", encoding="utf-8").write("### F-002 — б\n- Тип: х\n\n### F-001 — а\n- Тип: х\n")
+        open(os.path.join(mt, "00d-map-b.md"), "w", encoding="utf-8").write("### F-003 — в\n- Тип: х\n")
+        r = run([os.path.join(HERE, "merge_map.py"), mt])
+        merged = open(os.path.join(mt, "00d-map.md"), encoding="utf-8").read()
+        expect("склейка досье: части картографов собираются в 00d-map.md по возрастанию F-id",
+               r.returncode == 0 and merged.index("F-001") < merged.index("F-002") < merged.index("F-003"), r.stdout + merged)
+        open(os.path.join(mt, "00d-map-b.md"), "w", encoding="utf-8").write("### F-001 — снова\n")
+        r = run([os.path.join(HERE, "merge_map.py"), mt])
+        expect("склейка досье: документ в двух частях — ошибка", r.returncode == 1 and "дважды" in r.stdout, r.stdout)
         calls = {}
         for lv in ("light", "work", "strict"):
             m = re.search(r"~(\d+) вызов", run([ce, t, "--level", lv]).stdout)

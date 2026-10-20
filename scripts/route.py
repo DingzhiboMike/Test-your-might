@@ -8,6 +8,7 @@
   python3 scripts/route.py ready  tasks/<папка>                         # готовность: артефакты и проверки типа
   python3 scripts/route.py status tasks/<папка>                         # продолжение после обрыва
   python3 scripts/route.py retry  tasks/<папка>                         # перезапрос: заново открыть последний шаг с ошибками (та же роль и артефакт)
+  python3 scripts/route.py waive  tasks/<папка> <номер шага> <причина>   # принять упавший шаг с оговоркой (причина видна в готовности)
   python3 scripts/route.py profile tasks/<папка> generation=wide evidence=links validation=logic data=public ceiling="8 вызовов, sonnet"
                                                                         # профиль прогона (выбирает оркестратор по ТЗ; нет профиля — всё строго, как в v1)
 
@@ -39,7 +40,7 @@ import profile_lib  # noqa: E402
 STATE = "state.json"
 SERVICE = ("log.md", "state.json", "state.json.tmp", "trace.jsonl", "trace.jsonl.tmp", "trace-main.json",
            "trace-main.json.tmp", "sources.csv", "numbers.csv", "sources/*", "sources/*/*", "checks/*", "map/*",
-           "00m-model.md", "00m-model.json", "00i-impact.md")
+           "00m-model.md", "00m-model.json", "00i-impact.md", "00d-map.md")
 
 # Обязательные шаги по типу выхода: (роль, артефакт, условие). Условие: None — всегда; "ideas" — если новые идеи
 # нужны (check_effort.ideas_required); "rehearsal" — если в РЕЖИМЕ «пробный прогон: да».
@@ -253,12 +254,32 @@ def cmd_retry(task):
     if running(st):
         print("Шаг %d ещё идёт: дождись возврата исполнителя и закрой его (route.py done)." % running(st)[0]["n"])
         return 1
-    failed = [s for s in st.get("steps", []) if s.get("status") == "failed"]
+    failed = [s for s in st.get("steps", []) if s.get("status") == "failed" and not superseded(st, s)]
     if not failed:
         print("Нет шага с ошибками: перезапрашивать нечего.")
         return 1
     last = failed[-1]
     return cmd_start(task, last["role"], last["artifact"], last.get("allow", []))
+
+
+def cmd_waive(task, n, reason):
+    """Принять упавший шаг с оговоркой: причина обязательна, пишется в state.json и печатается в готовности.
+    Для случаев, когда проверка шага ошиблась или ошибку нельзя исправить (state.json руками не правится)."""
+    st = load(task)
+    if st is None:
+        print("Нет state.json: сначала python3 scripts/route.py init %s" % task)
+        return 1
+    step = next((s for s in st.get("steps", []) if s["n"] == n), None)
+    if step is None or step.get("status") != "failed":
+        print("Шага %d с ошибками нет." % n)
+        return 1
+    if len(reason.strip()) < 15:
+        print("Нужна причина (не короче 15 знаков): почему ошибку принимаем и что она значит для результата.")
+        return 2
+    step["waived"] = reason.strip()
+    save(task, st)
+    print("Шаг %d (%s) принят с оговоркой: %s" % (n, step["role"], step["waived"]))
+    return 0
 
 
 def cmd_start(task, role, artifact, allow):
@@ -312,6 +333,14 @@ def cmd_done(task, n=None):
     return 0 if step["status"] == "done" else 1
 
 
+def superseded(st, s):
+    """Упавший шаг снят, если позже тот же артефакт сдан успешно (перезапрос) или шаг принят с оговоркой (waive)."""
+    if s.get("waived"):
+        return True
+    return any(x["n"] > s["n"] and x.get("status") == "done" and x["artifact"] == s["artifact"]
+               for x in st.get("steps", []))
+
+
 def done_artifacts(st):
     return {s["artifact"] for s in st.get("steps", []) if s.get("status") == "done"}
 
@@ -348,8 +377,11 @@ def cmd_ready(task):
         errors.append("шаг %d (%s) не закрыт: route.py done" % (s["n"], s["role"]))
     for s in st.get("steps", []):
         if s.get("status") == "failed":
-            errors.append("шаг %d (%s) закрыт с ошибками: %s" % (s["n"], s["role"], "; ".join(s.get("errors") or [])
-                                                                  or s.get("checks", "")))
+            if s.get("waived"):
+                print("Принято с оговоркой: шаг %d (%s) — %s" % (s["n"], s["role"], s["waived"]))
+            elif not superseded(st, s):
+                errors.append("шаг %d (%s) закрыт с ошибками: %s" % (s["n"], s["role"], "; ".join(s.get("errors") or [])
+                                                                      or s.get("checks", "")))
     prof = profile_lib.load(task)
     checks = list(READY_CHECKS.get(kind, [])) + list(COMMON_CHECKS)
     if prof["validation"] != "full":
@@ -410,6 +442,11 @@ def main():
         return cmd_profile(task, a[2:])
     if cmd == "retry":
         return cmd_retry(task)
+    if cmd == "waive":
+        if len(a) < 4 or not a[2].isdigit():
+            sys.stderr.write(__doc__)
+            return 2
+        return cmd_waive(task, int(a[2]), " ".join(a[3:]))
     sys.stderr.write(__doc__)
     return 2
 

@@ -26,7 +26,7 @@ import os
 import re
 import sys
 
-VERSION = "1"
+VERSION = "2"
 KINDS = {"context", "interview", "from-tasks"}
 
 NUM = re.compile(
@@ -90,6 +90,34 @@ def clean(raw):
     return out
 
 
+LINE_LIMIT = 1000
+
+
+def chunks(s, limit=LINE_LIMIT):
+    """Длинную строку (статья одним абзацем) режем на куски до limit знаков по границам предложений и пробелов,
+    а не обрезаем: иначе досье и модель предмета видят только начало документа."""
+    if len(s) <= limit:
+        return [s]
+    out, cur = [], ""
+    for part in re.split(r"(?<=[.!?…])\s+", s):
+        while len(part) > limit:  # предложение длиннее лимита — режем по пробелу
+            cut = part.rfind(" ", 0, limit)
+            cut = cut if cut > limit // 2 else limit
+            if cur:
+                out.append(cur)
+                cur = ""
+            out.append(part[:cut].strip())
+            part = part[cut:].strip()
+        if cur and len(cur) + 1 + len(part) > limit:
+            out.append(cur)
+            cur = part
+        else:
+            cur = (cur + " " + part).strip()
+    if cur:
+        out.append(cur)
+    return [c for c in out if c]
+
+
 def tags(line):
     k = []
     if NUM.search(line):
@@ -131,12 +159,13 @@ def build(task, force=False):
         if not force and os.path.exists(jp):
             try:
                 old = json.load(open(jp, encoding="utf-8"))
-                if old.get("sha") == h:
+                if old.get("sha") == h and old.get("version") == VERSION:
                     data, cached = old, cached + 1
             except Exception:
                 data = None
         if data is None:
-            lines = [{"n": i, "text": s[:1000], "tags": tags(s)} for i, s in enumerate(clean(raw), 1)]
+            pieces = [c for s in clean(raw) for c in chunks(s)]
+            lines = [{"n": i, "text": s, "tags": tags(s)} for i, s in enumerate(pieces, 1)]
             data = {"id": rid, "sha": h, "version": VERSION, "location": r.get("location", ""),
                     "read": r.get("read", ""), "lines": lines}
             json.dump(data, open(jp, "w", encoding="utf-8"), ensure_ascii=False)
