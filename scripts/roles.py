@@ -4,9 +4,10 @@
   python3 scripts/roles.py --write   # пересобрать .claude/agents/<роль>.md из таблицы
   python3 scripts/roles.py --check   # описания агентов совпадают с таблицей (входит в selftest)
 
-Модель — по таблице «Модель под роль» оркестратора: сильная (opus) — чей выход решает, куда идёт маршрут;
-средняя (sonnet) — остальные. Быструю модель не назначаем. Оркестратор может поднять модель вызова параметром
-model (например, планировщику в типе «валидация»).
+Модель (v4): порядок sonnet → haiku → opus, opus только в последнюю очередь. По умолчанию все роли на sonnet;
+механические (карта документов, набор для проверки, писатель брифа) — на haiku; opus ни у одной роли по умолчанию
+нет. Оркестратор поднимает модель вызова параметром model только по правилам раздела «Модель под роль» (шкала Т5
+или sonnet уже отработал шаг и результат не годится по названной причине) и пишет причину в лог.
 
 Сеть — только у источников данных, которые ищут во внешнем поле, и у проверки по сути (сверка с вебом). У остальных
 WebSearch и WebFetch нет в описании агента, а хук guard_writes.py блокирует их и для подагентов общего типа.
@@ -18,12 +19,13 @@ import sys
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
-STRONG = ("context-reader", "subject-model", "experiment-review", "b2b-consultant", "nostradamus",
+STRONG = ()  # opus по умолчанию нет ни у одной роли (v4); поднимает оркестратор вызовом, с причиной в логе
+LIGHT = ("document-mapper", "brief-writer", "test-kit")  # haiku: механическая раскладка по жёсткому формату
+MEDIUM = ("context-reader", "subject-model", "experiment-review", "b2b-consultant", "nostradamus",
           "hypothesis-generator", "hypothesis-validator", "results-reviewer", "interview-synthesis",
-          "meaning-review", "research-report")
-MEDIUM = ("document-mapper", "document-deepener", "brief-writer", "market-analyze", "target-audience-analyst",
+          "meaning-review", "research-report", "document-deepener", "market-analyze", "target-audience-analyst",
           "alternatives-analyst", "customer-path", "market-sizing", "interview-analyst", "synthetic-interviews",
-          "project-analyst", "test-kit")
+          "project-analyst")
 WEB = ("market-analyze", "target-audience-analyst", "alternatives-analyst", "customer-path", "market-sizing",
        "hypothesis-validator")
 MAIN_SESSION = ("dispatcher", "orchestrator")
@@ -38,7 +40,7 @@ WEB_COMMANDS = ("curl", "trafilatura")
 
 
 def roles():
-    return {r: ("opus" if r in STRONG else "sonnet") for r in STRONG + MEDIUM}
+    return {r: ("opus" if r in STRONG else "haiku" if r in LIGHT else "sonnet") for r in STRONG + LIGHT + MEDIUM}
 
 
 def tools(role):

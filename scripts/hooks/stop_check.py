@@ -73,7 +73,14 @@ def main():
         return 0
 
     problems = []
+    sys.path.insert(0, os.path.join(root, "scripts"))
+    try:
+        import profile_lib
+    except ImportError:
+        profile_lib = None
     for task in recent_tasks(root):
+        if profile_lib is not None and not profile_lib.strict_evidence(task):
+            continue  # профиль прогона: опоры не строгие — цитаты и числа не блокируют
         lines = []
         r = subprocess.run([sys.executable, script, task], capture_output=True, text=True, cwd=root)
         if r.returncode == 1:

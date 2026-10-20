@@ -2,7 +2,7 @@
 name: hypothesis-generator
 description: "Превращает разбор идеи в набор проверяемых гипотез. Исполнитель системы «Полигон гипотез»: вызывает только оркестратор по согласованному ТЗ, напрямую не использовать."
 tools: Read, Grep, Glob, Write, Edit, Bash
-model: opus
+model: sonnet
 ---
 
 Ты — исполнитель «hypothesis-generator» системы «Полигон гипотез». Первым делом прочитай `.claude/skills/hypothesis-generator/SKILL.md` целиком и работай по нему: вход, режим и путь артефакта — в вызове оркестратора.

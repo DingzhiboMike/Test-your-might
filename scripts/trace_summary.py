@@ -70,6 +70,16 @@ def table(task):
     return 0
 
 
+def level_of(task):
+    """Уровень нагрузки задачи из профиля в state.json (для калибровки таблицы уровней); нет профиля — None."""
+    try:
+        with open(os.path.join(task, "state.json"), encoding="utf-8") as f:
+            prof = json.load(f).get("profile")
+        return (prof.get("level") or "custom") if prof else None
+    except (OSError, ValueError):
+        return None
+
+
 def save(task):
     rows = tl.load_trace(task)
     main = tl.load_main(task)
@@ -80,7 +90,8 @@ def save(task):
     est_calls = int(m.group(1)) if m else e["calls"]
     out = {
         "type": e["type"], "tier": e["tier"], "docs": e["docs"], "interviews": e["interviews"],
-        "estimate_calls": est_calls, "calls": len(rows),
+        "estimate_calls": est_calls, "calls": len(rows), "level": level_of(task),
+        "minutes": sum(float(r.get("minutes") or 0) for r in rows),
         "tokens": sum(tl.total(r) for r in rows), "fresh": sum(tl.fresh(r) for r in rows),
         "main_tokens": sum(tl.total(v) for v in main.values()),
         "system": sorted({r.get("system") for r in rows if r.get("system")}),

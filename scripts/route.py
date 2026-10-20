@@ -7,6 +7,9 @@
   python3 scripts/route.py next   tasks/<папка>                         # обязательные шаги впереди и остаток бюджета
   python3 scripts/route.py ready  tasks/<папка>                         # готовность: артефакты и проверки типа
   python3 scripts/route.py status tasks/<папка>                         # продолжение после обрыва
+  python3 scripts/route.py retry  tasks/<папка>                         # перезапрос: заново открыть последний шаг с ошибками (та же роль и артефакт)
+  python3 scripts/route.py profile tasks/<папка> generation=wide evidence=links validation=logic data=public ceiling="8 вызовов, sonnet"
+                                                                        # профиль прогона (выбирает оркестратор по ТЗ; нет профиля — всё строго, как в v1)
 
 state.json пишет только этот скрипт. Шаг — роль, артефакт (имя или маска для пачки), хэши всех файлов задачи до
 вызова. `done` сверяет хэши после: изменилось что-то кроме артефакта, масок --allow и служебного (log.md,
@@ -31,6 +34,7 @@ import time
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, HERE)
 from check_effort import ideas_required, output_type, tz_field  # noqa: E402
+import profile_lib  # noqa: E402
 
 STATE = "state.json"
 SERVICE = ("log.md", "state.json", "state.json.tmp", "trace.jsonl", "trace.jsonl.tmp", "trace-main.json",
@@ -150,11 +154,31 @@ def modes(tz):
     return {"rehearsal": bool(re.search(r"пробный прогон:\s*да", tz_field(tz, "РЕЖИМ")))}
 
 
+PROFILED = ("гипотезы", "план проверки", "ТЗ на доработку", "валидация", "исследование")
+
+
+def profile_keeps(prof, role, art):
+    """Какие обязательные шаги остаются при профиле. validation: none — без проверки по сути и всего, что после неё;
+    logic/web — проверка по сути; full — ещё проверка смысла и аудит. generation: narrow — без Нострадамуса и отсева идей."""
+    val, gen = prof["validation"], prof["generation"]
+    forecast = prof.get("forecast", "on") == "on"
+    if role == "meaning-review" and val != "full":
+        return False
+    if role == "hypothesis-validator" and art == "02c-validation.md" and val == "none":
+        return False
+    if role == "nostradamus" or art == "02g-ideas-check.md":
+        return gen != "narrow" and forecast
+    return True
+
+
 def required(task):
     tz = read(os.path.join(task, "00-tz.md"))
     kind = output_type(tz)
     out = []
+    prof = profile_lib.load(task)
     for role, art, cond in REQUIRED.get(kind, []):
+        if kind in PROFILED and not profile_keeps(prof, role, art):
+            continue
         if cond == "ideas" and not ideas_required(task):
             continue
         if cond == "rehearsal" and not modes(tz)["rehearsal"]:
@@ -178,6 +202,63 @@ def cmd_init(task):
     save(task, st)
     print("Маршрут: %s, шагов записано %d." % (kind, len(st["steps"])))
     return 0
+
+
+def cmd_profile(task, kv):
+    st = load(task)
+    if st is None:
+        print("Нет state.json: сначала python3 scripts/route.py init %s" % task)
+        return 1
+    prof = dict(st.get("profile") or {})
+    pairs = []
+    for item in kv:
+        if "=" not in item:
+            print("Ожидается ключ=значение: %s" % item)
+            return 2
+        pairs.append(item.split("=", 1))
+    # level=… задаёт набор параметров; остальные ключи в той же команде его уточняют
+    for k, v in pairs:
+        if k == "level":
+            if v not in profile_lib.LEVELS:
+                print("Параметр level: допустимо %s" % ", ".join(profile_lib.LEVELS))
+                return 2
+            prof.update(profile_lib.preset(v))
+            prof["level"] = v
+    for k, v in pairs:
+        if k == "level":
+            continue
+        if k not in profile_lib.KEYS:
+            print("Неизвестный параметр профиля: %s (есть: %s)" % (k, ", ".join(profile_lib.KEYS)))
+            return 2
+        v = profile_lib.ALIASES.get(k, {}).get(v, v)
+        if k in profile_lib.CHOICES and v not in profile_lib.CHOICES[k]:
+            print("Параметр %s: допустимо %s" % (k, ", ".join(profile_lib.CHOICES[k])))
+            return 2
+        prof[k] = v
+    if kv:
+        st["profile"] = prof
+        save(task, st)
+    cur = profile_lib.load(task)
+    print("Профиль: " + "; ".join("%s=%s" % (k, cur[k]) for k in profile_lib.KEYS))
+    return 0
+
+
+def cmd_retry(task):
+    """Перезапрос исполнителя после ошибок проверок: одной командой открывает заново последний шаг со статусом failed
+    (та же роль, тот же артефакт и маски). Закрывай `done` только после возврата исполнителя."""
+    st = load(task)
+    if st is None:
+        print("Нет state.json: сначала python3 scripts/route.py init %s" % task)
+        return 1
+    if running(st):
+        print("Шаг %d ещё идёт: дождись возврата исполнителя и закрой его (route.py done)." % running(st)[0]["n"])
+        return 1
+    failed = [s for s in st.get("steps", []) if s.get("status") == "failed"]
+    if not failed:
+        print("Нет шага с ошибками: перезапрашивать нечего.")
+        return 1
+    last = failed[-1]
+    return cmd_start(task, last["role"], last["artifact"], last.get("allow", []))
 
 
 def cmd_start(task, role, artifact, allow):
@@ -269,7 +350,15 @@ def cmd_ready(task):
         if s.get("status") == "failed":
             errors.append("шаг %d (%s) закрыт с ошибками: %s" % (s["n"], s["role"], "; ".join(s.get("errors") or [])
                                                                   or s.get("checks", "")))
-    for script, args in READY_CHECKS.get(kind, []) + COMMON_CHECKS:
+    prof = profile_lib.load(task)
+    checks = list(READY_CHECKS.get(kind, [])) + list(COMMON_CHECKS)
+    if prof["validation"] != "full":
+        checks = [c for c in checks if c[0] != "audit_sample.py"]
+    if prof["generation"] == "narrow" or prof.get("forecast", "on") != "on":
+        checks = [c for c in checks if c[0] not in ("check_forecast.py", "check_ideas.py")]
+    if prof["evidence"] != "quotes":
+        checks = [c for c in checks if c[0] != "check_quotes.py"]
+    for script, args in checks:
         r = subprocess.run([sys.executable, os.path.join(HERE, script), task] + args, capture_output=True, text=True)
         if r.returncode:
             last = next((l for l in reversed(r.stdout.splitlines()) if l.strip()), "")
@@ -317,6 +406,10 @@ def main():
         return cmd_ready(task)
     if cmd == "status":
         return cmd_status(task)
+    if cmd == "profile":
+        return cmd_profile(task, a[2:])
+    if cmd == "retry":
+        return cmd_retry(task)
     sys.stderr.write(__doc__)
     return 2
 
