@@ -282,6 +282,12 @@ LEVEL_TEXT = {
     "strict": ("Строгий (Т4–Т5)", "то же с цитатами, проверенными по тексту источников, независимой проверкой смысла и аудитом",
                "широты: идей будет меньше, работа идёт осторожнее"),
 }
+WHEN = {  # «подойдёт, если»: как человеку выбрать уровень по своей ситуации
+    "fast": "нужен ответ сейчас, исследовать нечего или решение мелкое",
+    "light": "материалов у вас мало или нет, цена ошибки низкая, нужны идеи и дешёвые тесты",
+    "work": "нужно опереться на факты из сети, материалы есть, решение средней важности",
+    "strict": "материалов много, или результат увидят другие, или решение трудно отменить",
+}
 MIN_PER_CALL = 4  # только для внутренней калибровки; человеку минуты не показываются
 
 
@@ -309,11 +315,12 @@ def levels_table(task):
     docs, interviews = context_docs(task)
     root = os.path.dirname(os.path.dirname(os.path.abspath(task)))
     _, _, _, ratios_level, _ = history_levels(root, exclude=task)
-    out = ["| Уровень | Что будет сделано | Что получите | Чего не будет | Прогон |", "|---|---|---|---|---|"]
+    out = ["| Уровень | Подойдёт, если | Что будет сделано | Что получите | Чего не будет | Прогон |",
+           "|---|---|---|---|---|---|"]
     for key in ("fast", "light", "work", "strict"):
         name, got, nope = LEVEL_TEXT[key]
         if key == "fast":
-            out.append("| %s | ответ без исполнителей | %s | %s | очень короткий |" % (name, got, nope))
+            out.append("| %s | %s | ответ без исполнителей | %s | %s | очень короткий |" % (name, WHEN[key], got, nope))
             continue
         prof = dict(pl.DEFAULT)
         prof.update(pl.preset(key))
@@ -322,7 +329,8 @@ def levels_table(task):
         r = median(ratios_level.get(key, [])) if len(ratios_level.get(key, [])) >= 2 else None
         if r:
             calls = max(1, round(calls * r))
-        out.append("| %s | %s | %s | %s | %s |" % (name, includes(items), got, nope, duration_word(calls)))
+        out.append("| %s | %s | %s | %s | %s | %s |" % (name, WHEN[key], includes(items), got, nope,
+                                                      duration_word(calls)))
     return "\n".join(out)
 
 

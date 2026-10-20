@@ -782,7 +782,7 @@ def profile_tests():
                0 < calls["light"] < calls["work"] < calls["strict"], str(calls))
         table = run([ce, t, "--levels"]).stdout
         expect("оценка: таблица уровней — что будет сделано, что получите, чего не будет; без минут и токенов",
-               table.count("\n| ") >= 4 and "Что получите" in table and "Чего не будет" in table and
+               table.count("\n| ") >= 4 and "Что получите" in table and "Чего не будет" in table and "Подойдёт, если" in table and
                " мин" not in table and "токен" not in table, table[:200])
     finally:
         shutil.rmtree(proj)
