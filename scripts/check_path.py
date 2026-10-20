@@ -96,6 +96,15 @@ def check_tz(tz, errors):
         errors.append("ВЕБ: нет, но у пунктов GAP %s ответ помечен «веб»" % ", ".join(map(str, web_items)))
 
 
+def check_decision(tz, errors):
+    """Для типов «гипотезы», «план проверки», «ТЗ на доработку» в ТЗ отдельной строкой стоит РЕШЕНИЕ с вариантами:
+    по нему консультант расставляет путь, а проверка пути сверяет покрытие вариантов."""
+    kind = re.search(r"^\**ТИП ВЫХОДА\**:?\**[ \t]*(.*)$", tz, re.M)
+    if kind and re.search(r"гипотез|план проверки|ТЗ на доработку", kind.group(1), re.I) \
+            and not re.search(r"^\**РЕШЕНИЕ\**:", tz, re.M):
+        errors.append("нет строки РЕШЕНИЕ с вариантами — консультант и проверка пути ждут её (при сокращении ТЗ она остаётся)")
+
+
 def check_price(tz, errors):
     m = re.search(r"^\**ЦЕНА\**:?\**[ \t]*(.*)$", tz, re.M)
     if not m:
@@ -196,6 +205,7 @@ def main():
         errors = []
         check_tz(tz, errors)
         check_price(tz, errors)
+        check_decision(tz, errors)
         for e in errors:
             print("ТЗ: " + e)
         if not errors:

@@ -753,6 +753,16 @@ def profile_tests():
         r = run([os.path.join(HERE, "check_chain.py"), t])
         expect("цепочка гипотез: без модели предмета проверка пропускается, а не падает",
                r.returncode == 0 and "пропущена" in r.stdout, r.stdout)
+        tzd = os.path.join(proj, "tasks", "tzd")
+        os.makedirs(tzd)
+        body = ("ТЗ\nЗАПРОС: х\nГАП:\n  1. вопрос {ответ: контекст}\nВЕБ: нет — причина\nТИП ВЫХОДА: гипотезы\n"
+                "ЦЕНА:       ~7 вызовов исполнителей (свободная часть 5, резерв 2, потолок 10)\n")
+        open(os.path.join(tzd, "00-tz.md"), "w", encoding="utf-8").write(body)
+        r = run([os.path.join(HERE, "check_path.py"), tzd, "--tz"])
+        expect("ТЗ: у типа «гипотезы» без строки РЕШЕНИЕ — ошибка", r.returncode == 1 and "РЕШЕНИЕ" in r.stdout, r.stdout)
+        open(os.path.join(tzd, "00-tz.md"), "w", encoding="utf-8").write(body + "РЕШЕНИЕ:    варианты: А — раз; Б — два\n")
+        r = run([os.path.join(HERE, "check_path.py"), tzd, "--tz"])
+        expect("ТЗ: со строкой РЕШЕНИЕ проходит", "РЕШЕНИЕ" not in r.stdout, r.stdout)
         calls = {}
         for lv in ("light", "work", "strict"):
             m = re.search(r"~(\d+) вызов", run([ce, t, "--level", lv]).stdout)
