@@ -89,10 +89,17 @@ GENERATIVE = re.compile(r"ТИП ВЫХОДА\W*(гипотезы|план пр�
 BAD_REASON = re.compile(r"внутренн\w* данн|данн\w* компании|условия\s*(1|\d)|не выполн|экономи\w* шаг|бюджет", re.I)
 
 
-def lenses(text, tz, heads, errors):
-    """Блок ЛИНЗЫ перед первым генератором в генеративных типах."""
+def lenses(text, tz, heads, errors, task=""):
+    """Блок ЛИНЗЫ перед первым генератором в генеративных типах. Профиль generation=narrow линзы не требует."""
     if not GENERATIVE.search(tz):
         return
+    try:
+        sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+        import profile_lib
+        if task and profile_lib.load(task)["generation"] == "narrow":
+            return
+    except ImportError:
+        pass
     gen = next((m for m in heads if m.group(2) == "hypothesis-generator"), None)
     if not gen:
         return
@@ -107,6 +114,13 @@ def lenses(text, tz, heads, errors):
     stop = re.search(r"^ШАГ\s+\d", block, re.M)
     block = block[:stop.start()] if stop else block
     called = 0
+    profile_lenses = None
+    try:
+        import profile_lib as _pl
+        if task and _pl.has_profile(task):
+            profile_lenses = int(_pl.load(task)["lenses"])
+    except (ImportError, ValueError):
+        profile_lenses = None
     for name in LENSES:
         lm = re.search(r"^\s*[-*]?\s*%s\s*[—:-]\s*(.*)$" % re.escape(name), block, re.M | re.I)
         if not lm:
@@ -117,6 +131,8 @@ def lenses(text, tz, heads, errors):
             called += 1
         elif re.match(r"не нужн\w*\s*:", val, re.I):
             reason = val.split(":", 1)[1].strip()
+            if re.search(r"профил|нагрузк|lenses", reason, re.I) and profile_lenses is not None:
+                continue  # причина «ограничение профиля»: лимит линз задан нагрузкой
             if len(reason) < 10:
                 errors.append("ЛИНЗЫ: «%s — не нужно» без причины" % name)
             elif BAD_REASON.search(reason):
@@ -124,7 +140,10 @@ def lenses(text, tz, heads, errors):
                               "во внутренних данных" % (name, reason[:60]))
         else:
             errors.append("ЛИНЗЫ: по линзе «%s» нет решения — ни хода к источнику, ни причины отказа" % name)
-    if called == 0 and re.search(r"^\**ВЕБ\**:\s*да", tz, re.M | re.I):
+    if profile_lenses is not None and called > profile_lenses:
+        errors.append("ЛИНЗЫ: вызвано %d линз, а профиль (нагрузка) разрешает не больше %d" % (called, profile_lenses))
+    if called == 0 and (profile_lenses is None or profile_lenses > 0) and \
+            re.search(r"^\**ВЕБ\**:\s*да", tz, re.M | re.I):
         errors.append("ЛИНЗЫ: при «ВЕБ: да» ни одна линза не вызвана — генератор построит всё из одного корня")
 
 
@@ -192,7 +211,13 @@ def main():
                 errors.append("%s: канал «веб» по GAP %d, а в ТЗ ответ помечен «%s» — нет строки «Пересмотр:» с "
                               "причиной" % (where, n, ", ".join(sorted(answers[n]))))
 
-    lenses(text, tz, heads, errors)
+    lenses(text, tz, heads, errors, task)
+    try:
+        import profile_lib as _pl2
+        if _pl2.has_profile(task) and not re.search(r"^\s*РЕЦЕПТ:", text, re.M):
+            warns.append("в логе нет строки «РЕЦЕПТ:» — выбор шагов не привязан к рецепту (recipes.md)")
+    except ImportError:
+        pass
 
     requests = 0
     for m in re.finditer(r"^\s*Запрос данных\s+(D-\d+)", text, re.M):

@@ -36,11 +36,11 @@ svg{position:absolute;left:0;top:0}
 <!-- top -->
 <div class="b" style="left:20px;top:26px;width:128px;height:58px"><div class="h">Человек</div><div class="s">заказчик</div></div>
 <div class="lab" style="left:154px;top:36px">запрос</div>
-<div class="b t" style="left:200px;top:14px;width:350px;height:96px"><div class="h">Диспетчер</div><div class="s">1) карта документов — скриптами, без модели до «да»</div><div class="s">2) ТЗ: GAP · РЕШЕНИЕ · ГРУППЫ · РАМКИ · ЭКСПЕРИМЕНТ</div><div class="s">ЦЕНА · ЁМКОСТЬ · ЧТО ПОЛУЧИШЬ · 3 вопроса + 4-й</div></div>
+<div class="b t" style="left:200px;top:14px;width:350px;height:96px"><div class="h">Диспетчер</div><div class="s">1) карта документов — скриптами, без модели до «да»</div><div class="s">2) компактное ТЗ: ЦЕЛЬ · GAP · РЕШЕНИЕ · СТАВКИ · НАГРУЗКА</div><div class="s">ЁМКОСТЬ · ЧТО ПОЛУЧИШЬ · ЦЕНА · 3 вопроса + нагрузка</div></div>
 <div class="b o" style="left:200px;top:128px;width:350px;height:42px"><div class="h" style="font-size:11.5px">Единственная пауза</div><div class="s">ответы и «да» одним сообщением</div></div>
 <div class="olab" style="left:22px;top:160px">ответы / правки / «да»</div>
 <div class="lab" style="left:384px;top:174px">СОГЛАСОВАНО</div>
-<div class="b t" style="left:200px;top:192px;width:350px;height:80px"><div class="h">Оркестратор</div><div class="s">route.py: шаг, периметр по хэшам, готовность · бюджет из ЦЕНЫ</div><div class="s">агенты ролей · линзы до генератора · проверки после шага</div></div>
+<div class="b t" style="left:200px;top:192px;width:350px;height:80px"><div class="h">Оркестратор</div><div class="s">route.py: шаг, периметр, готовность · профиль по уровню нагрузки</div><div class="s">рецепт · линзы по уровню · проверки после шага</div></div>
 <div class="lab" style="left:384px;top:278px">зовёт по одному</div>
 
 <!-- right column -->
@@ -48,7 +48,7 @@ svg{position:absolute;left:0;top:0}
 <div class="b r" style="left:592px;top:14px;width:340px;height:108px"><div class="h">methodology/</div><div class="s">tools-index — инструмент под пункт пути<br>модули: M0–M8, M11–M13 и Э Д К О П Ж С<br>эксперименты · данные · источники · оценки<br>оффер · жизненный цикл · сегменты<br>web-protocol — как ходить в веб</div></div>
 <div class="b r" style="left:592px;top:130px;width:340px;height:68px"><div class="h">context/</div><div class="s">кладёт человек до запуска<br>from-tasks/ — src-* и результаты живой проверки<br>карта документов — кэш по хэшу файла</div></div>
 <div class="lab" style="left:555px;top:224px">пишет</div>
-<div class="b r" style="left:592px;top:204px;width:340px;height:100px"><div class="h">tasks/‹задача›/</div><div class="s">00-tz · log · state.json · trace · map/ · 00d-map · 00m-model<br>00k · 01-review · src-* · 02-hypotheses · 02c<br>02f-forecast · 02g-ideas · 02e-position · 02e-trace<br>03-backlog / 03-plan · 03b · 03c · 06-* · 07a–07d<br>audit · 08-handoff · checks/ · results/</div></div>
+<div class="b r" style="left:592px;top:204px;width:340px;height:100px"><div class="h">tasks/‹задача›/</div><div class="s">00-tz · log · state.json · trace · map/ · 00d-map · 00m-model<br>00k · 01-review · src-* · 02-hypotheses · 02c<br>02f-forecast · 02g-ideas · 02e-position · 02e-trace<br>03-backlog / 03-plan · 03b · 03c · 06-* · 07a–07d<br>audit · 08-handoff · 08-service · checks/ · results/</div></div>
 
 <div class="b r" style="left:592px;top:314px;width:340px;height:166px"><div class="h">scripts/ и хуки</div><div class="s">route.py — шаг, периметр, обязательные шаги, готовность<br>хуки: права ролей, проверка шага до сдачи, трасса расхода<br>реестры источников и чисел · сверка цитат — скрипт<br>cost_estimate — ЦЕНА · check_effort — «мало данных»<br>check_forecast · check_ideas · check_rehearsal<br>audit_sample — три места на итоговый документ<br>roles → .claude/agents/ · rules · check_size<br>check_publish — локально, перед отправкой<br>map_docs · map_summary · check_map · build_model</div></div>
 <div class="b r" style="left:592px;top:490px;width:340px;height:80px"><div class="h">Полигон · scripts/polygon.py</div><div class="s">отчёты об экспериментах, транскрипты интервью,<br>строки документов — с ключом ответов<br>без нейросети, ничего не хранит</div></div>
@@ -90,7 +90,7 @@ svg{position:absolute;left:0;top:0}
 <div class="b o plain" style="left:30px;top:734px;width:166px;height:36px"><div class="h">Сборщик документа</div></div>
 <div class="b o plain" style="left:206px;top:734px;width:166px;height:36px"><div class="h">Писатель брифа</div></div>
 <div class="b plain" style="left:382px;top:734px;width:180px;height:36px"><div class="h">Проверка смысла · аудит</div><div class="s" style="margin-top:0">отдельный контекст</div></div>
-<div class="b plain" style="left:30px;top:780px;width:532px;height:50px"><div class="h">Сдача · 08-handoff</div><div class="s">позиция → версия и шаг → бэклог → вердикты → новые идеи · аудит · расход против ЦЕНЫ</div></div>
+<div class="b plain" style="left:30px;top:780px;width:532px;height:50px"><div class="h">Сдача · 08-handoff + 08-service</div><div class="s">для человека: позиция → версия → бэклог → идеи · служебное — отдельным файлом</div></div>
 
 <!-- experiment -->
 <div class="exp" style="left:20px;top:856px;width:912px;height:128px"><div class="gt">Эксперимент в системе · живой запуск делает человек, система готовит его и разбирает итог</div>

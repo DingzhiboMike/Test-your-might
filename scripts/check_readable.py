@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Проверяет, что документы для людей читаются людьми, а не только системой.
 
-  python3 scripts/check_readable.py tasks/<папка>
+  python3 scripts/check_readable.py tasks/<папка>[/<файл>]
 
 Файлы для людей: 07a-analyst.md, 07b-editor.md, 07c-decisions.md (писатель брифа) и 02e-position.md
 (итоговая позиция консультанта) и 06-validation.md (документ валидации), если они есть. Служебный файл 07d-trace.md
@@ -18,8 +18,10 @@
 - 03-backlog.md — бэклог тестов (финиш типа «гипотезы»): в таблице у каждой строки заполнены все девять колонок —
   № (он же приоритет), кому и как найти в данных, что говорим, где и кто, метрика, успех, отсечение, срок и цена,
   что решит;
-- 08-handoff.md — сдача: проверяется часть до заголовка «## Служебное»; служебная часть (путь — исходы, маршрут,
-  замечания к системе) пишется на языке системы и не проверяется.
+- 08-handoff.md — сдача для человека, целиком: без слов системы и номеров; раздел «## Что лежит в папке задачи» (таблица
+  файлов из handoff_index.py) допускает имена файлов и не входит в число слов. Служебная часть лежит в 08-service.md,
+  на языке системы, и не проверяется; раздел «Служебное» внутри 08-handoff.md — ошибка. Лимит слов — по уровню нагрузки
+  (быстро, лёгкий 450, рабочий 650, строгий 900; без профиля 900).
 Если тип выхода «гипотезы» и есть 02e-position.md, а 03-backlog.md нет — ошибка.
 
 Лимиты: 07a — до 1600 слов и до 10 задач, 07b — до 1600 слов, 07c — до 500 слов и до 10 пунктов,
@@ -62,11 +64,35 @@ def read(path):
     return open(path, encoding="utf-8").read() if os.path.exists(path) else ""
 
 
+INDEX_HEAD = re.compile(r"^##\s+Что лежит в папке задачи\s*$", re.M)
+LEVEL_LIMITS = {"light": 450, "work": 650, "strict": 900}  # слов в сдаче для человека по уровню нагрузки
+
+
+def strip_index(text):
+    """Раздел «Что лежит в папке задачи» не проверяется на имена файлов и не входит в число слов."""
+    m = INDEX_HEAD.search(text)
+    if not m:
+        return text
+    rest = text[m.end():]
+    nxt = re.search(r"^##\s+", rest, re.M)
+    return text[:m.start()] + (rest[nxt.start():] if nxt else "")
+
+
+def handoff_limit(task):
+    try:
+        import profile_lib
+        if profile_lib.has_profile(task):
+            return LEVEL_LIMITS.get(profile_lib.load(task)["level"], LIMITS[HANDOFF])
+    except ImportError:
+        pass
+    return LIMITS[HANDOFF]
+
+
 def human_part(f, text):
     if f != HANDOFF:
         return text
     m = re.search(r"^#+\s*Служебное", text, re.M)
-    return text[:m.start()] if m else text
+    return strip_index(text[:m.start()] if m else text)
 
 
 def backlog_rows(text):
@@ -84,8 +110,12 @@ def main():
     if len(sys.argv) < 2:
         sys.stderr.write(__doc__)
         return 2
-    task = sys.argv[1].rstrip("/")
-    present = [f for f in FILES if os.path.exists(os.path.join(task, f))]
+    arg = sys.argv[1].rstrip("/")
+    only = None  # проверка одного файла: check_readable.py tasks/<папка>/08-handoff.md
+    if os.path.isfile(arg):
+        only, arg = os.path.basename(arg), os.path.dirname(arg) or "."
+    task = arg
+    present = [f for f in FILES if os.path.exists(os.path.join(task, f)) and (only is None or f == only)]
     errors = []
     briefs_needed = bool(present)
     if not present:
@@ -95,9 +125,9 @@ def main():
         briefs_needed = bool(brief_type or other)
         if other:
             errors.append("брифы лежат под чужим именем (%s): нужны 07a-analyst.md, 07b-editor.md, 07c-decisions.md, 07d-trace.md" % ", ".join(other))
-    has_position = os.path.exists(os.path.join(task, POSITION))
-    has_validation = os.path.exists(os.path.join(task, VALIDATION))
-    extra = [f for f in (BACKLOG, HANDOFF) if os.path.exists(os.path.join(task, f))]
+    has_position = os.path.exists(os.path.join(task, POSITION)) and only in (None, POSITION)
+    has_validation = os.path.exists(os.path.join(task, VALIDATION)) and only in (None, VALIDATION)
+    extra = [f for f in (BACKLOG, HANDOFF) if os.path.exists(os.path.join(task, f)) and only in (None, f)]
     tz_text = read(os.path.join(task, "00-tz.md"))
     if has_position and BACKLOG not in extra and re.search(r"ТИП ВЫХОДА\W*гипотезы", tz_text, re.I):
         errors.append("%s: файла нет — финиш типа «гипотезы» без бэклога тестов" % BACKLOG)
@@ -112,6 +142,14 @@ def main():
         trace = norm(read(os.path.join(task, "07d-trace.md")))
         if not trace:
             errors.append("07d-trace.md: служебного файла нет, цитаты не сверить")
+    if HANDOFF in extra:
+        hand_raw = read(os.path.join(task, HANDOFF))
+        if re.search(r"^#+\s*Служебное", hand_raw, re.M):
+            errors.append("%s: служебная часть сдачи лежит в отдельном файле 08-service.md, а не в этом файле" % HANDOFF)
+        if not INDEX_HEAD.search(hand_raw):
+            errors.append("%s: нет раздела «Что лежит в папке задачи» со списком файлов (scripts/handoff_index.py)" % HANDOFF)
+        if not os.path.exists(os.path.join(task, "08-service.md")):
+            errors.append("%s: нет файла 08-service.md — служебная часть сдачи (путь, чек-лист, расход, замечания)" % HANDOFF)
     for f in present + ([POSITION] if has_position else []) + ([VALIDATION] if has_validation else []) + extra:
         text = human_part(f, read(os.path.join(task, f)))
         for i, line in enumerate(text.splitlines(), 1):
@@ -126,8 +164,9 @@ def main():
             if m:
                 errors.append("%s:%d — слово системы «%s»" % (f, i, m.group(0).lower()))
         words = len(re.findall(r"\w+", text))
-        if words > LIMITS[f]:
-            errors.append("%s: %d слов при лимите %d — сократи не менее чем на %d" % (f, words, LIMITS[f], words - LIMITS[f]))
+        limit_f = handoff_limit(task) if f == HANDOFF else LIMITS[f]
+        if words > limit_f:
+            errors.append("%s: %d слов при лимите %d — сократи не менее чем на %d" % (f, words, limit_f, words - limit_f))
         items = len(re.findall(r"^(?:##\s+\d+\.|\d+\.\s)", text, re.M))
         if f in ("07a-analyst.md", "07c-decisions.md") and items > 10:
             errors.append("%s: %d пунктов при лимите 10" % (f, items))

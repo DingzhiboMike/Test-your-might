@@ -24,6 +24,9 @@ import subprocess
 import sys
 
 HERE = os.path.dirname(os.path.abspath(__file__))
+sys.path.insert(0, HERE)
+import profile_lib  # noqa: E402
+SOFT = ("check_quotes", "check_fresh", "check_numbers")  # не блокируют при evidence: none|links
 
 
 def run(name, args):
@@ -42,6 +45,10 @@ def quote_counts(out):
     return "цитат %d, без id %d, источников %d, корней %d" % (n, loose, src, roots)
 
 
+def soft_n(n, task):
+    return n.startswith(SOFT) and not profile_lib.strict_evidence(task)
+
+
 def main():
     if len(sys.argv) < 3:
         sys.stderr.write(__doc__)
@@ -58,7 +65,7 @@ def main():
 
     parts = []
     for n, (code, last, out) in checks:
-        part = "%s — %s" % (n, "ок" if code == 0 else "ОШИБКИ")
+        part = "%s — %s" % (n, "ок" if code == 0 else ("предупреждения (профиль: опоры не строгие)" if soft_n(n, task) else "ОШИБКИ"))
         detail = [quote_counts(out)] if n.startswith("check_quotes") else []
         if code != 0:
             detail.append(last)
@@ -69,7 +76,8 @@ def main():
         print(run("trace_summary.py", [task, "--since", since])[1])
     elif "--since" in rest:
         print("Расход: трассы нет (хук scripts/hooks/trace.py не подключён или задача шла без подагентов)")
-    failed = [(n, out) for n, (code, _, out) in checks if code != 0]
+    soft = not profile_lib.strict_evidence(task)
+    failed = [(n, out) for n, (code, _, out) in checks if code != 0 and not (soft and n.startswith(SOFT))]
     for n, out in failed:
         print("\n== %s\n%s" % (n, out))
     return 1 if failed else 0

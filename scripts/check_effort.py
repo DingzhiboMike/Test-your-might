@@ -120,6 +120,8 @@ def attempted(log):
             continue
         block = log[m.end():heads[i + 1].start() if i + 1 < len(heads) else len(log)]
         got.update(int(n) for n in re.findall(r"GAP\s*(\d+)", field(block, "Пункт GAP") or ""))
+        # шаг-источник, закрывающий ещё и другие пункты: строка «Закрывает также: GAP 1, GAP 3»
+        got.update(int(n) for n in re.findall(r"GAP\s*(\d+)", field(block, "Закрывает также") or ""))
     return got
 
 

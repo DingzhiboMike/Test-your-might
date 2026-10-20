@@ -68,6 +68,10 @@ def main():
     errors, warnings = [], []
     mp = os.path.join(task, "00m-model.json")
     model = json.load(open(mp, encoding="utf-8")) if os.path.exists(mp) else None
+    if model is None and not os.path.exists(os.path.join(task, "00m-schema.txt")) \
+            and not os.path.exists(os.path.join(task, "00r-limits.md")):
+        print("Модели предмета нет (карта документов не строилась): проверка цепочки гипотез пропущена.")
+        return 0
     if model is None:
         errors.append("нет 00m-model.json: сначала собери модель (scripts/build_model.py)")
     lim = limits(task, errors)

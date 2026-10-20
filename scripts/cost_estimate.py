@@ -4,6 +4,12 @@
   python3 scripts/cost_estimate.py tasks/<папка>            # строка ЦЕНА для ТЗ (диспетчер)
   python3 scripts/cost_estimate.py tasks/<папка> --detail   # из чего сложилась оценка
   python3 scripts/cost_estimate.py tasks/<папка> --left     # сколько потрачено и сколько свободных вызовов осталось
+  python3 scripts/cost_estimate.py tasks/<папка> --levels   # четыре уровня нагрузки: вызовы, токены, время, что утверждать
+  python3 scripts/cost_estimate.py tasks/<папка> --level light   # строка ЦЕНА для выбранного уровня (до route.py profile)
+
+Профиль прогона (state.json, `route.py profile`, либо --level, либо поле НАГРУЗКА в ТЗ) меняет оценку: линзы по
+числу lenses, Нострадамус и отсев идей по forecast, проверка смысла и аудит только при validation=full. Нет профиля —
+оценка v1.
 
 Бюджет — все вызовы маршрута, категории «вне бюджета» нет. Он делится на две части:
 - свободная часть — шаги по тиру (Tier 1 — 8, Tier 2 — 6): консультант, звенья цепочки, источники данных;
@@ -26,12 +32,15 @@ import sys
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import trace_lib as tl  # noqa: E402
+import profile_lib as pl  # noqa: E402
 
 TYPES = ["разбор", "гипотезы", "план проверки", "вердикты по проверке", "валидация", "исследование",
          "ТЗ на доработку"]
 TIER_STEPS = {1: 8, 2: 6}
 DEEPEN_CAP = {1: 12, 2: 8}
 MAP_BATCH = 7
+MAP_BATCH_EST = 9   # документов на одного картографа по факту прогонов
+MAP_MIN_DOCS = 8    # с такого числа документов строится карта документов
 PRIOR_PER_CALL = 85000
 CEILING = 1.3
 
@@ -101,8 +110,10 @@ def context_docs(task):
     return docs, interviews
 
 
-def structure(kind, tier, docs, interviews, modes, mapped):
-    """Список (что, вызовов, часть) — часть «свободная» или «резерв»."""
+def structure(kind, tier, docs, interviews, modes, mapped, prof=None):
+    """Список (что, вызовов, часть) — часть «свободная» или «резерв». С профилем — оценка по нагрузке."""
+    if prof is not None and kind in ("гипотезы", "план проверки", "ТЗ на доработку"):
+        return profile_structure(kind, docs, interviews, modes, mapped, prof)
     free = TIER_STEPS.get(tier, 6)
     if kind == "разбор":
         free = 1
@@ -169,6 +180,17 @@ def history(root, exclude=None):
     return per_call, mains, ratios, len(tasks)
 
 
+def fresh_per_call(root, exclude=None):
+    """Новые токены на вызов (без чтения кэша) по трассам прошлых задач."""
+    vals = []
+    for tr in glob.glob(os.path.join(root, "tasks", "*", "trace.jsonl")):
+        task = os.path.dirname(tr)
+        if exclude and os.path.abspath(task) == os.path.abspath(exclude):
+            continue
+        vals += [tl.fresh(r) for r in tl.load_trace(task) if tl.fresh(r) > 0]
+    return vals
+
+
 def median(xs):
     xs = sorted(xs)
     if not xs:
@@ -182,13 +204,41 @@ def quantile(xs, q):
     return xs[min(len(xs) - 1, max(0, int(round(q * (len(xs) - 1)))))]
 
 
-def estimate(task):
+def profile_structure(kind, docs, interviews, modes, mapped, prof):
+    """Оценка вызовов по профилю: что реально входит в маршрут при этой нагрузке."""
+    lenses = int(prof["lenses"]) if prof["generation"] != "narrow" else 0
+    items = [("консультант", 1, "свободная")]
+    if lenses:
+        items.append(("линзы: ходы к источникам за сырьём", lenses, "свободная"))
+    items.append(("генератор" + (" (длинный список и глубина)" if prof["generation"] == "wide" else ""),
+                  2 if prof["generation"] == "wide" else 1, "свободная"))
+    if prof["validation"] != "none":
+        items.append(("проверка по сути", 1, "свободная"))
+    if docs >= MAP_MIN_DOCS:
+        # много документов: картограф пачками, углубление (по факту 2–3), модель предмета вместо разбора материалов
+        items.append(("картография документов", math.ceil(docs / MAP_BATCH_EST), "резерв"))
+        items.append(("углубление документов", min(3, docs), "резерв"))
+        items.append(("модель предмета", 1, "резерв"))
+    elif docs:
+        items.append(("разбор материалов", 1, "резерв"))
+    if prof["validation"] == "full":
+        items.append(("проверка смысла и исправление", 2, "резерв"))
+        items.append(("выборочный аудит", 1, "резерв"))
+    if prof["forecast"] == "on" and prof["generation"] != "narrow":
+        items.append(("Нострадамус и отсев идей", 2, "резерв"))
+    items.append(("итоговая позиция и бэклог", 2, "резерв"))
+    items.append(("перезапрос по ошибкам проверок", 1, "резерв"))
+    return items
+
+
+def estimate(task, level=None):
     root = os.path.dirname(os.path.dirname(os.path.abspath(task)))
     tz = read(os.path.join(task, "00-tz.md"))
     kind, tier = tz_type(tz), tz_tier(tz)
     docs, interviews = context_docs(task)
     mapped = os.path.exists(os.path.join(task, "00d-map.md")) or os.path.isdir(os.path.join(task, "map"))
-    items = structure(kind, tier, docs, interviews, tz_modes(tz), mapped)
+    prof = chosen_profile(task, tz, level)
+    items = structure(kind, tier, docs, interviews, tz_modes(tz), mapped, prof)
     calls = sum(n for _, n, _ in items)
     reserve = sum(n for _, n, p in items if p == "резерв")
     per_call, mains, ratios, runs = history(root, exclude=task)
@@ -212,13 +262,119 @@ def estimate(task):
     }
 
 
+def chosen_profile(task, tz, level=None):
+    """Профиль для оценки: явный уровень → state.json → поле НАГРУЗКА в ТЗ → None (оценка v1)."""
+    if level:
+        prof = dict(pl.DEFAULT)
+        prof.update(pl.preset(level))
+        return prof
+    if pl.has_profile(task):
+        return pl.load(task)
+    m = re.search(r"уровень:\s*(быстро|лёгкий|легкий|рабочий|строгий)", tz_field(tz, "НАГРУЗКА"), re.I)
+    if m:
+        key = {"быстро": "fast", "лёгкий": "light", "легкий": "light", "рабочий": "work",
+               "строгий": "strict"}[m.group(1).lower()]
+        prof = dict(pl.DEFAULT)
+        prof.update(pl.preset(key))
+        return prof
+    return None
+
+
+LEVEL_TEXT = {
+    "fast": ("Быстро", "готовый ответ и несколько идей, без исполнителей",
+             "идеи и рассуждение; выводы про рынок и факты не проверяются"),
+    "light": ("Лёгкий (К5–К4)", "пул гипотез с дешёвыми тестами и порогами «убьёт»; проверка по методологии",
+              "подтверждения источниками: выводы остаются гипотезами"),
+    "work": ("Рабочий (баланс)", "то же, плюс сверка внешних фактов в вебе и лучшие версии ответов по ключевым вопросам",
+             "дословной проверки цитат и независимого аудита"),
+    "strict": ("Строгий (Т4–Т5)", "то же с цитатами, проверенными по тексту источников, независимой проверкой смысла и аудитом",
+               "широты: идей будет меньше, работа идёт осторожнее"),
+}
+WHEN = {  # «подойдёт, если»: как человеку выбрать уровень по своей ситуации
+    "fast": "нужен ответ сейчас, исследовать нечего или решение мелкое",
+    "light": "материалов у вас мало или нет, цена ошибки низкая, нужны идеи и дешёвые тесты",
+    "work": "нужно опереться на факты из сети, материалы есть, решение средней важности",
+    "strict": "материалов много, или результат увидят другие, или решение трудно отменить",
+}
+MIN_PER_CALL = 4  # только для внутренней калибровки; человеку минуты не показываются
+
+
+SHORT = {"картография документов": "карта ваших документов", "углубление документов": "углубление ключевых документов",
+         "модель предмета": "модель предмета", "перезапрос по ошибкам проверок": "запас на перезапрос",
+         "консультант": "консультант", "линзы: ходы к источникам за сырьём": "линзы", "проверка по сути": "проверка по сути",
+         "разбор материалов": "разбор ваших материалов", "проверка смысла и исправление": "проверка смысла",
+         "выборочный аудит": "аудит", "Нострадамус и отсев идей": "версии и новые идеи",
+         "итоговая позиция и бэклог": "позиция и бэклог"}
+
+
+def includes(items):
+    """Что входит в уровень — словами, без чисел вызовов."""
+    out = []
+    for what, n, _ in items:
+        label = SHORT.get(what) or ("генератор: длинный список и глубина" if what.startswith("генератор (") else what)
+        if what.startswith("линзы"):
+            label = "линз: %d" % n
+        out.append(label)
+    return ", ".join(out)
+
+
+def levels_table(task):
+    """Таблица для вопроса про нагрузку: что будет сделано, что получите, чего не будет, прогон (словами)."""
+    tz = read(os.path.join(task, "00-tz.md"))
+    kind, tier = tz_type(tz), tz_tier(tz) or 2
+    docs, interviews = context_docs(task)
+    root = os.path.dirname(os.path.dirname(os.path.abspath(task)))
+    _, _, _, ratios_level, _ = history_levels(root, exclude=task)
+    out = ["| Уровень | Подойдёт, если | Что будет сделано | Что получите | Чего не будет | Прогон |",
+           "|---|---|---|---|---|---|"]
+    for key in ("fast", "light", "work", "strict"):
+        name, got, nope = LEVEL_TEXT[key]
+        if key == "fast":
+            out.append("| %s | %s | ответ без исполнителей | %s | %s | очень короткий |" % (name, WHEN[key], got, nope))
+            continue
+        prof = dict(pl.DEFAULT)
+        prof.update(pl.preset(key))
+        items = structure(kind or "гипотезы", tier, docs, interviews, tz_modes(tz), False, prof)
+        calls = sum(n for _, n, _ in items)
+        r = median(ratios_level.get(key, [])) if len(ratios_level.get(key, [])) >= 2 else None
+        if r:
+            calls = max(1, round(calls * r))
+        out.append("| %s | %s | %s | %s | %s | %s |" % (name, WHEN[key], includes(items), got, nope,
+                                                      duration_word(calls)))
+    return "\n".join(out)
+
+
+def history_levels(root, exclude=None):
+    """Поправка «факт / оценка» по уровням из tasks/*/checks/cost.json (поле level, пишет trace_summary --save)."""
+    by_level = {}
+    for cj in glob.glob(os.path.join(root, "tasks", "*", "checks", "cost.json")):
+        if exclude and os.path.abspath(os.path.dirname(os.path.dirname(cj))) == os.path.abspath(exclude):
+            continue
+        try:
+            c = json.load(open(cj, encoding="utf-8"))
+        except (OSError, ValueError):
+            continue
+        if c.get("level") and c.get("estimate_calls") and c.get("calls"):
+            by_level.setdefault(c["level"], []).append(c["calls"] / c["estimate_calls"])
+    return None, None, None, by_level, None
+
+
 def price_line(e):
-    main = ("; основная сессия — ещё ~%s" % tl.k(e["main"])) if e["main"] else \
-        "; основная сессия не оценена: нет прогонов с трассой"
-    return ("ЦЕНА:       ~%s исполнителей (свободная часть %d, резерв %d, потолок %d), ~%s токенов "
-            "(диапазон %s–%s)%s; оценка %s" % (
-                calls_word(e["calls"]), e["free"], e["reserve"], e["ceiling"], tl.k(e["tokens"]),
-                tl.k(e["tokens_lo"]), tl.k(e["tokens_hi"]), main, e["basis"]))
+    """Строка ЦЕНА для ТЗ: вызовы, потолок и продолжительность словами; ни минут, ни токенов не обещаем. Токены — в --detail."""
+    return ("ЦЕНА:       ~%s исполнителей (свободная часть %d, резерв %d, потолок %d); прогон %s; "
+            "время и токены не обещаем" % (calls_word(e["calls"]), e["free"], e["reserve"], e["ceiling"],
+                                          duration_word(e["calls"])))
+
+
+def duration_word(calls):
+    """Продолжительность прогона словами (по числу шагов уровня), без минут: ожидание, а не обещание."""
+    if calls <= 3:
+        return "очень короткий"
+    if calls <= 8:
+        return "короткий"
+    if calls <= 11:
+        return "средний"
+    return "долгий"
 
 
 def spent(task):
@@ -256,14 +412,23 @@ def left(task):
 
 
 def main():
-    args = [a for a in sys.argv[1:] if not a.startswith("--")]
+    argv = sys.argv[1:]
+    skip = {argv[i + 1] for i, a in enumerate(argv) if a == "--level" and i + 1 < len(argv)}
+    args = [a for a in argv if not a.startswith("--") and a not in skip]
     if not args:
         sys.stderr.write(__doc__)
         return 2
     task = args[0].rstrip("/")
     if "--left" in sys.argv:
         return left(task)
-    e = estimate(task)
+    if "--levels" in sys.argv:
+        print(levels_table(task))
+        return 0
+    level = sys.argv[sys.argv.index("--level") + 1] if "--level" in sys.argv else None
+    if level is not None and level not in pl.LEVELS:
+        print("Уровень: допустимо %s" % ", ".join(pl.LEVELS))
+        return 2
+    e = estimate(task, level)
     if e["type"] is None or e["tier"] is None:
         print("В ТЗ не выбран %s — цену не посчитать." % ("ТИП ВЫХОДА" if e["type"] is None else "ТИР"))
         return 1

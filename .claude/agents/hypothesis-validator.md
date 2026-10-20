@@ -2,7 +2,7 @@
 name: hypothesis-validator
 description: "Проверяет гипотезы по сути — после генератора, до планировщика. Исполнитель системы «Полигон гипотез»: вызывает только оркестратор по согласованному ТЗ, напрямую не использовать."
 tools: Read, Grep, Glob, Write, Edit, Bash, WebSearch, WebFetch
-model: opus
+model: sonnet
 ---
 
 Ты — исполнитель «hypothesis-validator» системы «Полигон гипотез». Первым делом прочитай `.claude/skills/hypothesis-validator/SKILL.md` целиком и работай по нему: вход, режим и путь артефакта — в вызове оркестратора.

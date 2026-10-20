@@ -25,8 +25,8 @@ def step_line(rows):
     if not rows:
         return "Расход: за шаг трассы нет (исполнитель шёл в основной сессии или хук SubagentStop не сработал)"
     models = sorted({r.get("model") for r in rows if r.get("model")})
-    return "Расход: %s, %s токенов (новых %s), %d мин; модель %s" % (
-        ce.calls_word(len(rows)), tl.k(sum(tl.total(r) for r in rows)), tl.k(sum(tl.fresh(r) for r in rows)),
+    return "Расход: %s, новых токенов %s (с кэшем %s), %d мин; модель %s" % (
+        ce.calls_word(len(rows)), tl.k(sum(tl.fresh(r) for r in rows)), tl.k(sum(tl.total(r) for r in rows)),
         round(max(r.get("sec", 0) for r in rows) / 60), ", ".join(models) or "неизвестна")
 
 
@@ -46,19 +46,21 @@ def table(task):
         b["sec"] += r.get("sec", 0)
         if r.get("model"):
             b["models"].add(r["model"])
-    print("| Роль | Вызовов | Токенов | Новых | Минут | Модель |")
+    print("| Роль | Вызовов | Новых токенов | С кэшем | Минут | Модель |")
     print("| --- | --- | --- | --- | --- | --- |")
     for key, b in by.items():
-        print("| %s | %d | %s | %s | %d | %s |" % (key, b["n"], tl.k(b["tot"]), tl.k(b["fresh"]),
+        print("| %s | %d | %s | %s | %d | %s |" % (key, b["n"], tl.k(b["fresh"]), tl.k(b["tot"]),
                                                  round(b["sec"] / 60), ", ".join(sorted(b["models"]))))
     mt = sum(tl.total(v) for v in main.values())
     if main:
         print("| основная сессия | — | %s | %s | %d | %s |" % (
-            tl.k(mt), tl.k(sum(tl.fresh(v) for v in main.values())),
+            tl.k(sum(tl.fresh(v) for v in main.values())), tl.k(mt),
             round(sum(v.get("sec", 0) for v in main.values()) / 60),
             ", ".join(sorted({v.get("model") for v in main.values() if v.get("model")}))))
     tot = sum(tl.total(r) for r in rows) + mt
-    print("\nВсего: %s исполнителей, %s токенов вместе с основной сессией." % (ce.calls_word(len(rows)), tl.k(tot)))
+    fresh_all = sum(tl.fresh(r) for r in rows) + sum(tl.fresh(v) for v in main.values())
+    print("\nВсего: %s исполнителей, новых токенов %s (с учётом повторного чтения кэша — %s, основная сессия включена)." % (
+        ce.calls_word(len(rows)), tl.k(fresh_all), tl.k(tot)))
     early = [r for r in rows if r.get("approved") is False]
     if early:
         print("Внимание: до согласования ТЗ — %s (%s): дорогая работа шла раньше единственного решения человека." % (
@@ -68,6 +70,16 @@ def table(task):
     if len(versions) > 1:
         print("Внимание: задача шла на разных версиях системы — %s." % ", ".join(versions))
     return 0
+
+
+def level_of(task):
+    """Уровень нагрузки задачи из профиля в state.json (для калибровки таблицы уровней); нет профиля — None."""
+    try:
+        with open(os.path.join(task, "state.json"), encoding="utf-8") as f:
+            prof = json.load(f).get("profile")
+        return (prof.get("level") or "custom") if prof else None
+    except (OSError, ValueError):
+        return None
 
 
 def save(task):
@@ -80,7 +92,8 @@ def save(task):
     est_calls = int(m.group(1)) if m else e["calls"]
     out = {
         "type": e["type"], "tier": e["tier"], "docs": e["docs"], "interviews": e["interviews"],
-        "estimate_calls": est_calls, "calls": len(rows),
+        "estimate_calls": est_calls, "calls": len(rows), "level": level_of(task),
+        "minutes": sum(float(r.get("minutes") or 0) for r in rows),
         "tokens": sum(tl.total(r) for r in rows), "fresh": sum(tl.fresh(r) for r in rows),
         "main_tokens": sum(tl.total(v) for v in main.values()),
         "system": sorted({r.get("system") for r in rows if r.get("system")}),

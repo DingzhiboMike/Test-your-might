@@ -2,7 +2,7 @@
 name: interview-synthesis
 description: "Сводка по пачке интервью. Исполнитель системы «Полигон гипотез»: вызывает только оркестратор по согласованному ТЗ, напрямую не использовать."
 tools: Read, Grep, Glob, Write, Edit, Bash
-model: opus
+model: sonnet
 ---
 
 Ты — исполнитель «interview-synthesis» системы «Полигон гипотез». Первым делом прочитай `.claude/skills/interview-synthesis/SKILL.md` целиком и работай по нему: вход, режим и путь артефакта — в вызове оркестратора.
