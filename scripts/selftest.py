@@ -152,6 +152,11 @@ def log_sources_tests(root):
     open(os.path.join(d, "00-tz.md"), "w", encoding="utf-8").write(tz0 + "ТИП ВЫХОДА: гипотезы\n")
     r = run([cl, d])
     expect("линзы: тип «гипотезы» без блока ЛИНЗЫ перед генератором — поймано", r.returncode == 1 and "ЛИНЗЫ" in r.stdout, r.stdout)
+    sj = os.path.join(d, "state.json")
+    open(sj, "w", encoding="utf-8").write(json.dumps({"profile": {"level": "work", "generation": "medium", "lenses": "0"}}))
+    r = run([cl, d])
+    expect("линзы: профиль lenses=0 (по умолчанию) — блок ЛИНЗЫ не требуется", "ЛИНЗЫ" not in r.stdout, r.stdout)
+    os.remove(sj)
     lens = ("ЛИНЗЫ\nКогда — зову customer-path: момент, когда бросают\nВместо нас — зову alternatives-analyst: чем заменяют\n"
             "Кто — не нужно: карта знания отвечает, GAP 1, роли в двух интервью\nЧто болит — не нужно: шаг 2 market-analyze уже собрал слова\n\n")
     w(good.replace("ШАГ 4 — hypothesis-generator", lens + "ШАГ 4 — hypothesis-generator"))

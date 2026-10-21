@@ -98,6 +98,8 @@ def lenses(text, tz, heads, errors, task=""):
         import profile_lib
         if task and profile_lib.load(task)["generation"] == "narrow":
             return
+        if task and profile_lib.has_profile(task) and profile_lib.load(task)["lenses"] == "0":
+            return  # линзы выключены профилем (по умолчанию): блок ЛИНЗЫ не нужен
     except ImportError:
         pass
     gen = next((m for m in heads if m.group(2) == "hypothesis-generator"), None)
