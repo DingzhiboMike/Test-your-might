@@ -34,7 +34,7 @@ def table(task):
     rows = tl.load_trace(task)
     main = tl.load_main(task)
     if not rows and not main:
-        print("Трассы нет: хук scripts/hooks/trace.py не подключён или задача шла без подагентов.")
+        print("Трассы нет: хук scripts/hooks/trace.py не сработал. Частая причина — Claude Code открыт не в корне проекта (хуки берутся из .claude/settings.json папки сессии, в том числе для проекта внутри другой папки или репозитория); либо задача шла без подагентов.")
         return 1
     by = OrderedDict()
     for r in rows:
