@@ -212,6 +212,7 @@ def main():
             print("ТЗ: пунктов GAP %d, у каждого есть пометка, где ответ; ВЕБ согласован; ЦЕНА есть." % len(gap_numbers(tz)))
         return 1 if errors else 0
     review = read(os.path.join(task, "01-review.md"))
+    review = re.sub(r"\*\*|__", "", review)  # жирный шрифт («**Закрывает GAP:** 1») — не повод перезапрашивать консультанта
     if not review:
         print("Разбора консультанта нет: проверять нечего.")
         return 0

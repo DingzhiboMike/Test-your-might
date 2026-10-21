@@ -79,9 +79,9 @@ def main():
         task_kb = sum(os.path.getsize(os.path.join(b, n)) for b, _, fs in os.walk(task) for n in fs
                       if n not in ("state.json", ".DS_Store") and "sources" not in b.split(os.sep)
                       and "map" not in b.split(os.sep)) // 1024
-        print("Расход: трассы нет — оценка по объёму: артефакт %d КБ, файлы задачи без источников и карты %d КБ. "
-              "Хук трассы не сработал: открой Claude Code в корне проекта (там .claude/settings.json), проверь `python3 scripts/check_env.py`"
-              % (art_kb, task_kb))
+        print("Расход: трассы нет (артефакт %d КБ, файлы задачи %d КБ)" % (art_kb, task_kb))
+        print("Подсказка (в лог не копировать): хук трассы не сработал — открой Claude Code в корне проекта "
+              "(там .claude/settings.json), проверь `python3 scripts/check_env.py`")
     soft = not profile_lib.strict_evidence(task)
     failed = [(n, out) for n, (code, _, out) in checks if code != 0 and not (soft and n.startswith(SOFT))]
     for n, out in failed:

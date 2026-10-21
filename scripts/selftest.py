@@ -429,6 +429,11 @@ def path_tests(root):
     open(os.path.join(d, "log.md"), "w", encoding="utf-8").write(log)
     r = run([cp, d])
     expect("путь: всё привязано и у каждого пункта исход", r.returncode == 0, r.stdout)
+    open(os.path.join(d, "01-review.md"), "w", encoding="utf-8").write(
+        review.replace("Закрывает GAP:", "**Закрывает GAP:**").replace("Сдвигает:", "**Сдвигает:**"))
+    r = run([cp, d])
+    expect("путь: жирная разметка в «Закрывает GAP» и «Сдвигает» не ломает проверку", r.returncode == 0, r.stdout)
+    open(os.path.join(d, "01-review.md"), "w", encoding="utf-8").write(review)
     open(os.path.join(d, "01-review.md"), "w", encoding="utf-8").write(review.replace("Закрывает GAP: 3", "Закрывает GAP: —"))
     r = run([cp, d])
     expect("путь: пункт GAP без привязки пойман", r.returncode == 1 and "GAP 3" in r.stdout, r.stdout)
