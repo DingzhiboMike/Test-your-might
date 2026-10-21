@@ -263,12 +263,19 @@ def estimate(task, level=None):
     }
 
 
+def tz_lenses(tz):
+    """Число линз из строки РЕЖИМ в ТЗ («линзы: нет/1/2/3»); нет строки — 0 (линзы выключены)."""
+    m = re.search(r"линзы:\s*(нет|0|1|2|3)", tz_field(tz, "РЕЖИМ"), re.I)
+    return "0" if not m or m.group(1).lower() == "нет" else m.group(1)
+
+
 def chosen_profile(task, tz, level=None):
     """Профиль для оценки: явный уровень → state.json → поле НАГРУЗКА в ТЗ → None (оценка v1)."""
     if level:
         prof = dict(pl.DEFAULT)
         prof.update(pl.preset(level))
         prof["level"] = level
+        prof["lenses"] = tz_lenses(tz)
         return prof
     if pl.has_profile(task):
         return pl.load(task)
@@ -279,6 +286,7 @@ def chosen_profile(task, tz, level=None):
         prof = dict(pl.DEFAULT)
         prof.update(pl.preset(key))
         prof["level"] = key
+        prof["lenses"] = tz_lenses(tz)
         return prof
     return None
 

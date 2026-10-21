@@ -942,6 +942,15 @@ def trace_tests():
         r = run([ce, cst])
         expect("цена: с заказом новых идей — плюс вызов на отсев", "~29 вызовов" in r.stdout and "резерв 19" in r.stdout, r.stdout)
         open(os.path.join(cst, "00-tz.md"), "w", encoding="utf-8").write(tz.replace("ТИП ВЫХОДА: гипотезы", "ТИП ВЫХОДА: разбор / гипотезы"))
+        base_tz = tz + "            новые идеи: нет\n"
+        open(os.path.join(cst, "00-tz.md"), "w", encoding="utf-8").write(base_tz + "НАГРУЗКА:   уровень: рабочий\n")
+        c0 = run([ce, cst]).stdout
+        open(os.path.join(cst, "00-tz.md"), "w", encoding="utf-8").write(base_tz.replace("новые идеи: нет", "новые идеи: нет · линзы: 2") + "НАГРУЗКА:   уровень: рабочий\n")
+        c2 = run([ce, cst]).stdout
+        n0, n2 = re.search(r"~(\d+) вызов", c0), re.search(r"~(\d+) вызов", c2)
+        expect("цена: линзы из ТЗ (РЕЖИМ: линзы: 2) добавляют вызовы, без строки линз нет",
+               bool(n0 and n2) and int(n2.group(1)) == int(n0.group(1)) + 2, c0 + c2)
+        open(os.path.join(cst, "00-tz.md"), "w", encoding="utf-8").write(tz.replace("ТИП ВЫХОДА: гипотезы", "ТИП ВЫХОДА: разбор / гипотезы"))
         r = run([ce, cst])
         expect("цена: тип выхода не выбран — отказ, а не догадка", r.returncode == 1 and "ТИП ВЫХОДА" in r.stdout, r.stdout)
         open(os.path.join(cst, "00-tz.md"), "w", encoding="utf-8").write(tz)
