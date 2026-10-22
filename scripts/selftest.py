@@ -448,6 +448,18 @@ def path_tests(root):
     open(os.path.join(d, "log.md"), "w", encoding="utf-8").write(log.replace("П-2 | GAP 3 | запрос данных D-1\n", "П-2 | GAP 3 | —\n"))
     r = run([cp, d])
     expect("путь: пункт без исхода пойман", r.returncode == 1 and "П-2" in r.stdout, r.stdout)
+    open(os.path.join(d, "log.md"), "w", encoding="utf-8").write(log)
+    hs = os.path.join(HERE, "handoff_service.py")
+    r = run([hs, d])
+    sv = open(os.path.join(d, "08-service.md"), encoding="utf-8").read()
+    expect("сдача: служебный файл собран скриптом — путь из лога, четыре раздела под заполнение",
+           r.returncode == 0 and "П-1 | GAP 1, 2" in sv and sv.count("— заполнить") == 4, r.stdout + sv)
+    open(os.path.join(d, "08-service.md"), "w", encoding="utf-8").write(sv.replace(
+        "## Замечания к системе\n\n— заполнить", "## Замечания к системе\n\nУказатель длинный."))
+    r = run([hs, d])
+    sv2 = open(os.path.join(d, "08-service.md"), encoding="utf-8").read()
+    expect("сдача: заполненный руками раздел сохраняется при пересборке",
+           "Указатель длинный." in sv2 and sv2.count("— заполнить") == 3, sv2)
     open(os.path.join(d, "log.md"), "w", encoding="utf-8").write("# Лог\n")
     r = run([cp, d])
     expect("путь: нет раздела «ПУТЬ — ИСХОДЫ» — ошибка", r.returncode == 1 and "ПУТЬ — ИСХОДЫ" in r.stdout, r.stdout)
