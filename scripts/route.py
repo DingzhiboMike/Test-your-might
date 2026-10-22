@@ -188,6 +188,8 @@ def required(task):
         if cond == "rehearsal" and not modes(tz)["rehearsal"]:
             continue
         out.append((role, art))
+    if kind == "гипотезы" and prof.get("run") == "solo":
+        out = [("light-run", art) for _, art in out]  # один агент пишет все артефакты типа
     return kind, out
 
 

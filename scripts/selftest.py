@@ -742,7 +742,12 @@ def profile_tests():
         expect("профиль: level=light записан", r.returncode == 0 and "level=light" in r.stdout and
                "forecast=off" in r.stdout and "validation=method" in r.stdout, r.stdout)
         nxt = run([rt, "next", t]).stdout.splitlines()[0]
-        expect("профиль light: без Нострадамуса, проверки смысла и аудита, проверка по сути остаётся",
+        expect("профиль light: один проход (run=solo): все артефакты за light-run, без Нострадамуса, проверки смысла и аудита",
+               "run=solo" in r.stdout and "light-run → 02c-validation.md" in nxt and "nostradamus" not in nxt
+               and "meaning-review" not in nxt and "audit.md" not in nxt, nxt + r.stdout)
+        run([rt, "profile", t, "run=steps"])
+        nxt = run([rt, "next", t]).stdout.splitlines()[0]
+        expect("профиль light + run=steps: цепочка отдельных агентов, проверка по сути остаётся",
                "nostradamus" not in nxt and "meaning-review" not in nxt and "hypothesis-validator" in nxt, nxt)
         run([rt, "profile", t, "level=strict"])
         nxt = run([rt, "next", t]).stdout.splitlines()[0]
@@ -950,6 +955,10 @@ def trace_tests():
         n0, n2 = re.search(r"~(\d+) вызов", c0), re.search(r"~(\d+) вызов", c2)
         expect("цена: линзы из ТЗ (РЕЖИМ: линзы: 2) добавляют вызовы, без строки линз нет",
                bool(n0 and n2) and int(n2.group(1)) == int(n0.group(1)) + 2, c0 + c2)
+        open(os.path.join(cst, "00-tz.md"), "w", encoding="utf-8").write(base_tz + "НАГРУЗКА:   уровень: лёгкий\n")
+        cl_ = run([ce, cst]).stdout
+        expect("цена: light, тип «гипотезы» — один проход (run=solo): ~2 вызова, свободная часть 1",
+               "~2 вызова" in cl_ and "свободная часть 1" in cl_, cl_)
         open(os.path.join(cst, "00-tz.md"), "w", encoding="utf-8").write(tz.replace("ТИП ВЫХОДА: гипотезы", "ТИП ВЫХОДА: разбор / гипотезы"))
         r = run([ce, cst])
         expect("цена: тип выхода не выбран — отказ, а не догадка", r.returncode == 1 and "ТИП ВЫХОДА" in r.stdout, r.stdout)

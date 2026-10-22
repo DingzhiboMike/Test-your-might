@@ -11,6 +11,8 @@
   forecast:   on | off                      — Нострадамус и отсев идей
   lenses:     0..3                          — сколько линз до генератора (ходов к источникам за сырьём); по умолчанию 0: линзы выключены, число берётся из строки РЕЖИМ в ТЗ
   data:       none | context | public       — какие данные человека берём (подсказка оркестратору)
+  run:        steps | solo                  — steps: цепочка отдельных агентов; solo: один агент light-run пишет все артефакты
+                                              типа «гипотезы» (по умолчанию на light)
   ceiling:    произвольная строка           — потолок вызовов и модель (подсказка оркестратору)
 
 Шкала «креатив ↔ точность» (К5 … Т5) — язык для человека; уровни нагрузки — её готовые наборы:
@@ -19,18 +21,18 @@
 import json
 import os
 
-KEYS = ("level", "generation", "evidence", "validation", "forecast", "lenses", "data", "ceiling")
+KEYS = ("level", "generation", "evidence", "validation", "forecast", "lenses", "data", "ceiling", "run")
 DEFAULT = {"level": "strict", "generation": "wide", "evidence": "quotes", "validation": "full", "forecast": "on",
-           "lenses": "0", "data": "context", "ceiling": ""}
+           "lenses": "0", "data": "context", "ceiling": "", "run": "steps"}
 CHOICES = {"level": ("fast", "light", "work", "strict"), "generation": ("narrow", "medium", "wide"),
            "evidence": ("none", "links", "quotes"), "validation": ("none", "method", "web", "full"),
-           "forecast": ("on", "off"), "lenses": ("0", "1", "2", "3"), "data": ("none", "context", "public")}
+           "forecast": ("on", "off"), "lenses": ("0", "1", "2", "3"), "data": ("none", "context", "public"), "run": ("steps", "solo")}
 # Готовые наборы по уровню. fast — без маршрута (ответ диспетчера/оркестратора без исполнителей, 0–2 вызова).
 LEVELS = {
-    "fast": {"generation": "narrow", "evidence": "none", "validation": "none", "forecast": "off", "lenses": "0"},
-    "light": {"generation": "wide", "evidence": "none", "validation": "method", "forecast": "off", "lenses": "0"},
-    "work": {"generation": "medium", "evidence": "links", "validation": "web", "forecast": "on", "lenses": "0"},
-    "strict": {"generation": "medium", "evidence": "quotes", "validation": "full", "forecast": "on", "lenses": "0"},
+    "fast": {"generation": "narrow", "evidence": "none", "validation": "none", "forecast": "off", "lenses": "0", "run": "steps"},
+    "light": {"generation": "medium", "evidence": "none", "validation": "method", "forecast": "off", "lenses": "0", "run": "solo"},
+    "work": {"generation": "medium", "evidence": "links", "validation": "web", "forecast": "on", "lenses": "0", "run": "steps"},
+    "strict": {"generation": "medium", "evidence": "quotes", "validation": "full", "forecast": "on", "lenses": "0", "run": "steps"},
 }
 ALIASES = {"validation": {"logic": "method"}}
 
