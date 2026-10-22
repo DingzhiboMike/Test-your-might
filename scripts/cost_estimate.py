@@ -41,6 +41,7 @@ DEEPEN_CAP = {1: 12, 2: 8}
 MAP_BATCH = 7
 MAP_BATCH_EST = 9   # документов на одного картографа по факту прогонов
 MAP_MIN_DOCS = 8    # с такого числа документов строится карта документов
+DEEPEN_BATCH = 3    # документов углубления на одного агента (оркестратор берёт 3–4)
 PRIOR_PER_CALL = 85000
 CEILING = 1.3
 
@@ -123,7 +124,7 @@ def structure(kind, tier, docs, interviews, modes, mapped, prof=None):
     if docs and kind != "вердикты по проверке":
         if mapped:
             items.append(("картография документов", math.ceil(docs / MAP_BATCH), "резерв"))
-            items.append(("углубление документов", min(DEEPEN_CAP.get(tier, 8), docs), "резерв"))
+            items.append(("углубление документов", math.ceil(min(DEEPEN_CAP.get(tier, 8), docs) / DEEPEN_BATCH), "резерв"))
             items.append(("модель предмета", 1, "резерв"))
         else:
             items.append(("разбор материалов", 1, "резерв"))
@@ -214,10 +215,10 @@ def profile_structure(kind, docs, interviews, modes, mapped, prof):
                   2 if prof["generation"] == "wide" else 1, "свободная"))
     if prof["validation"] != "none":
         items.append(("проверка по сути", 1, "свободная"))
-    if docs >= MAP_MIN_DOCS:
-        # много документов: картограф пачками, углубление (по факту 2–3), модель предмета вместо разбора материалов
+    if docs >= MAP_MIN_DOCS and prof.get("level") == "strict":
+        # модель предмета только на строгом уровне: картограф пачками, углубление пачками по DEEPEN_BATCH, модель
         items.append(("картография документов", math.ceil(docs / MAP_BATCH_EST), "резерв"))
-        items.append(("углубление документов", min(3, docs), "резерв"))
+        items.append(("углубление документов", math.ceil(min(DEEPEN_CAP.get(2, 8), docs) / DEEPEN_BATCH), "резерв"))
         items.append(("модель предмета", 1, "резерв"))
     elif docs:
         items.append(("разбор материалов", 1, "резерв"))
@@ -262,11 +263,19 @@ def estimate(task, level=None):
     }
 
 
+def tz_lenses(tz):
+    """Число линз из строки РЕЖИМ в ТЗ («линзы: нет/1/2/3»); нет строки — 0 (линзы выключены)."""
+    m = re.search(r"линзы:\s*(нет|0|1|2|3)", tz_field(tz, "РЕЖИМ"), re.I)
+    return "0" if not m or m.group(1).lower() == "нет" else m.group(1)
+
+
 def chosen_profile(task, tz, level=None):
     """Профиль для оценки: явный уровень → state.json → поле НАГРУЗКА в ТЗ → None (оценка v1)."""
     if level:
         prof = dict(pl.DEFAULT)
         prof.update(pl.preset(level))
+        prof["level"] = level
+        prof["lenses"] = tz_lenses(tz)
         return prof
     if pl.has_profile(task):
         return pl.load(task)
@@ -276,6 +285,8 @@ def chosen_profile(task, tz, level=None):
                "строгий": "strict"}[m.group(1).lower()]
         prof = dict(pl.DEFAULT)
         prof.update(pl.preset(key))
+        prof["level"] = key
+        prof["lenses"] = tz_lenses(tz)
         return prof
     return None
 

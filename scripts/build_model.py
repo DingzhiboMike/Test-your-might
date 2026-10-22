@@ -160,11 +160,20 @@ def main():
                                                                  counts["идея"], counts["нет данных"]), "",
           "| Группа | " + " | ".join(feats) + " |", "| --- |" + " --- |" * len(feats)]
     for r in rows:
+        if all(out_cells[(r, ft)]["level"] == "нет данных" for ft in feats):
+            continue  # группа без единой записи — в разделе «Пустые клетки», строку таблицы не занимает
         md.append("| %s | " % r + " | ".join(
             mark[out_cells[(r, ft)]["level"]] + (" (%s)" % ", ".join(out_cells[(r, ft)]["sources"]) if out_cells[(r, ft)]["sources"] else "")
             + (", старше года" if out_cells[(r, ft)]["old"] else "") for ft in feats) + " |")
     md += ["", "## Пустые клетки", ""]
-    md += ["- %s × %s" % k for k, c in out_cells.items() if c["level"] == "нет данных"] or ["- нет"]
+    empty = []
+    for r in rows:
+        miss = [ft for ft in feats if out_cells[(r, ft)]["level"] == "нет данных"]
+        if len(miss) == len(feats):
+            empty.append("- %s × все %d признаков (групповая строка таблицы опущена)" % (r, len(feats)))
+        elif miss:
+            empty.append("- %s × %s" % (r, "; ".join(miss)))
+    md += empty or ["- нет"]
     md += ["", "## Слабые клетки (версия или идея)", ""]
     md += ["- %s × %s — %s (%s)" % (k[0], k[1], c["level"], ", ".join(c["sources"])) for k, c in out_cells.items()
            if c["level"] in ("версия", "идея")] or ["- нет"]

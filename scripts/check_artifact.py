@@ -34,6 +34,7 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import review_format as rf  # noqa: E402
 
 MIN_CHARS = 400
+OS_JUNK = (".DS_Store", "Thumbs.db", "desktop.ini")  # служебные файлы ОС
 ALWAYS_OK = ("sources.csv", "sources/", "checks/", "log.md", "00-tz.md", "private.txt")
 
 
@@ -122,6 +123,8 @@ def main():
         allowed = list(ALWAYS_OK) + names + a.allow
         for root, _, files in os.walk(a.task):
             for f in files:
+                if f in OS_JUNK:
+                    continue
                 full = os.path.join(root, f)
                 if os.path.getmtime(full) < a.since:
                     continue

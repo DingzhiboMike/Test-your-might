@@ -9,7 +9,7 @@
   validation: none | method | web | full    — проверка (none: без проверки по сути; method: проверка по сути по методологии
                                               без веба; web: то же с веб-сверкой; full: + проверка смысла и аудит)
   forecast:   on | off                      — Нострадамус и отсев идей
-  lenses:     0..3                          — сколько линз до генератора (ходов к источникам за сырьём)
+  lenses:     0..3                          — сколько линз до генератора (ходов к источникам за сырьём); по умолчанию 0: линзы выключены, число берётся из строки РЕЖИМ в ТЗ
   data:       none | context | public       — какие данные человека берём (подсказка оркестратору)
   ceiling:    произвольная строка           — потолок вызовов и модель (подсказка оркестратору)
 
@@ -21,16 +21,16 @@ import os
 
 KEYS = ("level", "generation", "evidence", "validation", "forecast", "lenses", "data", "ceiling")
 DEFAULT = {"level": "strict", "generation": "wide", "evidence": "quotes", "validation": "full", "forecast": "on",
-           "lenses": "3", "data": "context", "ceiling": ""}
+           "lenses": "0", "data": "context", "ceiling": ""}
 CHOICES = {"level": ("fast", "light", "work", "strict"), "generation": ("narrow", "medium", "wide"),
            "evidence": ("none", "links", "quotes"), "validation": ("none", "method", "web", "full"),
            "forecast": ("on", "off"), "lenses": ("0", "1", "2", "3"), "data": ("none", "context", "public")}
 # Готовые наборы по уровню. fast — без маршрута (ответ диспетчера/оркестратора без исполнителей, 0–2 вызова).
 LEVELS = {
     "fast": {"generation": "narrow", "evidence": "none", "validation": "none", "forecast": "off", "lenses": "0"},
-    "light": {"generation": "wide", "evidence": "none", "validation": "method", "forecast": "off", "lenses": "1"},
-    "work": {"generation": "medium", "evidence": "links", "validation": "web", "forecast": "on", "lenses": "2"},
-    "strict": {"generation": "medium", "evidence": "quotes", "validation": "full", "forecast": "on", "lenses": "3"},
+    "light": {"generation": "wide", "evidence": "none", "validation": "method", "forecast": "off", "lenses": "0"},
+    "work": {"generation": "medium", "evidence": "links", "validation": "web", "forecast": "on", "lenses": "0"},
+    "strict": {"generation": "medium", "evidence": "quotes", "validation": "full", "forecast": "on", "lenses": "0"},
 }
 ALIASES = {"validation": {"logic": "method"}}
 

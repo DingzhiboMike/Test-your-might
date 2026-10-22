@@ -152,6 +152,11 @@ def log_sources_tests(root):
     open(os.path.join(d, "00-tz.md"), "w", encoding="utf-8").write(tz0 + "ТИП ВЫХОДА: гипотезы\n")
     r = run([cl, d])
     expect("линзы: тип «гипотезы» без блока ЛИНЗЫ перед генератором — поймано", r.returncode == 1 and "ЛИНЗЫ" in r.stdout, r.stdout)
+    sj = os.path.join(d, "state.json")
+    open(sj, "w", encoding="utf-8").write(json.dumps({"profile": {"level": "work", "generation": "medium", "lenses": "0"}}))
+    r = run([cl, d])
+    expect("линзы: профиль lenses=0 (по умолчанию) — блок ЛИНЗЫ не требуется", "ЛИНЗЫ" not in r.stdout, r.stdout)
+    os.remove(sj)
     lens = ("ЛИНЗЫ\nКогда — зову customer-path: момент, когда бросают\nВместо нас — зову alternatives-analyst: чем заменяют\n"
             "Кто — не нужно: карта знания отвечает, GAP 1, роли в двух интервью\nЧто болит — не нужно: шаг 2 market-analyze уже собрал слова\n\n")
     w(good.replace("ШАГ 4 — hypothesis-generator", lens + "ШАГ 4 — hypothesis-generator"))
@@ -429,6 +434,11 @@ def path_tests(root):
     open(os.path.join(d, "log.md"), "w", encoding="utf-8").write(log)
     r = run([cp, d])
     expect("путь: всё привязано и у каждого пункта исход", r.returncode == 0, r.stdout)
+    open(os.path.join(d, "01-review.md"), "w", encoding="utf-8").write(
+        review.replace("Закрывает GAP:", "**Закрывает GAP:**").replace("Сдвигает:", "**Сдвигает:**"))
+    r = run([cp, d])
+    expect("путь: жирная разметка в «Закрывает GAP» и «Сдвигает» не ломает проверку", r.returncode == 0, r.stdout)
+    open(os.path.join(d, "01-review.md"), "w", encoding="utf-8").write(review)
     open(os.path.join(d, "01-review.md"), "w", encoding="utf-8").write(review.replace("Закрывает GAP: 3", "Закрывает GAP: —"))
     r = run([cp, d])
     expect("путь: пункт GAP без привязки пойман", r.returncode == 1 and "GAP 3" in r.stdout, r.stdout)
@@ -922,15 +932,24 @@ def trace_tests():
         open(os.path.join(cst, "00-tz.md"), "w", encoding="utf-8").write(tz)
         ce = os.path.join(HERE, "cost_estimate.py")
         r = run([ce, cst, "--detail"])
-        expect("цена: вызовы по структуре маршрута — свободная часть 10, резерв 26, потолок 47",
-               r.returncode == 0 and "~36 вызовов" in r.stdout and "резерв 26" in r.stdout and "потолок 47" in r.stdout, r.stdout)
+        expect("цена: вызовы по структуре маршрута — свободная часть 10, резерв 18, потолок 37 (углубление пачками по 3)",
+               r.returncode == 0 and "~28 вызовов" in r.stdout and "резерв 18" in r.stdout and "потолок 37" in r.stdout, r.stdout)
         expect("цена: продолжительность словами, ни минут, ни токенов не обещается (токены только в --detail и в трассе)",
                "прогон " in r.stdout and "время и токены не обещаем" in r.stdout and
                "млн токенов" not in r.stdout and " минут" not in r.stdout, r.stdout)
         open(os.path.join(cst, "00-tz.md"), "w", encoding="utf-8").write(tz.replace("ТИП ВЫХОДА: гипотезы", "ТИП ВЫХОДА: разбор / гипотезы"))
         open(os.path.join(cst, "00-tz.md"), "w", encoding="utf-8").write(tz + "            новые идеи: да\n")
         r = run([ce, cst])
-        expect("цена: с заказом новых идей — плюс вызов на отсев", "~37 вызовов" in r.stdout and "резерв 27" in r.stdout, r.stdout)
+        expect("цена: с заказом новых идей — плюс вызов на отсев", "~29 вызовов" in r.stdout and "резерв 19" in r.stdout, r.stdout)
+        open(os.path.join(cst, "00-tz.md"), "w", encoding="utf-8").write(tz.replace("ТИП ВЫХОДА: гипотезы", "ТИП ВЫХОДА: разбор / гипотезы"))
+        base_tz = tz + "            новые идеи: нет\n"
+        open(os.path.join(cst, "00-tz.md"), "w", encoding="utf-8").write(base_tz + "НАГРУЗКА:   уровень: рабочий\n")
+        c0 = run([ce, cst]).stdout
+        open(os.path.join(cst, "00-tz.md"), "w", encoding="utf-8").write(base_tz.replace("новые идеи: нет", "новые идеи: нет · линзы: 2") + "НАГРУЗКА:   уровень: рабочий\n")
+        c2 = run([ce, cst]).stdout
+        n0, n2 = re.search(r"~(\d+) вызов", c0), re.search(r"~(\d+) вызов", c2)
+        expect("цена: линзы из ТЗ (РЕЖИМ: линзы: 2) добавляют вызовы, без строки линз нет",
+               bool(n0 and n2) and int(n2.group(1)) == int(n0.group(1)) + 2, c0 + c2)
         open(os.path.join(cst, "00-tz.md"), "w", encoding="utf-8").write(tz.replace("ТИП ВЫХОДА: гипотезы", "ТИП ВЫХОДА: разбор / гипотезы"))
         r = run([ce, cst])
         expect("цена: тип выхода не выбран — отказ, а не догадка", r.returncode == 1 and "ТИП ВЫХОДА" in r.stdout, r.stdout)
@@ -940,12 +959,12 @@ def trace_tests():
         open(os.path.join(cst, "trace.jsonl"), "w", encoding="utf-8").write(
             "".join(line(ts=1, agent_id="d%d" % i, role="document-mapper", out=10) for i in range(3)))
         r = run([ce, cst, "--left"])
-        expect("остаток: потрачено 3, резерв впереди 23, свободных 21",
-               "Потрачено: 3 вызова" in r.stdout and "резерв впереди 23" in r.stdout and "до потолка 21" in r.stdout, r.stdout + price)
+        expect("остаток: потрачено 3, резерв впереди 15, свободных 19",
+               "Потрачено: 3 вызова" in r.stdout and "резерв впереди 15" in r.stdout and "до потолка 19" in r.stdout, r.stdout + price)
         r = run([os.path.join(HERE, "trace_summary.py"), cst, "--save"])
         c = json.load(open(os.path.join(cst, "checks", "cost.json"), encoding="utf-8"))
-        expect("сдача: cost.json с оценкой и фактом", c.get("estimate_calls") == 36 and c.get("calls") == 3
-               and "из ~36" in r.stdout, r.stdout)
+        expect("сдача: cost.json с оценкой и фактом", c.get("estimate_calls") == 28 and c.get("calls") == 3
+               and "из ~28" in r.stdout, r.stdout)
         open(os.path.join(cst, "01-review.md"), "w", encoding="utf-8").write("# Разбор\n\n" + "Разрыв логики между первым запуском и использованием. " * 10 + "\n")
         r = run([os.path.join(HERE, "check_step.py"), cst, "01-review.md", "--since", "0"])
         expect("шаг: под строкой проверок — строка «Расход»", "\nРасход: 3 вызова" in r.stdout, r.stdout)
@@ -1563,6 +1582,12 @@ def main():
         open(os.path.join(task, "02-h.md"), "w", encoding="utf-8").write("ГИПОТЕЗА 1\n" + "Текст гипотезы. " * 40)
         a2 = run([ca, task, "02-h.md", "--since", str(time.time() + 1)])
         expect("полный артефакт проходит", a2.returncode == 0, a2.stdout)
+        time.sleep(0.05)
+        t1 = time.time()
+        open(os.path.join(task, ".DS_Store"), "w", encoding="utf-8").write("служебный файл Finder\n")
+        a3 = run([ca, task, "02-h.md", "--since", str(t1)])
+        expect("служебный файл ОС (.DS_Store) не считается нарушением периметра", a3.returncode == 0, a3.stdout)
+        os.remove(os.path.join(task, ".DS_Store"))
 
         an = os.path.join(HERE, "add_number.py")
         cn = os.path.join(HERE, "check_numbers.py")

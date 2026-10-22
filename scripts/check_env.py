@@ -50,7 +50,10 @@ def web_ok():
 def main():
     strict = "--strict" in sys.argv
     print("Python {}.{}.{}".format(*sys.version_info[:3]))
-    print("CLAUDE_PROJECT_DIR: " + (os.environ.get("CLAUDE_PROJECT_DIR") or "не задан — хуки не сработают, открой Claude Code в корне проекта"))
+    print("CLAUDE_PROJECT_DIR: " + (os.environ.get("CLAUDE_PROJECT_DIR") or "не задан — хуки ищут проект по git и по текущей папке"))
+    root_here = os.path.isfile(os.path.join(os.getcwd(), ".claude", "settings.json")) and os.path.isfile(os.path.join(os.getcwd(), "AGENTS.md"))
+    if not root_here:
+        print("ВНИМАНИЕ: текущая папка не корень проекта (нет .claude/settings.json и AGENTS.md): хуки трассы, записи и остановки не сработают. Открой Claude Code в корне проекта.")
     have = {}
     print("\nПакеты Python:")
     for name, mod, why in PY_TOOLS:

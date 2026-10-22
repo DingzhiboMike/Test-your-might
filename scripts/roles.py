@@ -55,15 +55,17 @@ def skill_summary(role):
         return role
     m = re.search(r"description:\s*>?\s*\n?\s*(.+)", text)
     first = (m.group(1) if m else role).strip()
-    return re.split(r"(?<=[.!?])\s", first)[0].replace('"', "'")
+    one = re.split(r"(?<=[.!?])\s", first)[0].replace('"', "'")
+    if len(one) > 110:  # в списке агентов нужна одна короткая фраза: роль, а не триггеры
+        one = one[:110].rsplit(" ", 1)[0].rstrip(",;:—-") + "…"
+    return one
 
 
 def agent_text(role, model):
     return (
         "---\n"
         "name: %s\n"
-        "description: \"%s Исполнитель системы «Полигон гипотез»: вызывает только оркестратор по согласованному ТЗ, "
-        "напрямую не использовать.\"\n"
+        "description: \"%s Только оркестратор, напрямую не вызывать.\"\n"
         "tools: %s\n"
         "model: %s\n"
         "---\n\n"

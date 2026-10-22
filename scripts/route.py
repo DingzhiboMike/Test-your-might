@@ -38,6 +38,7 @@ from check_effort import ideas_required, output_type, tz_field  # noqa: E402
 import profile_lib  # noqa: E402
 
 STATE = "state.json"
+OS_JUNK = (".DS_Store", "Thumbs.db", "desktop.ini")  # служебные файлы ОС: не артефакты и не нарушение периметра
 SERVICE = ("log.md", "state.json", "state.json.tmp", "trace.jsonl", "trace.jsonl.tmp", "trace-main.json",
            "trace-main.json.tmp", "sources.csv", "numbers.csv", "sources/*", "sources/*/*", "checks/*", "map/*",
            "00m-model.md", "00m-model.json", "00i-impact.md", "00d-map.md")
@@ -120,6 +121,8 @@ def snapshot(task):
     out = {}
     for base, _, files in os.walk(task):
         for name in files:
+            if name in OS_JUNK:
+                continue
             p = os.path.join(base, name)
             rel = os.path.relpath(p, task)
             if rel.startswith(STATE):
