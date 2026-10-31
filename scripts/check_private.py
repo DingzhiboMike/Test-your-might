@@ -12,6 +12,10 @@
 
 Закрытые слова для веба: tasks/<папка>/closed-web.txt (партнёры, акции, продукты). В артефактах они допустимы, в блоках «Запросы:» лога (там лежат запросы в веб) нет.
 
+До запроса: функция web_leaks() — её зовёт хук hooks/guard_writes.py перед WebSearch, WebFetch и curl/trafilatura
+и блокирует запрос с шаблоном или термином из private.txt и closed-web.txt любой задачи. Проверка лога ниже — второй
+рубеж: она видит только то, что уже ушло.
+
 Не проверяет: 00-tz.md и 00-hypotheses-in.md (там список материалов, он внутренний), sources.csv,
 sources/raw/ (сырой текст лежит локально), checks/.
 
@@ -65,6 +69,45 @@ def load_closed_web(task):
     return [t.strip() for t in open(path, encoding="utf-8") if t.strip() and not t.strip().startswith("#")]
 
 
+def term_rx(term):
+    """Основа и любое окончание без учёта регистра. Термин до трёх букв (аббревиатура) — только целым словом
+    и с регистром: иначе «ЗК» ловит «зкх» и «зка»."""
+    t = stem(term)
+    if len(t) <= 3:
+        return re.compile(r"(?<!\w)" + re.escape(t) + r"(?!\w)")
+    return re.compile(r"\b" + re.escape(t) + r"\w*", re.I)
+
+
+# В адресах и командах длинные числа — обычно id страниц, а не номера карт: там их не ищем.
+URL_KINDS = {"e-mail", "телефон", "ИНН", "паспорт или СНИЛС с номером"}
+
+
+def web_leaks(root, query="", urls=()):
+    """Что из закрытого попало бы во внешний запрос: виды шаблонов и термины из private.txt и closed-web.txt
+    всех задач в tasks/. Ход скрипта до запроса, а не после: зовёт хук guard_writes.py перед WebSearch, WebFetch
+    и curl/trafilatura. Найденное по шаблону не повторяется — только вид; термины названы, чтобы их заменить."""
+    found = []
+    texts = [(query, False)] + [(u, True) for u in urls if u]
+    for kind, rx in ERROR_PATTERNS:
+        if any(rx.search(t) for t, is_url in texts if t and (not is_url or kind in URL_KINDS)):
+            found.append(kind)
+    tasks = os.path.join(root, "tasks")
+    terms = {}
+    for name in sorted(os.listdir(tasks)) if os.path.isdir(tasks) else []:
+        d = os.path.join(tasks, name)
+        if not os.path.isdir(d):
+            continue
+        for t in load_terms(d):
+            terms.setdefault(t, "private.txt")
+        for t in load_closed_web(d):
+            terms.setdefault(t, "closed-web.txt")
+    for t, src in terms.items():
+        rx = term_rx(t)
+        if any(t_ and rx.search(t_) for t_, _ in texts):
+            found.append("термин из {}: {}".format(src, t))
+    return found
+
+
 FIELD = re.compile(r"^[А-ЯЁA-Za-zа-яё\[(][^\n]{0,40}:\s")
 
 
@@ -86,7 +129,7 @@ def main():
         sys.exit(2)
     task = sys.argv[1].rstrip("/")
     terms = load_terms(task)
-    term_res = [(t, re.compile(r"\b" + re.escape(stem(t)) + r"\w*", re.I)) for t in terms]
+    term_res = [(t, term_rx(t)) for t in terms]
     errors, warns = [], []
     names = sorted(n for n in os.listdir(task) if n.endswith(".md") and n not in SKIP)
     for name in names:
@@ -104,7 +147,7 @@ def main():
     closed = load_closed_web(task)
     logpath = os.path.join(task, "log.md")
     if closed and os.path.exists(logpath):
-        crx = [(t, re.compile(r"\b" + re.escape(stem(t)) + r"\w*", re.I)) for t in closed]
+        crx = [(t, term_rx(t)) for t in closed]
         for i, line in query_lines(open(logpath, encoding="utf-8").read()):
             for t, rx in crx:
                 if rx.search(line):

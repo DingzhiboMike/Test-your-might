@@ -7,6 +7,10 @@ context/from-tasks/*
 tasks/*
 !tasks/README.md
 
+# Прогоны кейсов и настоящие кейсы — только локально (R-021); в репозитории — выдуманные кейсы evals/cases/
+evals/results/
+evals/cases-local/
+
 # Системное
 .polygon-dev
 __pycache__/

@@ -15,7 +15,7 @@
 
 Пишет отчёт в tasks/<папка>/checks/quotes.md и печатает его.
 Код возврата 1 — есть ошибки: цитата не найдена, ссылка на несуществующий источник,
-опора на непрочитанный источник или только на пересказ.
+опора на непрочитанный источник или только на пересказ, строка, где все опоры — источники с пометкой [инъекция].
 """
 import csv
 import os
@@ -31,6 +31,7 @@ QUOTE_RE = re.compile(r"«([^«»]{3,}?)»" + SEP + r"\[(F-\d{3,})\]")
 URL_RE = re.compile(r"https?://[^\s)\]>|«»\"']+")
 REF_RE = re.compile(r"\[(F-\d{3,})\]")
 SKIP = {"log.md", "00-tz.md"}
+INJECTION = "[инъекция]"  # пометка add_source.py в поле note (scripts/injection.py, MARK)
 
 
 def norm(s):
@@ -132,6 +133,11 @@ def main():
             miss = found_in_order(parts(q), body)
             if miss is not None:
                 problems.append("ОШИБКА [{}] не найдено в источнике: «{}»".format(sid, short))
+        for i, line in enumerate(text.splitlines(), 1):
+            sids = {s for _, s in QUOTE_RE.findall(line) if s in reg}
+            if sids and all(INJECTION in reg[s].get("note", "") for s in sids):
+                problems.append("ОШИБКА строка {}: все опоры ({}) — источники с инструкцией для ИИ внутри; единственной "
+                                "опорой такой источник не служит".format(i, ", ".join(sorted(sids))))
         for sid in sorted(refs - set(reg)):
             if sid not in {s for _, s in quotes}:
                 problems.append("ОШИБКА [{}] ссылка на источник, которого нет в реестре".format(sid))

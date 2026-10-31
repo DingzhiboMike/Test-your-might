@@ -111,6 +111,7 @@ def meaning_audit(task, log):
     else:
         code, out = run("audit_sample.py", task, "--check")
         parts.append("Аудит: " + (out.splitlines()[-1] if out else ("нет плана" if code else "—")))
+        parts += [l for l in (out or "").splitlines() if l.startswith(("Человеку:", "аудит: проверка смысла шла"))]
     q = read(os.path.join(task, "checks", "quotes.md"))
     first = next((l.strip("# ").strip() for l in q.splitlines() if l.strip()), "")
     parts.append("Опоры: " + (first or "checks/quotes.md нет"))

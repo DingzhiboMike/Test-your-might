@@ -10,8 +10,12 @@
 имени задачи и хэшей артефактов, записан в плане). Место — строка с опорой («…» [F-id] или [A]) или с вердиктом.
 
 Аудит делает meaning-review в режиме «аудит» в отдельном контексте: файл audit.md с блоком данных «аудит»
-(data_block.py) — по каждому месту оценка «держит», «не держит» или «подогнано» и почему. Те же места идут
-в служебную часть сдачи: человек может проверить их сам.
+(data_block.py) — по каждому месту оценка «держит», «частично», «не держит», «нерепрезентативно» (фрагмент верен, но
+про другую группу, рынок или период) или «подогнано» и почему. Те же места идут в служебную часть сдачи.
+
+Независимость проверяющего (профиль reviewer, profile_lib.py): при other и human --check сверяет по трассе
+(trace.jsonl, пишет хук trace.py), что проверка смысла шла на модели другого семейства, чем у авторов артефактов;
+та же модель — ошибка, трассы нет — предупреждение. При human каждое место печатается строкой «Человеку: …».
 """
 import hashlib
 import os
@@ -22,9 +26,16 @@ import sys
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, HERE)
 import data_block  # noqa: E402
+import profile_lib  # noqa: E402
+import trace_lib  # noqa: E402
+
+FAMILIES = ("opus", "sonnet", "haiku", "fable")
+REVIEWER = "meaning-review"
+OPEN = ("частично", "не держит", "нерепрезентативно", "подогнано")  # незакрытое: в сдачу, человеку
 
 ARTIFACTS = ("02c-validation.md", "02g-ideas-check.md", "03-backlog.md", "06-research.md", "06-validation.md")
 PER_ARTIFACT = 3
+LIGHT_ROLES = ("document-mapper", "brief-writer", "test-kit")  # механическая раскладка, выводов не пишут
 PLACE = re.compile(r"«[^»]{8,}»\s*\[(?:F-\d+|A)|^\s*Вердикт\s*:|^\|\s*\d+\s*\|", re.M)
 PLAN = "audit-plan.md"
 REPORT = "audit.md"
@@ -69,7 +80,7 @@ def write_plan(task):
     out = ["# План аудита: " + os.path.basename(task), "", "seed: %d" % seed,
            "Артефакты: " + (", ".join(present) or "нет"), "",
            "По каждому месту: держит ли фрагмент утверждение и не подогнано ли поле под проверку. Ответ — audit.md с "
-           "блоком данных «аудит»: артефакт, строка, оценка (держит / не держит / подогнано), почему.", ""]
+           "блоком данных «аудит»: артефакт, строка, оценка (держит / частично / не держит / нерепрезентативно / подогнано), почему.", ""]
     for c in chosen:
         out.append("- %s, строка %d: %s" % (c["артефакт"], c["строка"], c["текст"]))
     with open(os.path.join(task, PLAN), "w", encoding="utf-8") as f:
@@ -104,11 +115,40 @@ def check(task):
     counts = {}
     for v in got.values():
         counts[v.get("оценка", "?")] = counts.get(v.get("оценка", "?"), 0) + 1
+    reviewer = profile_lib.load(task).get("reviewer", "same")
+    if reviewer in ("other", "human"):
+        errors += independence(task)
     for e in errors:
         print("аудит: " + e)
+    if reviewer == "human":
+        for c in chosen:
+            v = got.get((c["артефакт"], c["строка"]), {})
+            print("Человеку: %s, строка %d — проверяющий: %s%s" % (c["артефакт"], c["строка"], v.get("оценка", "не оценено"),
+                                                                    " (%s)" % v["почему"] if v.get("почему") else ""))
     summary = ", ".join("%s %d" % (k, n) for k, n in sorted(counts.items())) or "оценок нет"
     print("Аудит: мест %d — %s." % (len(chosen), summary))
     return 1 if errors else 0
+
+
+def family(model):
+    m = (model or "").lower()
+    return next((f for f in FAMILIES if f in m), m)
+
+
+def independence(task):
+    """Ошибки, если проверка смысла шла на том же семействе моделей, что и авторы артефактов (по трассе)."""
+    rows = trace_lib.load_trace(task)
+    rev = {family(r.get("model")) for r in rows if r.get("role") == REVIEWER and r.get("model")}
+    authors = {family(r.get("model")) for r in rows if r.get("role") not in (REVIEWER, None) and r.get("model")
+               and r.get("role") not in LIGHT_ROLES}
+    if not rev:
+        print("аудит: внимание — в трассе нет вызовов %s с моделью; независимость проверяющего не сверена" % REVIEWER)
+        return []
+    same = sorted(rev & authors)
+    if same:
+        return ["проверка смысла шла на той же модели, что и авторы (%s); профиль reviewer требует другую — "
+                "вызывай %s с параметром model" % (", ".join(same), REVIEWER)]
+    return []
 
 
 def main():

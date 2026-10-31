@@ -38,6 +38,17 @@
           }
         ]
       }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "WebFetch|WebSearch",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "sh -c 'for d in \"$CLAUDE_PROJECT_DIR\" \"$(git rev-parse --show-toplevel 2>/dev/null)\" \"$PWD\"; do f=\"$d/scripts/hooks/web_flag.py\"; [ -n \"$d\" ] && [ -f \"$f\" ] && exec python3 \"$f\"; done; exit 0'"
+          }
+        ]
+      }
     ]
   }
 }
