@@ -188,6 +188,8 @@ def required(task):
         if cond == "rehearsal" and not modes(tz)["rehearsal"]:
             continue
         out.append((role, art))
+    if kind == "гипотезы" and prof.get("run") == "solo":
+        out = [("light-run", art) for _, art in out]  # один агент пишет все артефакты типа
     return kind, out
 
 
@@ -391,8 +393,14 @@ def cmd_ready(task):
         checks = [c for c in checks if c[0] != "audit_sample.py"]
     if prof["generation"] == "narrow" or prof.get("forecast", "on") != "on":
         checks = [c for c in checks if c[0] not in ("check_forecast.py", "check_ideas.py")]
+    if kind != "вердикты по проверке":
+        checks.append(("check_path.py", ["--tz"]))
+    if os.path.exists(os.path.join(task, "00k-knowledge.md")):
+        checks.append(("check_knowledge.py", []))
+    if os.path.exists(os.path.join(task, "numbers.csv")):
+        checks.append(("check_numbers.py", []))
     if prof["evidence"] != "quotes":
-        checks = [c for c in checks if c[0] != "check_quotes.py"]
+        checks = [c for c in checks if c[0] not in ("check_quotes.py", "check_numbers.py")]
     for script, args in checks:
         r = subprocess.run([sys.executable, os.path.join(HERE, script), task] + args, capture_output=True, text=True)
         if r.returncode:

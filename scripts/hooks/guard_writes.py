@@ -19,6 +19,10 @@
 Если в задаче заведён маршрут (tasks/<задача>/state.json, его пишет scripts/route.py), подагент пишет в папку задачи
 только артефакт идущего шага и маски --allow этого шага; шага нет — запись блокируется: route.py start перед вызовом.
 
+Для всех, включая основную сессию и режим правки системы: WebSearch, WebFetch и curl/trafilatura в Bash не уходят,
+если в запросе, адресе или команде есть e-mail, телефон, ИНН, паспорт или термин из private.txt / closed-web.txt
+любой задачи (scripts/check_private.py, web_leaks) — проверка до отправки, а не по логу после.
+
 Чтобы править саму систему, создай в корне пустой файл .polygon-dev (в git не попадает) и удали после.
 """
 import json
@@ -37,6 +41,39 @@ except Exception:  # хук не должен падать, если табли�
 
 def known_role(agent_type):
     return _roles is not None and agent_type in _roles.roles()
+
+
+def web_leak_reason(root, tool, ti):
+    """Закрытое во внешнем запросе (scripts/check_private.py, web_leaks) или None. Действует для всех, включая
+    основную сессию и режим правки системы: утечка одинакова, кто бы ни отправил."""
+    import re
+    try:
+        import check_private
+    except Exception:
+        return None
+    if tool == "WebSearch":
+        query, urls = ti.get("query", ""), list(ti.get("allowed_domains") or []) + list(ti.get("blocked_domains") or [])
+    elif tool == "WebFetch":
+        query, urls = ti.get("prompt", ""), [ti.get("url", "")]
+    else:
+        cmd = ti.get("command", "")
+        heads = []
+        for seg in re.split(r"&&|\|\||[;|\n]|\$\(", cmd):
+            words = seg.replace("(", " ").split()
+            while words and re.match(r"^[A-Z_][A-Z0-9_]*=", words[0]):
+                words = words[1:]
+            if words:
+                heads.append(os.path.basename(words[0]))
+                if heads[-1] in ("python3", "python") and "trafilatura" in words[1:4]:
+                    heads.append("trafilatura")
+        if not set(heads) & {"curl", "wget", "trafilatura"}:
+            return None
+        query, urls = "", [cmd]
+    found = check_private.web_leaks(root, query, urls)
+    if not found:
+        return None
+    return ("в запросе закрытое ({}). Замени описанием: «<категория> без названия», респондент — «Интервью N, "
+            "сегмент» (methodology/web-protocol.md, п. 2)").format("; ".join(found))
 
 
 def web_allowed(agent_type):
@@ -127,6 +164,11 @@ def main():
     if tool not in TOOLS and tool not in WEB_TOOLS and tool != "Bash":
         return 0
     root = project_root(data)
+    if tool in WEB_TOOLS or tool == "Bash":
+        leak = web_leak_reason(root, tool, data.get("tool_input") or {})
+        if leak:
+            sys.stderr.write("{} заблокирован: {}.\n".format(tool, leak))
+            return 2
     if os.path.exists(os.path.join(root, ".polygon-dev")):
         return 0
     agent_type = data.get("agent_type") or ""

@@ -18,11 +18,13 @@ O = os.path.join(ROOT, ".claude", "skills", "orchestrator")
 CHARS_PER_TOKEN = 2.6
 LIMITS = {"core": 15000, "route": 8000, "skill": 15000, "per_type": 35000}
 PER_TYPE = {
-    "разбор": ["routes/review.md", "routes/handoff.md"],
+    "разбор": ["routes/review.md", "routes/subject-model.md", "routes/handoff.md"],
     "гипотезы, план проверки, ТЗ на доработку": ["routes/hypotheses.md", "routes/sources.md", "routes/forecast.md",
-                                                 "routes/handoff.md"],
-    "валидация": ["routes/validation.md", "routes/sources.md", "routes/handoff.md"],
-    "исследование": ["routes/research.md", "routes/sources.md", "routes/forecast.md", "routes/handoff.md"],
+                                                 "routes/meaning.md", "routes/subject-model.md", "routes/handoff.md"],
+    "валидация": ["routes/validation.md", "routes/sources.md", "routes/meaning.md", "routes/subject-model.md",
+                  "routes/handoff.md"],
+    "исследование": ["routes/research.md", "routes/sources.md", "routes/forecast.md", "routes/meaning.md",
+                     "routes/subject-model.md", "routes/handoff.md"],
     "вердикты по проверке": ["routes/results.md", "routes/handoff.md"],
 }
 
