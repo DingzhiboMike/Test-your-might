@@ -10,6 +10,7 @@ body{font-family:Inter,"SF Pro Text",-apple-system,"Helvetica Neue",Arial,sans-s
 .flow{display:flex;align-items:center}
 .b{height:32px;border:1.5px solid var(--line);border-radius:5px;background:var(--box);display:flex;align-items:center;justify-content:center;text-align:center;font-size:11.5px;line-height:1.15;padding:0 6px;width:96px;flex:none}
 .b.w{width:118px}
+.lbl{line-height:1.2}
 .t{border-color:var(--teal);background:var(--tealbg)}
 .o{border-color:var(--or);background:var(--orbg);color:var(--or);font-weight:600}
 .n{border-color:var(--teal);color:#bfeee0}
@@ -25,10 +26,13 @@ body{font-family:Inter,"SF Pro Text",-apple-system,"Helvetica Neue",Arial,sans-s
 <div class="b t">Консультант</div><div class="a"></div><div class="b o">финиш</div></div></div>
 
 <div class="row"><div class="lbl">Гипотезы</div><div class="flow">
-<div class="b t">Консультант</div><div class="a"></div><div class="b n">Линзы</div><div class="a"></div><div class="b">Генератор</div><div class="a"></div><div class="b">Проверка<br>по сути</div><div class="a"></div><div class="b n">Нострадамус<br>· отсев</div><div class="a"></div><div class="b">Позиция</div><div class="a"></div><div class="b o">Бэклог тестов</div></div></div>
+<div class="b t">Консультант</div><div class="a"></div><div class="b n d">Линзы</div><div class="a"></div><div class="b">Генератор</div><div class="a"></div><div class="b">Проверка<br>по сути</div><div class="a"></div><div class="b n">Нострадамус<br>· отсев</div><div class="a"></div><div class="b">Позиция</div><div class="a"></div><div class="b o">Бэклог тестов</div></div></div>
+
+<div class="row"><div class="lbl">Гипотезы · лёгкий</div><div class="flow">
+<div class="b n" style="width:578px">Один проход light-run: разбор → гипотезы → проверка по сути (не независимая) → позиция</div><div class="a"></div><div class="b o">Бэклог тестов</div></div></div>
 
 <div class="row"><div class="lbl">План проверки</div><div class="flow">
-<div class="b t">Консультант</div><div class="a"></div><div class="b n">Линзы</div><div class="a"></div><div class="b">Генератор</div><div class="a"></div><div class="b">Проверка<br>по сути</div><div class="a"></div><div class="b n">Нострадамус<br>· отсев</div><div class="a"></div><div class="b">Планировщик</div><div class="a"></div><div class="b o">Набор проверки</div></div></div>
+<div class="b t">Консультант</div><div class="a"></div><div class="b n d">Линзы</div><div class="a"></div><div class="b">Генератор</div><div class="a"></div><div class="b">Проверка<br>по сути</div><div class="a"></div><div class="b n">Нострадамус<br>· отсев</div><div class="a"></div><div class="b">Планировщик</div><div class="a"></div><div class="b o">Набор проверки</div></div></div>
 
 <div class="row"><div class="lbl">Валидация</div><div class="flow">
 <div class="b t">Консультант</div><div class="a"></div><div class="b">Проверка<br>по сути</div><div class="a"></div><div class="b">Усиление</div><div class="a"></div><div class="b">Методы</div><div class="a"></div><div class="b o w">Документ валидации</div></div></div>
@@ -40,17 +44,17 @@ body{font-family:Inter,"SF Pro Text",-apple-system,"Helvetica Neue",Arial,sans-s
 <div class="b t">Консультант</div><div class="a"></div><div class="b">Источники</div><div class="a"></div><div class="b n">Нострадамус<br>· отсев</div><div class="a"></div><div class="b">Отчёт</div><div class="a"></div><div class="b o">Проверка смысла</div></div></div>
 
 <div class="row"><div class="lbl">ТЗ на доработку</div><div class="flow">
-<div class="b t">Консультант</div><div class="a"></div><div class="b n">Линзы</div><div class="a"></div><div class="b">Генератор</div><div class="a"></div><div class="b">Проверка<br>по сути</div><div class="a"></div><div class="b n">Нострадамус<br>· отсев</div><div class="a"></div><div class="b">Позиция</div><div class="a"></div><div class="b o">Писатель брифа</div></div></div>
+<div class="b t">Консультант</div><div class="a"></div><div class="b n d">Линзы</div><div class="a"></div><div class="b">Генератор</div><div class="a"></div><div class="b">Проверка<br>по сути</div><div class="a"></div><div class="b n">Нострадамус<br>· отсев</div><div class="a"></div><div class="b">Позиция</div><div class="a"></div><div class="b o">Писатель брифа</div></div></div>
 
 <div class="notes">
-Типичный ход, не жёсткий порядок; оранжевая рамка — финиш. Перед консультантом, кроме «Вердиктов», — досье документов и модель предмета (разбор материалов, если карты нет).<br>
-<span class="leg"></span><b>Линзы</b> — до генератора: когда (путь клиента), вместо нас (альтернативы), кто (портрет ЦА), что болит (боли рынка); «зову» или «не нужно» с причиной.<br>
+Типичный ход, не жёсткий порядок; оранжевая рамка — финиш. Перед консультантом, кроме «Вердиктов», — разбор материалов; на строгом уровне при 8 документах и больше — досье документов и модель предмета.<br>
+<span class="leg" style="border-style:dashed"></span><b>Линзы</b> — по умолчанию выключены; 1–3 включает строка РЕЖИМ в ТЗ. До генератора: когда (путь клиента), вместо нас (альтернативы), кто (портрет ЦА), что болит (боли рынка).<br>
 Остальные источники данных подключаются вбок в любой строке, кроме «Разбор» и «Вердикты», — если без них шаг будет гадать. Ключевой вопрос с ответом в сети без поиска не сдаётся, пока есть бюджет.<br>
 <span class="leg"></span><b>Нострадамус · отсев</b> — лучшая версия по каждому ключевому вопросу всегда; новые идеи и их отсев — если ты их попросил или все вердикты «сузить / не держится»; в сдачу — не больше ёмкости + 1.<br>
 Позиция — итоговая позиция консультанта по текущему раунду: что запускать, на что ставить, с какой уверенностью. Бэклог — не больше ёмкости + 1 тестов.<br>
 Валидация: идея → утверждения; по каждому — подтверждается, опровергается или нет данных (версии и что их различит).<br>
 Вердикты: * только для гипотез с вердиктом «переформулировать»; консультант не зовётся — задачу он оценивал в исходном прогоне.<br>
 Проверка смысла — по проверке по сути, итоговому документу и источнику по главному вопросу. Перед финишем всех строк, кроме «Разбор» и «Вердикты», — выборочный аудит: три места на итоговый документ.<br>
-Пробный прогон (по ответу человека) — после набора проверки; его следствия правят бэклог или план до старта.<br>Уровень нагрузки (лёгкий · рабочий · строгий) задаёт профиль: у лёгкого одна линза, без Нострадамуса, проверки смысла и аудита; у рабочего две линзы и веб-сверка; у строгого всё по схеме, цитаты проверяются по тексту.
+Пробный прогон (по ответу человека) — после набора проверки; его следствия правят бэклог или план до старта.<br>Уровень нагрузки задаёт профиль: лёгкий — один проход одного агента, без веба, Нострадамуса, проверки смысла и аудита; рабочий — цепочка агентов, веб-сверка, Нострадамус; строгий — всё по схеме, цитаты проверяются по тексту, проверка смысла и аудит (reviewer: та же модель, другая или человек).
 </div>
 </body></html>
