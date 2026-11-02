@@ -6,6 +6,7 @@ SubagentStop. Если в задаче заведён маршрут (state.json
 check_fresh. Есть ошибки — один раз не даёт подагенту закончить и показывает их: исправить в том же контексте
 дешевле, чем перезапрос. Второй раз подряд (stop_hook_active) не блокирует: дальше решает route.py done.
 Пачки (артефакт — маска) не проверяются: в пачке файлы соседей ещё пишутся. С .polygon-dev хук молчит.
+Хук защитный и при сбое закрыт: исключение по ходу проверки — одна блокировка с причиной, на повторе пропуск.
 """
 import json
 import os
@@ -20,8 +21,9 @@ import trace_lib as tl  # noqa: E402
 def main():
     try:
         data = json.load(sys.stdin)
-    except Exception:
-        return 0
+    except Exception as e:
+        sys.stderr.write("Хук шага: вход не читается как JSON ({}) — остановка подагента заблокирована.\n".format(e))
+        return 2
     try:
         if data.get("hook_event_name") != "SubagentStop" or data.get("stop_hook_active"):
             return 0
@@ -51,8 +53,12 @@ def main():
         if out:
             sys.stderr.write("Артефакт %s не прошёл проверки — исправь его и закончи снова:\n\n%s\n" % (art, "\n\n".join(out)))
             return 2
-    except Exception:
-        return 0
+    except Exception as e:
+        if data.get("stop_hook_active"):
+            return 0
+        sys.stderr.write("Хук шага упал ({}: {}) — проверки артефакта не прошли. Прогони сам "
+                         "python3 scripts/check_step.py tasks/<задача> <артефакт> --since <время> и закончи снова.\n".format(type(e).__name__, e))
+        return 2
     return 0
 
 

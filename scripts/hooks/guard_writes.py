@@ -24,6 +24,9 @@
 любой задачи (scripts/check_private.py, web_leaks) — проверка до отправки, а не по логу после.
 
 Чтобы править саму систему, создай в корне пустой файл .polygon-dev (в git не попадает) и удали после.
+
+Хук защитный и при сбое закрыт: нечитаемый вход, не загрузившаяся таблица ролей или проверка закрытого — блокировка
+с причиной, а не пропуск. Скрипт не найден или упал с исключением — блокирует команда в .claude/settings.json (код 2).
 """
 import json
 import os
@@ -35,7 +38,7 @@ WEB_TOOLS = {"WebSearch", "WebFetch"}
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 try:
     import roles as _roles
-except Exception:  # хук не должен падать, если таблицы нет
+except Exception:  # таблицы нет — правила подагентов не проверить, и хук их блокирует (bash_reason, web_allowed)
     _roles = None
 
 
@@ -47,10 +50,6 @@ def web_leak_reason(root, tool, ti):
     """Закрытое во внешнем запросе (scripts/check_private.py, web_leaks) или None. Действует для всех, включая
     основную сессию и режим правки системы: утечка одинакова, кто бы ни отправил."""
     import re
-    try:
-        import check_private
-    except Exception:
-        return None
     if tool == "WebSearch":
         query, urls = ti.get("query", ""), list(ti.get("allowed_domains") or []) + list(ti.get("blocked_domains") or [])
     elif tool == "WebFetch":
@@ -69,6 +68,10 @@ def web_leak_reason(root, tool, ti):
         if not set(heads) & {"curl", "wget", "trafilatura"}:
             return None
         query, urls = "", [cmd]
+    try:
+        import check_private
+    except Exception as e:
+        return "scripts/check_private.py не загрузился ({}) — закрытое в запросе не проверить".format(e)
     found = check_private.web_leaks(root, query, urls)
     if not found:
         return None
@@ -77,6 +80,8 @@ def web_leak_reason(root, tool, ti):
 
 
 def web_allowed(agent_type):
+    if _roles is None:
+        return False
     return not known_role(agent_type) or agent_type in _roles.WEB
 
 
@@ -84,7 +89,7 @@ def bash_reason(cmd, agent_type):
     """Причина запрета команды подагента или None."""
     import re
     if _roles is None:
-        return None
+        return "таблица ролей scripts/roles.py не загрузилась — права исполнителя не проверить"
     text = re.sub(r"'[^']*'", "''", cmd)
     text = re.sub(r'"(?:[^"\\]|\\.)*"', "''", text)
     text = re.sub(r"\d?>>?\s*/dev/null|2>&1|>&2", " ", text)
@@ -158,8 +163,9 @@ def project_root(data):
 def main():
     try:
         data = json.load(sys.stdin)
-    except Exception:
-        return 0
+    except Exception as e:
+        sys.stderr.write("Хук записи: вход не читается как JSON ({}) — действие заблокировано.\n".format(e))
+        return 2
     tool = data.get("tool_name")
     if tool not in TOOLS and tool not in WEB_TOOLS and tool != "Bash":
         return 0
@@ -174,7 +180,8 @@ def main():
     agent_type = data.get("agent_type") or ""
     if tool in WEB_TOOLS:
         if data.get("agent_id") and not web_allowed(agent_type):
-            sys.stderr.write("{} заблокирован: у роли {} нет доступа к сети (scripts/roles.py).\n".format(tool, agent_type))
+            why = "у роли {} нет доступа к сети".format(agent_type) if _roles is not None else "таблица ролей не загрузилась"
+            sys.stderr.write("{} заблокирован: {} (scripts/roles.py).\n".format(tool, why))
             return 2
         return 0
     if tool == "Bash":
