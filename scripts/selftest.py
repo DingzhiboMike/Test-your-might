@@ -672,7 +672,7 @@ def audit_tests(root):
     expect("аудит: проверка смысла на той же модели, что и автор, — ошибка", r.returncode == 1 and "той же модели" in r.stdout, r.stdout)
     trace([("hypothesis-validator", "claude-sonnet-5-5"), ("brief-writer", "claude-haiku-5-5"), ("meaning-review", "claude-opus-5-5")])
     r = run([au, d, "--check"])
-    expect("аудит: проверка смысла на другом семействе — проходит", r.returncode == 0, r.stdout)
+    expect("аудит: проверка смысла на другой модели — проходит", r.returncode == 0, r.stdout)
     rep([{"артефакт": a, "строка": n, "оценка": ("нерепрезентативно", "частично", "держит")[i], "почему": "про другой рынок"}
          for i, (a, n) in enumerate(marks)])
     open(os.path.join(d, "state.json"), "w", encoding="utf-8").write(json.dumps({"profile": {"reviewer": "same"}}))
