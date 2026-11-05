@@ -10,6 +10,8 @@
 (stop_hook_active), чтобы не было петли: решение, что делать с оставшимися ошибками, за человеком.
 
 С файлом .polygon-dev в корне хук молчит.
+
+Хук защитный и при сбое закрыт: нет scripts/check_quotes.py или проверка упала — это ошибка, а не чистый результат.
 """
 import json
 import os
@@ -36,9 +38,17 @@ def recent_tasks(root):
 
 
 
+def crashed(name, r):
+    """Проверка упала, а не нашла ошибки: код не 0/1 или трассировка в stderr. Сбой — тоже незакрытое."""
+    if r.returncode in (0, 1) and "Traceback" not in r.stderr:
+        return []
+    tail = (r.stderr.strip().splitlines() or ["код %d" % r.returncode])[-1]
+    return ["- ОШИБКА: проверка %s упала: %s" % (name, tail[:300])]
+
+
 def project_root(data):
     """Корень проекта. CLAUDE_PROJECT_DIR бывает пустым или устаревшим после смены папки в сессии, поэтому сначала —
-    рабочая папка сессии из события хука и её git-корень, потом переменная, потом текущая папка."""
+    рабочая папка сессии из события хука и её git-корень, потом переменная, потом папка самого хука."""
     import subprocess
     candidates = []
     cwd = data.get("cwd")
@@ -55,7 +65,7 @@ def project_root(data):
     env = os.environ.get("CLAUDE_PROJECT_DIR", "")
     if env and os.path.isdir(env):
         return env
-    return os.getcwd()
+    return os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 def main():
     try:
@@ -70,7 +80,9 @@ def main():
     script = os.path.join(root, "scripts", "check_quotes.py")
     nscript = os.path.join(root, "scripts", "check_numbers.py")
     if not os.path.exists(script):
-        return 0
+        sys.stderr.write("Стоп-хук: нет {} — цитаты не проверить, окончание ответа заблокировано. "
+                         "Восстанови scripts/ (git checkout -- scripts) или открой сессию в корне проекта.\n".format(script))
+        return 2
 
     problems = []
     sys.path.insert(0, os.path.join(root, "scripts"))
@@ -83,16 +95,19 @@ def main():
             continue  # профиль прогона: опоры не строгие — цитаты и числа не блокируют
         lines = []
         r = subprocess.run([sys.executable, script, task], capture_output=True, text=True, cwd=root)
+        lines += crashed("check_quotes.py", r)
         if r.returncode == 1:
             lines += [l for l in r.stdout.splitlines() if l.startswith("- ОШИБКА") or l.startswith("## ")]
         if os.path.exists(nscript) and os.path.exists(os.path.join(task, "numbers.csv")):
             r2 = subprocess.run([sys.executable, nscript, task], capture_output=True, text=True, cwd=root)
+            lines += crashed("check_numbers.py", r2)
             if r2.returncode == 1:
                 body = r2.stdout.split("## Ошибки", 1)[1].split("##", 1)[0] if "## Ошибки" in r2.stdout else ""
                 lines += ["числа:" + l[1:] for l in body.splitlines() if l.startswith("- ") and "нет" != l[2:].strip()]
         pscript = os.path.join(root, "scripts", "check_private.py")
         if os.path.exists(pscript):
             r3 = subprocess.run([sys.executable, pscript, task], capture_output=True, text=True, cwd=root)
+            lines += crashed("check_private.py", r3)
             if r3.returncode == 1:
                 body = r3.stdout.split("## Ошибки", 1)[1].split("##", 1)[0] if "## Ошибки" in r3.stdout else ""
                 lines += ["персональные данные:" + l[1:] for l in body.splitlines() if l.startswith("- ") and l[2:].strip() != "нет"]

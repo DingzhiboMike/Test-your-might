@@ -1827,7 +1827,7 @@ def main():
         os.remove(stem_art)
         os.remove(os.path.join(task, "private.txt"))
 
-        # --- хуки не блокируют всё, если скрипта нет; блокируют, когда он есть ---
+        # --- защитные хуки при сбое закрыты: скрипта нет или он упал — блокировка; учётные — открыты ---
         import json as _json
         cfg = _json.load(open(os.path.join(os.path.dirname(HERE), ".claude", "settings.json"), encoding="utf-8"))
         proj = tempfile.mkdtemp(prefix="polygon-hooks-")
@@ -1836,17 +1836,46 @@ def main():
             shutil.copy(os.path.join(HERE, "hooks", hn), os.path.join(proj, "scripts", "hooks", hn))
         pre_cmd = cfg["hooks"]["PreToolUse"][0]["hooks"][0]["command"]
         stop_cmd = cfg["hooks"]["Stop"][0]["hooks"][0]["command"]
+        trace_cmd = cfg["hooks"]["Stop"][0]["hooks"][1]["command"]
+        gate_cmd = cfg["hooks"]["SubagentStop"][0]["hooks"][1]["command"]
+        expect("настройки: хуки стоят на своих местах", "trace.py" in trace_cmd and "step_gate.py" in gate_cmd
+               and "stop_check.py" in stop_cmd and "guard_writes.py" in pre_cmd)
         forbidden = _json.dumps({"tool_name": "Write", "tool_input": {"file_path": "methodology/x.md"}})
         empty = tempfile.mkdtemp(prefix="polygon-empty-")
-        lost = subprocess.run(["sh", "-c", pre_cmd], input=forbidden, capture_output=True, text=True, cwd=empty,
-                              env=dict(os.environ, CLAUDE_PROJECT_DIR="/нет/такой/папки"))
-        expect("хук записи: скрипта нет — запись не блокируется", lost.returncode == 0, lost.stderr)
-        lost2 = subprocess.run(["sh", "-c", stop_cmd], input="{}", capture_output=True, text=True, cwd=empty,
-                               env=dict(os.environ, CLAUDE_PROJECT_DIR="/нет/такой/папки"))
-        expect("стоп-хук: скрипта нет — ответ не блокируется", lost2.returncode == 0, lost2.stderr)
-        found = subprocess.run(["sh", "-c", pre_cmd], input=forbidden, capture_output=True, text=True, cwd=empty,
-                               env=dict(os.environ, CLAUDE_PROJECT_DIR=proj))
+
+        def sh(cmd, payload, cwd=empty, project="/нет/такой/папки"):
+            return subprocess.run(["sh", "-c", cmd], input=payload, capture_output=True, text=True, cwd=cwd,
+                                  env=dict(os.environ, CLAUDE_PROJECT_DIR=project))
+        lost = sh(pre_cmd, forbidden)
+        expect("хук записи: скрипта нет — действие блокируется с подсказкой про корень проекта",
+               lost.returncode == 2 and "не найден" in lost.stderr and "AGENTS.md" in lost.stderr, lost.stderr)
+        lost2 = sh(stop_cmd, "{}")
+        expect("стоп-хук: скрипта нет — окончание ответа блокируется", lost2.returncode == 2, lost2.stderr)
+        again = sh(stop_cmd, _json.dumps({"stop_hook_active": True}))
+        expect("стоп-хук: скрипта нет, повторная остановка — без петли", again.returncode != 2,
+               again.stderr)
+        lost3 = sh(gate_cmd, _json.dumps({"hook_event_name": "SubagentStop", "stop_hook_active": False}))
+        expect("хук шага: скрипта нет — остановка подагента блокируется", lost3.returncode == 2, lost3.stderr)
+        lost4 = sh(trace_cmd, "{}")
+        expect("хук трассы: скрипта нет — не блокирует (учётный, открыт при сбое)", lost4.returncode == 0, lost4.stderr)
+        found = sh(pre_cmd, forbidden, project=proj)
         expect("хук записи: скрипт на месте — запись в систему блокируется", found.returncode == 2, found.stderr)
+        allowed = sh(pre_cmd, _json.dumps({"tool_name": "Write", "tool_input": {"file_path": "tasks/demo/02-h.md"}}), project=proj)
+        expect("хук записи: скрипт на месте — артефакт пишется", allowed.returncode == 0, allowed.stderr)
+        broken = os.path.join(proj, "scripts", "hooks", "guard_writes.py")
+        shutil.copy(broken, broken + ".ok")
+        src = open(broken, encoding="utf-8").read()
+        open(broken, "w", encoding="utf-8").write(src.replace("\ndef main():\n", "\ndef main():\n    raise RuntimeError('сломан')\n", 1))
+        crash = sh(pre_cmd, _json.dumps({"tool_name": "Write", "tool_input": {"file_path": "tasks/demo/02-h.md"}}), project=proj)
+        expect("хук записи: исключение в скрипте — действие блокируется", crash.returncode == 2 and "упал" in crash.stderr, crash.stderr)
+        open(os.path.join(proj, ".polygon-dev"), "w").close()
+        crash_dev = sh(pre_cmd, _json.dumps({"tool_name": "Write", "tool_input": {"file_path": "scripts/hooks/guard_writes.py"}}), project=proj)
+        expect("хук записи: исключение в режиме правки системы — не блокирует, хук можно починить",
+               crash_dev.returncode == 1, crash_dev.stderr)
+        os.remove(os.path.join(proj, ".polygon-dev"))
+        os.replace(broken + ".ok", broken)
+        bad_in = subprocess.run([PY, broken], input="не json", capture_output=True, text=True)
+        expect("хук записи: нечитаемый вход — блокировка", bad_in.returncode == 2, bad_in.stderr)
         open(os.path.join(proj, "AGENTS.md"), "w", encoding="utf-8").write("# проект\n")
         no_env = {k: v for k, v in os.environ.items() if k != "CLAUDE_PROJECT_DIR"}
         found2 = subprocess.run(["sh", "-c", pre_cmd], input=forbidden, capture_output=True, text=True, cwd=proj,
