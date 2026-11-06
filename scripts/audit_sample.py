@@ -33,7 +33,8 @@ FAMILIES = ("opus", "sonnet", "haiku", "fable")
 REVIEWER = "meaning-review"
 OPEN = ("частично", "не держит", "нерепрезентативно", "подогнано")  # незакрытое: в сдачу, человеку
 
-ARTIFACTS = ("02c-validation.md", "02g-ideas-check.md", "03-backlog.md", "06-research.md", "06-validation.md")
+ARTIFACTS = ("02c-validation.md", "02g-ideas-check.md", "03-backlog.md", "06-research.md", "06-validation.md",
+             "06-directions.md")
 PER_ARTIFACT = 3
 LIGHT_ROLES = ("document-mapper", "brief-writer", "test-kit")  # механическая раскладка, выводов не пишут
 PLACE = re.compile(r"«[^»]{8,}»\s*\[(?:F-\d+|A)|^\s*Вердикт\s*:|^\|\s*\d+\s*\|", re.M)

@@ -9,6 +9,8 @@
 - check_fresh.py — старые веб-источники в артефакте стоят с годом в тексте;
 - check_private.py — по задаче;
 - check_numbers.py — по задаче, если есть numbers.csv;
+- check_concrete.py --step — если шаг пишет 02c-validation.md (в том числе одиночный проход light-run): у «сузить»,
+  «нет данных», «не держится» есть версия и путь к ответу;
 - trace_summary.py --since — строка «Расход: …» за шаг из трассы (хук scripts/hooks/trace.py).
 
 Печатает строку «Проверки: …» — её и пиши в лог. У check_quotes в строке счётчики: цитат, без id, источников,
@@ -62,6 +64,10 @@ def main():
     checks.append(("check_private", run("check_private.py", [task])))
     if os.path.exists(os.path.join(task, "numbers.csv")):
         checks.append(("check_numbers", run("check_numbers.py", [task])))
+    c02 = os.path.join(task, "02c-validation.md")
+    since_ = float(rest[rest.index("--since") + 1]) if "--since" in rest else 0
+    if "02c-validation.md" in files or "06-directions.md" in files or (os.path.exists(c02) and os.path.getmtime(c02) >= since_ > 0):
+        checks.append(("check_concrete", run("check_concrete.py", [task, "--step"])))
 
     parts = []
     for n, (code, last, out) in checks:

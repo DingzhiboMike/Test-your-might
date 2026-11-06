@@ -37,6 +37,9 @@ AGENTS_SECTIONS = ("## Принципы", "## Правила", "## Правил�
 # Типы выхода, которых касается файл маршрута; ядро и AGENTS.md — всех.
 SCOPE = {
     "routes/hypotheses.md": ("гипотезы", "план проверки", "ТЗ на доработку"),
+    "routes/rehearsal.md": ("гипотезы", "план проверки", "ТЗ на доработку"),
+    "routes/refinement.md": ("ТЗ на доработку",), "routes/plan.md": ("план проверки",),
+    "routes/directions.md": ("карта направлений",),
     "routes/forecast.md": ("гипотезы", "план проверки", "ТЗ на доработку", "исследование"),
     "routes/validation.md": ("валидация",), "routes/research.md": ("исследование",),
     "routes/results.md": ("вердикты по проверке",), "routes/review.md": ("разбор",),

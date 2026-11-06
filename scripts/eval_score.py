@@ -15,7 +15,10 @@
 - противоречие исходу — абзацы с шаблоном из outcome.contradicts;
 - причинные выводы без опоры — абзацы с причинным словом (из-за, потому что, приводит к…), где независимых корней
   опор (реестр, как в check_quotes.py) меньше key.causal_min_roots (по умолчанию 2);
-- завышенная уверенность — абзацы с «уверенность: высокая», где корней меньше трёх (web-protocol.md, п. 4).
+- завышенная уверенность — абзацы с «уверенность: высокая», где корней меньше трёх (web-protocol.md, п. 4);
+- применимость сдачи — доля пунктов `08-handoff.md` без тупика (вывод «не измерено / сужено / не верю» без версии
+  и шага, очередь без условия возврата) — те же правила, что check_concrete.py (R-077);
+- сужения без версии — гипотезы «сузить / нет данных / не держится» в `02c-validation.md` без «Скорее» и пути к ответу.
 Оценку эксперта скрипт не ставит: её передают флагом --expert, она пишется в отчёт рядом с метриками.
 
 Отчёт — evals/results/<кейс>--<папка задачи>.md (в git не попадает; другая папка — --out <папка>). Код возврата 0 — это измерение, а не проверка
@@ -31,9 +34,10 @@ import sys
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, HERE)
 from check_quotes import QUOTE_RE, load_registry, root_of  # noqa: E402
+import check_concrete as cc  # noqa: E402
 
 ARTIFACTS = ("02c-validation.md", "02d-validation2.md", "02e-position.md", "02f-forecast.md", "02g-ideas-check.md",
-             "03-backlog.md", "06-research.md", "06-validation.md", "07*.md", "08-handoff.md")
+             "03-backlog.md", "06-research.md", "06-validation.md", "06-directions.md", "07*.md", "08-handoff.md")
 CAUSAL = (r"\bиз-за\b|\bпотому что\b|\bприводит к\b|\bпривел\w* к\b|\bвызван\w*\b|\bв результате\b|\bблагодаря\b"
           r"|\bbecause\b|\bdue to\b|\bleads? to\b|\bcaused\b")
 HIGH = re.compile(r"уверенност\w*\s*[:—-]?\s*высок", re.I)
@@ -106,13 +110,22 @@ def score(task, case, expert="", rdir=None):
     high = [p for p in paras if HIGH.search(p[2])]
     over = [p for p in high if len(roots(p[2], reg)) < 3]
 
+    hand = cc.read(os.path.join(task, "08-handoff.md"))
+    units = cc.handoff_units(hand) if hand else []
+    dead = cc.check_handoff(hand) if hand else []
+    val = cc.read(os.path.join(task, "02c-validation.md"))
+    n_hyp, hyp_err = cc.check_hypotheses(val) if val and cc.hypotheses(val) else (0, [])
+    hyp_bad = len({e.split(":")[0] for e in hyp_err})
     must_hit = sum(1 for _, h in res["must"] if h)
     m = {"полнота": "%d из %d" % (must_hit, len(res["must"])),
          "ловушки": sum(1 for _, h in res["traps"] if h),
          "неприемлемые рекомендации": sum(1 for _, h in res["forbidden"] if h),
          "противоречие исходу": len(contra),
          "причинные выводы без опоры": "%d из %d" % (len(weak), len(causal)),
-         "завышенная уверенность": "%d из %d" % (len(over), len(high))}
+         "завышенная уверенность": "%d из %d" % (len(over), len(high)),
+         "применимость сдачи": ("%d%% (тупиков %d из %d пунктов)" % (round(100 * (len(units) - len(dead)) / len(units)),
+                                                                   len(dead), len(units)) if units else "сдачи нет"),
+         "сужения без версии": "%d из %d" % (hyp_bad, n_hyp)}
     out = ["# Оценка прогона: %s · %s" % (os.path.basename(case.rstrip("/")), os.path.basename(task.rstrip("/"))), "",
            "Дата: %s. Абзацев в итоговых артефактах: %d." % (datetime.date.today().isoformat(), len(paras)), "",
            "| Метрика | Значение |", "| --- | --- |"]
@@ -132,6 +145,10 @@ def score(task, case, expert="", rdir=None):
         out += ["", "## Причинные выводы, где опор меньше %d независимых" % need, "- " + where(weak)]
     if over:
         out += ["", "## «Уверенность: высокая» меньше чем на трёх корнях", "- " + where(over)]
+    if dead:
+        out += ["", "## Тупики в сдаче"] + ["- " + e.replace("08-handoff.md, ", "") for e in dead]
+    if hyp_err:
+        out += ["", "## Сужения без версии"] + ["- " + e for e in hyp_err]
     report = "\n".join(out) + "\n"
     rdir = rdir or os.path.join(os.path.dirname(HERE), "evals", "results")
     os.makedirs(rdir, exist_ok=True)

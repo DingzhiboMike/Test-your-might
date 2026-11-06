@@ -83,7 +83,7 @@ def ideas_required(task):
 
 def output_type(tz):
     v = tz_field(tz, "ТИП ВЫХОДА").lower()
-    found = [t for t in CHECKED + ("разбор", "валидация", "вердикты по проверке") if t.lower() in v]
+    found = [t for t in CHECKED + ("разбор", "валидация", "вердикты по проверке", "карта направлений") if t.lower() in v]
     return found[0] if len(found) == 1 else None
 
 
