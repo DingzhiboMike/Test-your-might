@@ -452,6 +452,53 @@ def effort_tests(root):
     expect("усилие: валидация не проверяется", r.returncode == 0 and "не из проверяемых" in r.stdout, r.stdout)
 
 
+def concrete_tests(root):
+    cc = os.path.join(HERE, "check_concrete.py")
+    d = os.path.join(root, "tasks", "conc")
+    os.makedirs(d)
+    write = lambda name, t: open(os.path.join(d, name), "w", encoding="utf-8").write(t)
+    r = run([cc, d])
+    expect("конкретика: без файлов проверять нечего", r.returncode == 0 and "нечего" in r.stdout, r.stdout)
+    good = ("У-1 — Владельцы кофеен сверяют остатки вручную  [ключевой]\n"
+            "Исход:        нет данных\nИз контекста: в контексте нет\n"
+            "Версии:          А — сверяют вручную; Б — уже есть учётная программа\n"
+            "Что косвенно за каждую: А — оценка; Б — оценка\n"
+            "Что каждая значит для идеи: если А — идея работает; если Б — нет\n"
+            "Скорее:          А — сверяют вручную; уверенность низкая; потому что оценка\n"
+            "Что даст ответ:  если будет доля точек с учётной программой — станет ясно, А или Б\n"
+            "Где посмотреть:  у вас — выгрузка заявок с полем «чем считаете»; открыто — отзывы на учётные программы; "
+            "живая проверка — 10 звонков с одним вопросом\n\n"
+            "У-2 — Сверка занимает час в неделю\nИсход:        подтверждается\n")
+    write("02c-validation.md", good)
+    r = run([cc, d])
+    expect("конкретика: полный блок проходит", r.returncode == 0, r.stdout)
+    write("02c-validation.md", good.replace("Скорее:          А — сверяют вручную; уверенность низкая; потому что оценка",
+                                            "Скорее:          не различимы"))
+    r = run([cc, d])
+    expect("конкретика: «не различимы» в «Скорее» — поймано", r.returncode == 1 and "отказ" in r.stdout, r.stdout)
+    write("02c-validation.md", good.replace("уверенность низкая; ", ""))
+    r = run([cc, d])
+    expect("конкретика: «Скорее» без уверенности — поймано", r.returncode == 1 and "уверенност" in r.stdout, r.stdout)
+    write("02c-validation.md", good.replace("открыто — отзывы на учётные программы; ", ""))
+    r = run([cc, d])
+    expect("конкретика: нет ступени «открыто» — поймано", r.returncode == 1 and "открыто" in r.stdout and "У-2" not in r.stdout, r.stdout)
+    write("02c-validation.md", re.sub(r"Что даст ответ:.*\n", "", good))
+    r = run([cc, d])
+    expect("конкретика: нет «Что даст ответ» — поймано", r.returncode == 1 and "Что даст ответ" in r.stdout, r.stdout)
+    write("02c-validation.md", good)
+    table = ("# Валидация\n\n## 2. Утверждения\n\n| Утверждение | Исход | Скорее | Опор |\n| --- | --- | --- | --- |\n"
+             "| Сверяют вручную | нет данных | %s | 0 / 0 |\n| Час в неделю | подтверждается | — | 2 / 0 |\n")
+    write("06-validation.md", table % "сверяют вручную, уверенность низкая (оценка)")
+    r = run([cc, d])
+    expect("конкретика: таблица со «Скорее» проходит", r.returncode == 0, r.stdout)
+    write("06-validation.md", table % "нет данных")
+    r = run([cc, d])
+    expect("конкретика: отказ в столбце «Скорее» — пойман", r.returncode == 1 and "Сверяют вручную" in r.stdout, r.stdout)
+    write("06-validation.md", (table % "x").replace(" Скорее |", " Итог |"))
+    r = run([cc, d])
+    expect("конкретика: таблица без столбца «Скорее» — поймано", r.returncode == 1 and "столбца" in r.stdout, r.stdout)
+
+
 def knowledge_links_tests(root):
     ck = os.path.join(HERE, "check_knowledge.py")
     d = os.path.join(root, "tasks", "knl")
@@ -1979,6 +2026,7 @@ def main():
         message_tests()
         polygon_more_tests(root)
         effort_tests(root)
+        concrete_tests(root)
         knowledge_tests(root)
         map_tests(root)
         model_tests(root)
