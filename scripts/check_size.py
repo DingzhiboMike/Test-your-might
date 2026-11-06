@@ -16,16 +16,23 @@ import sys
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 O = os.path.join(ROOT, ".claude", "skills", "orchestrator")
 CHARS_PER_TOKEN = 2.6
-LIMITS = {"core": 15000, "route": 8000, "skill": 15000, "per_type": 35000}
+LIMITS = {"core": 15000, "route": 8000, "skill": 15000, "per_type": 33000}
 PER_TYPE = {
     "разбор": ["routes/review.md", "routes/subject-model.md", "routes/handoff.md"],
-    "гипотезы, план проверки, ТЗ на доработку": ["routes/hypotheses.md", "routes/sources.md", "routes/forecast.md",
-                                                 "routes/meaning.md", "routes/subject-model.md", "routes/handoff.md"],
+    "гипотезы": ["routes/hypotheses.md", "routes/sources.md", "routes/forecast.md", "routes/meaning.md",
+                 "routes/subject-model.md", "routes/handoff.md"],
+    "гипотезы + пробный прогон": ["routes/hypotheses.md", "routes/rehearsal.md", "routes/sources.md", "routes/forecast.md",
+                                  "routes/meaning.md", "routes/subject-model.md", "routes/handoff.md"],
+    "план проверки": ["routes/hypotheses.md", "routes/plan.md", "routes/rehearsal.md", "routes/sources.md",
+                      "routes/forecast.md", "routes/meaning.md", "routes/subject-model.md", "routes/handoff.md"],
+    "ТЗ на доработку": ["routes/hypotheses.md", "routes/refinement.md", "routes/sources.md", "routes/forecast.md",
+                        "routes/meaning.md", "routes/subject-model.md", "routes/handoff.md"],
     "валидация": ["routes/validation.md", "routes/sources.md", "routes/meaning.md", "routes/subject-model.md",
                   "routes/handoff.md"],
     "исследование": ["routes/research.md", "routes/sources.md", "routes/forecast.md", "routes/meaning.md",
                      "routes/subject-model.md", "routes/handoff.md"],
     "вердикты по проверке": ["routes/results.md", "routes/handoff.md"],
+    "карта направлений": ["routes/directions.md", "routes/sources.md", "routes/handoff.md"],
 }
 
 

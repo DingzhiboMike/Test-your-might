@@ -9,6 +9,8 @@
   python3 scripts/route.py status tasks/<папка>                         # продолжение после обрыва
   python3 scripts/route.py retry  tasks/<папка>                         # перезапрос: заново открыть последний шаг с ошибками (та же роль и артефакт)
   python3 scripts/route.py waive  tasks/<папка> <номер шага> <причина>   # принять упавший шаг с оговоркой (причина видна в готовности)
+  python3 scripts/route.py recheck tasks/<папка> <номер шага> <что поправлено>   # перепроверить упавший шаг после правки
+                                                                        # оркестратора, без нового шага и без исполнителя
   python3 scripts/route.py profile tasks/<папка> generation=wide evidence=links validation=logic data=public ceiling="8 вызовов, sonnet"
                                                                         # профиль прогона (выбирает оркестратор по ТЗ; нет профиля — всё строго, как в v1)
 
@@ -73,6 +75,8 @@ REQUIRED = {
                     [("research-report", "06-research.md", None), ("meaning-review", "review-06-research.md", None),
                      AUDIT],
     "вердикты по проверке": [("results-reviewer", "04-results.md", None)],
+    "карта направлений": [("b2b-consultant", "01-review.md", None), ("hypothesis-generator", "02-long-list.md", None),
+                          ("b2b-consultant", "06-directions.md", None)],
 }
 # Проверки готовности по типу: скрипт и аргументы после папки задачи.
 READY_CHECKS = {
@@ -84,13 +88,13 @@ READY_CHECKS = {
                       ("check_ideas.py", []), ("check_effort.py", []), ("check_rehearsal.py", [])],
     "ТЗ на доработку": [("check_path.py", []), ("check_log_sources.py", []), ("check_forecast.py", []),
                         ("check_ideas.py", []), ("check_readable.py", []), ("check_effort.py", [])],
-    "валидация": [("check_path.py", []), ("check_log_sources.py", []), ("check_readable.py", []),
-                  ("check_concrete.py", [])],
+    "валидация": [("check_path.py", []), ("check_log_sources.py", []), ("check_readable.py", [])],
+    "карта направлений": [("check_path.py", []), ("check_readable.py", [])],
     "исследование": [("check_path.py", []), ("check_log_sources.py", []), ("check_forecast.py", []),
                      ("check_ideas.py", []), ("check_effort.py", [])],
     "вердикты по проверке": [],
 }
-COMMON_CHECKS = [("check_quotes.py", []), ("check_private.py", [])]
+COMMON_CHECKS = [("check_quotes.py", []), ("check_private.py", []), ("check_concrete.py", [])]  # concrete: «нет данных» и тупики сдачи
 for _kind in ("гипотезы", "план проверки", "ТЗ на доработку", "валидация", "исследование"):
     READY_CHECKS[_kind].append(("audit_sample.py", ["--check"]))
 
@@ -288,6 +292,45 @@ def cmd_waive(task, n, reason):
     return 0
 
 
+def cmd_recheck(task, n, what):
+    """Перепроверка упавшего шага после правки оркестратора (ложное срабатывание проверки, строка лога, усечённая
+    цитата): проверки шага запускаются заново по тому же артефакту, без нового номера шага и без вызова исполнителя.
+    Прошли — шаг становится done, прежняя строка проверок и что поправлено сохраняются в state.json.
+    Ошибку периметра так не снять: исполнитель тронул чужой файл — это retry или waive."""
+    st = load(task)
+    if st is None:
+        print("Нет state.json: сначала python3 scripts/route.py init %s" % task)
+        return 1
+    step = next((s for s in st.get("steps", []) if s["n"] == n), None)
+    if step is None or step.get("status") != "failed" or superseded(st, step):
+        print("Шага %d с ошибками нет (или он уже снят перезапросом / waive)." % n)
+        return 1
+    if step.get("errors"):
+        print("У шага %d ошибка периметра (%s): перепроверка её не снимает — route.py retry или waive."
+              % (n, "; ".join(step["errors"])))
+        return 1
+    if len(what.strip()) < 15:
+        print("Нужно описание правки (не короче 15 знаков): что поправлено и почему проверка теперь должна пройти.")
+        return 2
+    r = subprocess.run([sys.executable, os.path.join(HERE, "check_step.py"), task, step["artifact"],
+                        "--since", str(step["started"]), "--allow", "*"], capture_output=True, text=True)
+    lines = [l for l in r.stdout.splitlines() if l.startswith(("Проверки:", "Расход:"))]
+    if r.returncode:
+        print("Шаг %d — перепроверка: ОШИБКИ остались" % n)
+        for l in lines:
+            print(l)
+        print("\n".join(l for l in r.stdout.splitlines() if not l.startswith(("Проверки:", "Расход:"))).strip())
+        return 1
+    step.setdefault("recheck", []).append({"ts": round(time.time()), "fixed": what.strip(),
+                                           "checks_before": step.get("checks", "")})
+    step.update(status="done", checks=lines[0] if lines else "")
+    save(task, st)
+    print("Шаг %d — %s: ок после перепроверки (%s)" % (n, step["role"], what.strip()))
+    for l in lines:
+        print(l)
+    return 0
+
+
 def cmd_start(task, role, artifact, allow):
     st = load(task)
     if st is None:
@@ -382,6 +425,8 @@ def cmd_ready(task):
     for s in running(st):
         errors.append("шаг %d (%s) не закрыт: route.py done" % (s["n"], s["role"]))
     for s in st.get("steps", []):
+        for rc in s.get("recheck", []):
+            print("Перепроверен после правки оркестратора: шаг %d (%s) — %s" % (s["n"], s["role"], rc["fixed"]))
         if s.get("status") == "failed":
             if s.get("waived"):
                 print("Принято с оговоркой: шаг %d (%s) — %s" % (s["n"], s["role"], s["waived"]))
@@ -459,6 +504,11 @@ def main():
             sys.stderr.write(__doc__)
             return 2
         return cmd_waive(task, int(a[2]), " ".join(a[3:]))
+    if cmd == "recheck":
+        if len(a) < 4 or not a[2].isdigit():
+            sys.stderr.write(__doc__)
+            return 2
+        return cmd_recheck(task, int(a[2]), " ".join(a[3:]))
     sys.stderr.write(__doc__)
     return 2
 

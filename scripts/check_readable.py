@@ -42,12 +42,13 @@ FILES = ("07a-analyst.md", "07b-editor.md", "07c-decisions.md")
 POSITION = "02e-position.md"
 VALIDATION = "06-validation.md"
 BACKLOG = "03-backlog.md"
+DIRECTIONS = "06-directions.md"
 HANDOFF = "08-handoff.md"
-LIGHT = (VALIDATION, BACKLOG, HANDOFF)
+LIGHT = (VALIDATION, BACKLOG, HANDOFF, DIRECTIONS)
 INTERNAL = re.compile(r"(?<![А-Яа-яA-Za-z])[ПУСD]-\d+\b")
 JARGON_VALIDATION = re.compile(r"слот\w*|развилк|гигиен|выводимост|\bGAP\b|валидатор|\bM\d{1,2}\s*·|\bD-\d+\b|рамк[аиуе]\b", re.I)
 LIMITS = {"07a-analyst.md": 1600, "07b-editor.md": 1600, "07c-decisions.md": 500, POSITION: 450, VALIDATION: 5000,
-          BACKLOG: 1500, HANDOFF: 900}
+          BACKLOG: 1500, HANDOFF: 900, DIRECTIONS: 1500}
 ID_PATTERNS = [
     ("номер гипотезы", re.compile(r"(?<![А-Яа-яA-Za-z])[ГгHh]-\d+[a-zа-я]?\b")),
     ("id источника или числа", re.compile(r"\[(?:F|N)-\d+\]")),
@@ -127,7 +128,7 @@ def main():
             errors.append("брифы лежат под чужим именем (%s): нужны 07a-analyst.md, 07b-editor.md, 07c-decisions.md, 07d-trace.md" % ", ".join(other))
     has_position = os.path.exists(os.path.join(task, POSITION)) and only in (None, POSITION)
     has_validation = os.path.exists(os.path.join(task, VALIDATION)) and only in (None, VALIDATION)
-    extra = [f for f in (BACKLOG, HANDOFF) if os.path.exists(os.path.join(task, f)) and only in (None, f)]
+    extra = [f for f in (BACKLOG, HANDOFF, DIRECTIONS) if os.path.exists(os.path.join(task, f)) and only in (None, f)]
     tz_text = read(os.path.join(task, "00-tz.md"))
     if has_position and BACKLOG not in extra and re.search(r"ТИП ВЫХОДА\W*гипотезы", tz_text, re.I):
         errors.append("%s: файла нет — финиш типа «гипотезы» без бэклога тестов" % BACKLOG)

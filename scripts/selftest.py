@@ -119,6 +119,13 @@ def eval_tests(root):
            r.returncode == 0 and "| полнота | 3 из 3 |" in r.stdout and "| ловушки | 0 |" in r.stdout
            and "| противоречие исходу | 0 |" in r.stdout and "| причинные выводы без опоры | 0 из 1 |" in r.stdout
            and "корректность=5" in r.stdout and os.listdir(out), r.stdout)
+    open(os.path.join(t, "08-handoff.md"), "w", encoding="utf-8").write(
+        "# Сдача\n\n## Что проверено\n- Охват напоминаний не измерен.\n"
+        "- Отклик на границе случайности → скорее: эффекта нет (уверенность низкая) → шаг: пересчитать по неделям.\n"
+        "- Интеграция ломается после смены календаря.\n- Бумажный журнал дешевле сервиса.\n")
+    r = run([ev, t, case, "--out", out])
+    expect("evals: применимость сдачи — доля пунктов без тупика, тупики перечислены",
+           "| применимость сдачи | 75% (тупиков 1 из 4 пунктов) |" in r.stdout and "## Тупики в сдаче" in r.stdout, r.stdout)
     bad = os.path.join(root, "bad-case")
     os.makedirs(bad)
     open(os.path.join(bad, "key.json"), "w", encoding="utf-8").write('{"must": [{"id": "M1", "pattern": "(("}]}')
@@ -452,6 +459,102 @@ def effort_tests(root):
     expect("усилие: валидация не проверяется", r.returncode == 0 and "не из проверяемых" in r.stdout, r.stdout)
 
 
+def handoff_concrete_tests(root):
+    """Тупик — не вывод: в сдаче у «не измерено / сужено / не верю» есть версия или шаг, у очереди — условие возврата."""
+    cc = os.path.join(HERE, "check_concrete.py")
+    d = os.path.join(root, "tasks", "hconc")
+    os.makedirs(d)
+    good = ("# Сдача\n\nВсе направления сужены: решать пока не на чем.\n\n"
+            "## Что нужно, чтобы двигаться дальше\n- Охват напоминаний не измерен — нужен отчёт.\n\n"
+            "## Что проверено\n"
+            "- Охват напоминаний не измерен → скорее: напоминание увидела меньшая часть мастеров (уверенность низкая) → шаг: открыть отчёт доставки, полдня.\n"
+            "- Отклик салонов на пробный месяц на границе случайности; вероятно, эффект меньше 0,5 п.п.\n"
+            "- Срок окупаемости — 6 недель.\n\n"
+            "## А ещё есть идеи\nВ очереди: звонки администраторам — вернуться, если звонки владельцам покажут барьер расписания.\n\n"
+            "## Чего не покрыл уровень\nЦитаты не сверены, данных нет.\n")
+    open(os.path.join(d, "08-handoff.md"), "w", encoding="utf-8").write(good)
+    r = run([cc, d, "--handoff"])
+    expect("сдача: тупики с версией или шагом, очередь с условием, вводный абзац и служебные разделы — проходят",
+           r.returncode == 0, r.stdout)
+    bad = good.replace(" → скорее: напоминание увидела меньшая часть мастеров (уверенность низкая) → шаг: открыть отчёт доставки, полдня", "")
+    bad = bad.replace("; вероятно, эффект меньше 0,5 п.п.", "")
+    bad = bad.replace(" — вернуться, если звонки владельцам покажут барьер расписания", "")
+    bad += "\n## На что ставить\nНе верю в «мастера не любят приложения».\nУ салонов с одним мастером отклика на напоминание нет.\n"
+    open(os.path.join(d, "08-handoff.md"), "w", encoding="utf-8").write(bad)
+    r = run([cc, d, "--handoff"])
+    expect("сдача: «не измерен», «на границе случайности», «не верю» и «отклика … нет» без версии — пойманы, очередь без условия — поймана",
+           r.returncode == 1 and r.stdout.count("тупик без версии") == 3 and "очередь без условия" in r.stdout
+           and "Срок окупаемости" not in r.stdout and "Что нужно" not in r.stdout and "Чего не покрыл" not in r.stdout,
+           r.stdout)
+
+
+def hyp_concrete_tests(root):
+    """Проверка по сути в типе «гипотезы»: у «сузить» — версия, что даст ответ и где посмотреть; у «не держится» — версия."""
+    cc = os.path.join(HERE, "check_concrete.py")
+    d = os.path.join(root, "tasks", "hypc")
+    os.makedirs(d)
+    good = ("ГИПОТЕЗА 1 — Пробный месяц возвращает ушедшие салоны\nВердикт:    сузить\nМетодология: Э — пройдена\n"
+            "Сверка:     не требовалась\nУверенность: низкая\nСузить до:  только ушедшие на бумажный журнал\n"
+            "Основание:  в контроле возвращаются сами 7%\n"
+            "Скорее:          пробный месяц возвращает только салоны с несколькими мастерами; уверенность низкая; оценка\n"
+            "Что даст ответ:  если среди вернувшихся больше половины — салоны с несколькими мастерами, эффект узкий; меньше трети — общий\n"
+            "Где посмотреть:  у вас — выгрузка возвратов по неделям; открыто — нет — внутренние данные; живая проверка — 8 звонков\n\n"
+            "ГИПОТЕЗА 2 — Нет планшета — нет первой записи\nВердикт:    не держится\nОснование: планшет есть у всех\n"
+            "Скорее:          мешает перенос старой базы клиентов; уверенность низкая; оценка\n\n"
+            "ГИПОТЕЗА 3 — Онбординг ускоряет первую запись\nВердикт:    держится на бумаге\nОснование: два теста\n\n"
+            "расхождения: нет\n")
+    w = lambda t: open(os.path.join(d, "02c-validation.md"), "w", encoding="utf-8").write(t)
+    w(good)
+    r = run([cc, d, "--step"])
+    expect("гипотезы: «сузить» и «не держится» с версией и путём к ответу проходят", r.returncode == 0, r.stdout)
+    w(good.replace("Скорее:          пробный месяц возвращает только салоны с несколькими мастерами; уверенность низкая; оценка\n", "")
+          .replace("Скорее:          мешает перенос старой базы клиентов; уверенность низкая; оценка\n", "Скорее:          нет данных\n"))
+    r = run([cc, d, "--step"])
+    expect("гипотезы: «сузить» без «Скорее» и «не держится» с отказом в «Скорее» — пойманы, «держится» не трогается",
+           r.returncode == 1 and "Гипотеза 1" in r.stdout and "Гипотеза 2" in r.stdout and "Гипотеза 3" not in r.stdout, r.stdout)
+    open(os.path.join(d, "08-handoff.md"), "w", encoding="utf-8").write("# С\n\n## Что проверено\n- Охват не измерен.\n")
+    w(good)
+    r = run([cc, d, "--step"])
+    expect("гипотезы: --step не смотрит сдачу", r.returncode == 0, r.stdout)
+
+
+def directions_tests(root):
+    """Тип «карта направлений»: маршрут в коде, цена, форма карты, читаемость."""
+    cc, rt = os.path.join(HERE, "check_concrete.py"), os.path.join(HERE, "route.py")
+    d = os.path.join(root, "tasks", "dirs")
+    os.makedirs(d)
+    open(os.path.join(d, "00-tz.md"), "w", encoding="utf-8").write(
+        "ТЗ\nЗАПРОС: куда можно пойти\nGAP:\n  1. Куда можно пойти? [ключевой] {ответ: контекст}\n"
+        "ТИП ВЫХОДА: карта направлений\nТИР: Tier 2\nЁМКОСТЬ: 0\nСОГЛАСОВАНО: 2026-11-06\n")
+    r = run([rt, "init", d])
+    nxt = run([rt, "next", d]).stdout
+    expect("карта: маршрут — консультант, длинный список, карта; без проверки по сути и бэклога",
+           r.returncode == 0 and "06-directions.md" in nxt and "02-long-list.md" in nxt and "02c-validation" not in nxt
+           and "03-backlog" not in nxt and "nostradamus" not in nxt, r.stdout + nxt)
+    r = run([os.path.join(HERE, "cost_estimate.py"), d])
+    expect("карта: цена считается для нового типа", r.returncode == 0 and "вызов" in r.stdout, r.stdout + r.stderr)
+    block = ("НАПРАВЛЕНИЕ %d — Ход %d\nСуть:          вернуть ушедшие салоны по причине\nКому:          состояние: ушедшие\n"
+             "На чём стоит:  опрос ушедших салонов\nСкорее:        сработает для ушедших на бумажный журнал; уверенность низкая\n"
+             "Что различит:  доля причин в звонках\nПервый шаг:    10 звонков, неделя\nУбьёт:         одна причина у всех\n\n")
+    good = ("КАК ДЕЛИТЬ\nсостояние: ушедшие / новые — видна в таблице салонов\n\n" + "".join(block % (i, i) for i in (1, 2, 3))
+            + "С ЧЕГО НАЧАТЬ\nЗвонки — различат направления 1 и 2.\n\nЧЕГО НЕ ХВАТАЕТ\nвыгрузки возвратов.\n")
+    w = lambda t: open(os.path.join(d, "06-directions.md"), "w", encoding="utf-8").write(t)
+    w(good)
+    r = run([cc, d, "--step"])
+    expect("карта: полная карта проходит", r.returncode == 0, r.stdout)
+    w(good.replace("Скорее:        сработает для ушедших на бумажный журнал; уверенность низкая\nЧто различит:  доля причин в звонках\n", "", 1))
+    r = run([cc, d, "--step"])
+    expect("карта: направление без версии и «что различит» — поймано",
+           r.returncode == 1 and "направление 1" in r.stdout and "Скорее" in r.stdout and "направление 2" not in r.stdout, r.stdout)
+    w(good.replace("С ЧЕГО НАЧАТЬ", "ИТОГ").replace("КАК ДЕЛИТЬ", "ОСИ"))
+    r = run([cc, d, "--step"])
+    expect("карта: без «КАК ДЕЛИТЬ» и «С ЧЕГО НАЧАТЬ» — поймано", r.returncode == 1 and "КАК ДЕЛИТЬ" in r.stdout
+           and "С ЧЕГО НАЧАТЬ" in r.stdout, r.stdout)
+    w(good.replace("опрос ушедших салонов", "опрос [F-003]", 1))
+    r = run([os.path.join(HERE, "check_readable.py"), d])
+    expect("карта: id источника в документе для человека — поймано", r.returncode == 1 and "06-directions.md" in r.stdout, r.stdout)
+
+
 def concrete_tests(root):
     cc = os.path.join(HERE, "check_concrete.py")
     d = os.path.join(root, "tasks", "conc")
@@ -467,7 +570,7 @@ def concrete_tests(root):
             "Скорее:          А — сверяют вручную; уверенность низкая; потому что оценка\n"
             "Что даст ответ:  если будет доля точек с учётной программой — станет ясно, А или Б\n"
             "Где посмотреть:  у вас — выгрузка заявок с полем «чем считаете»; открыто — отзывы на учётные программы; "
-            "живая проверка — 10 звонков с одним вопросом\n\n"
+            "живая проверка — 8 звонков с одним вопросом\n\n"
             "У-2 — Сверка занимает час в неделю\nИсход:        подтверждается\n")
     write("02c-validation.md", good)
     r = run([cc, d])
@@ -945,6 +1048,38 @@ def profile_tests():
                and "шаг 1 (b2b-consultant) закрыт с ошибками" not in r2.stdout, r2.stdout)
         r = run([rt, "waive", t, "1", "коротко"])
         expect("waive: короткая причина — отказ", r.returncode in (1, 2), r.stdout)
+        # перепроверка после правки оркестратора: тот же шаг, без нового номера и без исполнителя
+        run([rt, "start", t, "alternatives-analyst", "src-alt.md"])
+        open(os.path.join(t, "src-alt.md"), "w", encoding="utf-8").write(
+            "# Альтернативы\n" + "Клиенты платят со счёта. " * 30 + "\nЗвонить: +7 (999) 123-45-67\n")
+        r = run([rt, "done", t])
+        n_alt = re.search(r"Шаг (\d+)", r.stdout)
+        n_alt = n_alt.group(1) if n_alt else "0"
+        expect("перепроверка: шаг падает на проверке данных, периметр чист", r.returncode == 1 and "Периметр" not in r.stdout, r.stdout)
+        r = run([rt, "recheck", t, n_alt, "коротко"])
+        expect("перепроверка: без описания правки — отказ", r.returncode == 2, r.stdout)
+        r = run([rt, "recheck", t, n_alt, "убрал телефон из строки контактов, ложного нет"])
+        expect("перепроверка: ошибка не исправлена — шаг остаётся упавшим", r.returncode == 1 and "остались" in r.stdout, r.stdout)
+        open(os.path.join(t, "src-alt.md"), "w", encoding="utf-8").write("# Альтернативы\n" + "Клиенты платят со счёта. " * 30 + "\n")
+        steps_before = len(json.load(open(os.path.join(t, "state.json"), encoding="utf-8"))["steps"])
+        r = run([rt, "recheck", t, n_alt, "убрал телефон из строки контактов, ложного нет"])
+        st_ = json.load(open(os.path.join(t, "state.json"), encoding="utf-8"))
+        step_ = next(x for x in st_["steps"] if str(x["n"]) == n_alt)
+        expect("перепроверка: после правки шаг done, новый номер не заводится, правка и прежняя строка сохранены",
+               r.returncode == 0 and step_["status"] == "done" and len(st_["steps"]) == steps_before
+               and step_["recheck"][0]["fixed"].startswith("убрал телефон") and "ОШИБКИ" in step_["recheck"][0]["checks_before"],
+               r.stdout + json.dumps(step_, ensure_ascii=False)[:400])
+        r2 = run([rt, "ready", t])
+        expect("перепроверка видна в готовности", "Перепроверен после правки оркестратора: шаг " + n_alt in r2.stdout, r2.stdout)
+        run([rt, "start", t, "customer-path", "src-path.md"])
+        open(os.path.join(t, "stray.md"), "w", encoding="utf-8").write("чужой файл\n")
+        open(os.path.join(t, "src-path.md"), "w", encoding="utf-8").write("# Путь\n" + "Шаг клиента. " * 40 + "\n")
+        r = run([rt, "done", t])
+        n_path = re.search(r"Шаг (\d+)", r.stdout).group(1)
+        r = run([rt, "recheck", t, n_path, "чужой файл тронут, но это не важно для шага"])
+        expect("перепроверка: ошибку периметра не снимает", r.returncode == 1 and "периметр" in r.stdout, r.stdout)
+        os.remove(os.path.join(t, "stray.md"))
+        run([rt, "waive", t, n_path, "чужой файл создан тестом и удалён, артефакт шага цел"])
         open(os.path.join(t, "08-handoff.md"), "w", encoding="utf-8").write("# Сдача\n\nСм. D-4.\n")
         r = run([os.path.join(HERE, "check_readable.py"), os.path.join(t, "08-handoff.md")])
         expect("читаемость: принимает путь к файлу и проверяет только его", r.returncode == 1 and "D-4" in r.stdout, r.stdout)
@@ -1657,6 +1792,20 @@ def main():
                and "ИНН" in pv.stdout and "термин из private.txt: Тестор" in pv.stdout and "термин из private.txt: Тестин" in pv.stdout, pv.stdout)
         expect("найденное в отчёт не копируется",
                "123-45-67" not in pv.stdout and "7701234567" not in pv.stdout and "ivan@" not in pv.stdout, pv.stdout)
+        # длинные дроби из выгрузок — не номера карт; карта — только со сходящейся суммой Луна, счёт — 20 цифр
+        open(pa, "w", encoding="utf-8").write(
+            "Доля 0.12345678901234567 и 0,1234567890123456789; вес 0.1234567890 и 1,123456789012.\n"
+            "Код 1234567812345679 — шестнадцать цифр без суммы Луна.\n")
+        pv = run([cprv, task])
+        expect("дроби из выгрузок и цифры без суммы Луна — не номер карты и не ИНН",
+               "номер карты" not in pv.stdout and "возможно ИНН" not in pv.stdout, pv.stdout)
+        open(pa, "w", encoding="utf-8").write("Карта 4111111111111111, счёт 40702810900000012345.\n")
+        pv = run([cprv, task])
+        expect("номер карты (сумма Луна) и счёта (20 цифр) пойманы",
+               pv.returncode == 1 and pv.stdout.count("номер карты или счёта") == 1 and "4111" not in pv.stdout, pv.stdout)
+        open(pa, "w", encoding="utf-8").write("Счёт 40702810900000012345.\n")
+        pv = run([cprv, task])
+        expect("счёт из 20 цифр пойман без суммы Луна", pv.returncode == 1 and "номер карты или счёта" in pv.stdout, pv.stdout)
         os.remove(pa)
         pv2 = run([cprv, task])
         expect("без персональных данных проверка чистая", pv2.returncode == 0, pv2.stdout)
@@ -2027,6 +2176,9 @@ def main():
         polygon_more_tests(root)
         effort_tests(root)
         concrete_tests(root)
+        handoff_concrete_tests(root)
+        hyp_concrete_tests(root)
+        directions_tests(root)
         knowledge_tests(root)
         map_tests(root)
         model_tests(root)

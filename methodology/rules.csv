@@ -54,16 +54,16 @@ R-052,orchestrator/SKILL.md,Риск.,2026-10-18,702d22b,—,—,активно
 R-053,orchestrator/SKILL.md,Стоимость — тай-брейк.,2026-10-18,702d22b,—,—,активно
 R-054,orchestrator/routes/forecast.md,Два режима.,2026-10-18,702d22b,—,—,активно
 R-055,orchestrator/routes/forecast.md,Не опора.,2026-10-18,702d22b,—,—,активно
-R-056,orchestrator/routes/handoff.md,Продолжения без нового ТЗ нет.,2026-10-18,702d22b,—,—,активно
+R-056,orchestrator/routes/handoff.md,Продолжения без нового ТЗ нет.,2026-10-18,702d22b,удалено 2026-11-06 — дубль R-058 (продолжение только через ТЗ),—,удалено
 R-057,orchestrator/routes/handoff.md,Успешный финиш.,2026-10-18,702d22b,—,—,активно
 R-058,orchestrator/routes/handoff.md,Продолжение — только через ТЗ.,2026-10-18,702d22b,—,—,активно
 R-059,orchestrator/routes/hypotheses.md,Режим ширины.,2026-10-18,702d22b,—,—,активно
-R-060,orchestrator/routes/hypotheses.md,Прогон не уходит в приложение — он меняет эксперимент и решение.,2026-10-18,702d22b,—,—,активно
-R-061,orchestrator/routes/hypotheses.md,Решение.,2026-10-18,702d22b,—,—,активно
+R-060,orchestrator/routes/rehearsal.md,Прогон не уходит в приложение — он меняет эксперимент и решение.,2026-10-18,702d22b,—,—,активно
+R-061,orchestrator/routes/rehearsal.md,Решение.,2026-10-18,702d22b,—,—,активно
 R-062,orchestrator/routes/hypotheses.md,При ВЕБ: да хотя бы одна линза — «зову».,2026-10-18,702d22b,—,—,активно
 R-063,orchestrator/routes/hypotheses.md,Цена.,2026-10-18,702d22b,—,—,активно
 R-064,orchestrator/routes/hypotheses.md,Куда идёт.,2026-10-18,702d22b,—,—,активно
-R-065,orchestrator/routes/hypotheses.md,hypothesis-generator.,2026-10-18,702d22b,—,—,активно
+R-065,orchestrator/routes/refinement.md,hypothesis-generator.,2026-10-18,702d22b,—,—,активно
 R-066,orchestrator/routes/research.md,Строгость по тиру.,2026-10-18,702d22b,—,—,активно
 R-067,orchestrator/routes/sources.md,Путь консультанта — план по умолчанию.,2026-10-18,702d22b,—,—,активно
 R-068,orchestrator/routes/sources.md,"Ключевые пункты пути — с достаточностью, а не с лимитом.",2026-10-18,702d22b,—,—,активно
@@ -74,3 +74,5 @@ R-072,orchestrator/routes/sources.md,Стоимость.,2026-10-18,702d22b,—,
 R-073,orchestrator/routes/sources.md,Запрос данных.,2026-10-18,702d22b,—,—,активно
 R-074,orchestrator/routes/sources.md,Инструмент методологии.,2026-10-18,702d22b,—,—,активно
 R-075,orchestrator/routes/sources.md,Вопрос шага сверяется скриптом до вызова.,2026-10-18,702d22b,—,—,активно
+R-076,orchestrator/SKILL.md,Старт в чистой сессии.,2026-11-06,не закоммичено,system-notes.md 2026-11-06 — чистая сессия и recheck,только прогон,активно
+R-077,orchestrator/routes/handoff.md,Тупик — не вывод.,2026-11-06,не закоммичено,system-notes.md 2026-11-06 — тупики в сдаче,selftest: handoff_concrete_tests,активно
