@@ -76,3 +76,4 @@ R-074,orchestrator/routes/sources.md,Инструмент методологии
 R-075,orchestrator/routes/sources.md,Вопрос шага сверяется скриптом до вызова.,2026-10-18,702d22b,—,—,активно
 R-076,orchestrator/SKILL.md,Старт в чистой сессии.,2026-11-06,не закоммичено,system-notes.md 2026-11-06 — чистая сессия и recheck,только прогон,активно
 R-077,orchestrator/routes/handoff.md,Тупик — не вывод.,2026-11-06,не закоммичено,system-notes.md 2026-11-06 — тупики в сдаче,selftest: handoff_concrete_tests,активно
+R-078,orchestrator/SKILL.md,Веб не зависит от уровня.,2026-10-18,d4607a2,—,—,активно
