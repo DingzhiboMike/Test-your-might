@@ -214,7 +214,7 @@ def profile_structure(kind, docs, interviews, modes, mapped, prof):
     """Оценка вызовов по профилю: что реально входит в маршрут при этой нагрузке."""
     if prof.get("run") == "solo" and kind == "гипотезы":
         # один агент (light-run) пишет все артефакты типа; независимой проверки нет
-        web = [("ход к источнику за веб-пунктом", modes["web_points"], "свободная")] if modes.get("web_points") else []
+        web = [("ходы к источнику по веб-пунктам (до; решает оркестратор)", modes["web_points"], "свободная")] if modes.get("web_points") else []
         return web + [("один проход: разбор, гипотезы, проверка, позиция, бэклог", 1, "свободная"),
                       ("перезапрос по ошибкам проверок", 1, "резерв")]
     lenses = int(prof["lenses"]) if prof["generation"] != "narrow" else 0
