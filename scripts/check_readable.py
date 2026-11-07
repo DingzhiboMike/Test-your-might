@@ -48,7 +48,7 @@ LIGHT = (VALIDATION, BACKLOG, HANDOFF, DIRECTIONS)
 INTERNAL = re.compile(r"(?<![А-Яа-яA-Za-z])[ПУСD]-\d+\b")
 JARGON_VALIDATION = re.compile(r"слот\w*|развилк|гигиен|выводимост|\bGAP\b|валидатор|\bM\d{1,2}\s*·|\bD-\d+\b|рамк[аиуе]\b", re.I)
 LIMITS = {"07a-analyst.md": 1600, "07b-editor.md": 1600, "07c-decisions.md": 500, POSITION: 450, VALIDATION: 5000,
-          BACKLOG: 1500, HANDOFF: 900, DIRECTIONS: 2500}
+          BACKLOG: 1500, HANDOFF: 900, DIRECTIONS: 2000}
 ID_PATTERNS = [
     ("номер гипотезы", re.compile(r"(?<![А-Яа-яA-Za-z])[ГгHh]-\d+[a-zа-я]?\b")),
     ("id источника или числа", re.compile(r"\[(?:F|N)-\d+\]")),
