@@ -9,9 +9,17 @@
    «Без хода: GAP k — <причина>». «Нет данных», «мало данных», «данных не хватает», «экономия», «бюджет», «шагов»
    причиной не считаются — кроме случая, когда свободных вызовов не осталось (по трассе и строке ЦЕНА или по строке
    «свободных вызовов нет» в логе): тогда пропуск — предупреждение, а не ошибка.
-2. Если итоговые вердикты (последний из 02d-validation2.md, 02c-validation.md) все «сузить» или «не держится»,
-   часть сдачи для человека (08-handoff.md до «## Служебное») начинается с раздела «Что нужно, чтобы двигаться
-   дальше» — запросы данных и дешёвые замены идут первыми, а не после новых идей.
+2. Часть сдачи для человека (08-handoff.md до «## Служебное») начинается с раздела «Что я рекомендую сделать»:
+   в нём названы цена, первый шаг и условие отказа, а у каждой рекомендации (пункт «1.», «2.» …) — «Отвечает на:»
+   (вопрос человека словами) и «Почему:» (что выяснили). Связь пишет оркестратор в 08-service.md, раздел
+   «Рекомендации и пункты»: строка таблицы «| N | GAP k | GAP m, GAP n |» — номер рекомендации, на какой пункт
+   отвечает, на каких закрытых пунктах стоит. Каждый ключевой пункт GAP — в «отвечает» хотя бы у одной рекомендации;
+   «стоит на» не пусто, и каждый названный пункт закрыт в логе (строка «Закрыто: GAP …»). Рекомендация,
+   которая не отвечает на вопрос и не опирается на закрытое, — плохой вывод: ошибка. Первая рекомендация, которая
+   начинается с запроса данных («запросить», «выгрузка», «собрать данные»), — предупреждение: запрос данных идёт
+   в «Что нужно, чтобы двигаться дальше». Если итоговые вердикты (последний из 02d-validation2.md,
+   02c-validation.md) все «сузить» или «не держится», в сдаче есть и раздел «Что нужно, чтобы двигаться дальше»
+   (запросы данных и дешёвые замены) — после рекомендации, а не вместо неё.
 3. В разделе «А ещё есть идеи» сдачи — не больше ЁМКОСТЬ + 1 идей (строки-пункты); остальные — одной строкой
    «В очереди: …».
 
@@ -35,7 +43,13 @@ VERDICT = re.compile(r"^\s*Вердикт\s*:\s*(держится на бума�
 BAD_REASON = re.compile(r"нет данных|данных нет|мало данных|данных не хват|недостаточно данных|эконом|бюджет|шаг",
                         re.I)
 NEXT = "Что нужно, чтобы двигаться дальше"
+FIRST = "Что я рекомендую сделать"
+FIRST_PARTS = (("цены", re.compile(r"(?<![а-яё])цен\w*|стоимост|токен|вызов|₽|руб", re.I)),
+               ("первого шага", re.compile(r"первый шаг|шаг:", re.I)),
+               ("условия отказа", re.compile(r"откаж|отказ|убь[её]т|снима", re.I)))
 MORE = "А ещё есть идеи"
+LINKS = "Рекомендации и пункты"
+DATA_FIRST = re.compile(r"^\W*(запрос\w*|выгрузк\w*|собрать данные|получить данные)", re.I)
 
 
 def read(path):
@@ -139,6 +153,59 @@ def section(text, title):
     return rest[:stop.start()] if stop else rest
 
 
+def recommendations(body):
+    """Пункты «1.», «2.» … верхнего уровня раздела рекомендаций: [(номер, текст пункта)]."""
+    heads = list(re.finditer(r"^\**\s*(\d+)[.)]\s+", body, re.M))
+    return [(int(m.group(1)), body[m.end():heads[i + 1].start() if i + 1 < len(heads) else len(body)])
+            for i, m in enumerate(heads)]
+
+
+def gap_numbers(text):
+    """Номера пунктов из «GAP 1, 2 и 4», «GAP 1, GAP 3»."""
+    got = set()
+    for m in re.finditer(r"GAP\s*(\d+(?:\s*(?:,|и)\s*(?:GAP\s*)?\d+)*)", text):
+        got.update(int(n) for n in re.findall(r"\d+", m.group(1)))
+    return got
+
+
+def closed_gaps(log):
+    return set().union(*[gap_numbers(l) for l in re.findall(r"^\s*Закрыто\s*:(.*)$", log, re.M)] or [set()])
+
+
+def link_errors(task, tz, log, recs):
+    """Таблица «Рекомендации и пункты» в 08-service.md: каждая рекомендация отвечает на пункт и стоит на закрытом."""
+    if not recs:
+        return ["в разделе «%s» нет пунктов «1.», «2.» …" % FIRST]
+    table = section(read(os.path.join(task, "08-service.md")), LINKS)
+    if table is None:
+        return ["в 08-service.md нет раздела «%s»: какой пункт GAP закрывает каждая рекомендация и на чём стоит" % LINKS]
+    rows = {}
+    for line in table.splitlines():
+        cells = [c.strip() for c in line.strip().strip("|").split("|")]
+        if len(cells) >= 3 and cells[0].isdigit():
+            rows[int(cells[0])] = (gap_numbers(cells[1]), gap_numbers(cells[2]))
+    errors, closed, answered = [], closed_gaps(log), set()
+    for n in recs:
+        if n not in rows:
+            errors.append("«%s»: нет строки для рекомендации %d" % (LINKS, n))
+            continue
+        ans, base = rows[n]
+        answered |= ans
+        if not ans:
+            errors.append("рекомендация %d не отвечает ни на один пункт GAP" % n)
+        if not base:
+            errors.append("рекомендация %d не стоит ни на одном закрытом пункте — вывод без аргумента" % n)
+        open_ = sorted(base - closed)
+        if open_:
+            errors.append("рекомендация %d стоит на незакрытых пунктах: %s (в логе нет «Закрыто: GAP …»)"
+                          % (n, ", ".join("GAP %d" % k for k in open_)))
+    missed = [k for k in key_gaps(tz) if k not in answered]
+    if missed:
+        errors.append("ключевые пункты без рекомендации: %s — сдача не отвечает на вопрос человека"
+                      % ", ".join("GAP %d" % k for k in missed))
+    return errors
+
+
 def check(task):
     tz = read(os.path.join(task, "00-tz.md"))
     kind = output_type(tz)
@@ -164,10 +231,25 @@ def check(task):
 
     handoff = human_part(read(os.path.join(task, "08-handoff.md")))
     if handoff:
-        if all_narrowed(task):
-            first = re.search(r"^#{2,}\s*(.+)$", handoff, re.M)  # заголовок документа «# …» не раздел
-            if not first or NEXT.lower() not in first.group(1).lower():
-                errors.append("все вердикты «сузить / не держится», а сдача начинается не с раздела «%s»" % NEXT)
+        first = re.search(r"^#{2,}\s*(.+)$", handoff, re.M)  # заголовок документа «# …» не раздел
+        if not first or FIRST.lower() not in first.group(1).lower():
+            errors.append("сдача начинается не с раздела «%s»" % FIRST)
+        else:
+            body = section(handoff, FIRST) or ""
+            missing = [name for name, rx in FIRST_PARTS if not rx.search(body)]
+            if missing:
+                errors.append("в разделе «%s» нет: %s" % (FIRST, ", ".join(missing)))
+            recs = recommendations(body)
+            for n, text in recs:
+                lack = [w for w in ("Отвечает на", "Почему") if not re.search(w + r"\s*:", text, re.I)]
+                if lack:
+                    errors.append("рекомендация %d: нет «%s» — на какой вопрос отвечает и что выяснили"
+                                  % (n, "», «".join(lack)))
+            if recs and DATA_FIRST.search(re.sub(r"[*_]", "", recs[0][1])):
+                warns.append("рекомендация 1 начинается с запроса данных — запрос данных идёт в «%s»" % NEXT)
+            errors += link_errors(task, tz, log, [n for n, _ in recs])
+        if all_narrowed(task) and section(handoff, NEXT) is None:
+            errors.append("все вердикты «сузить / не держится», а раздела «%s» (запросы данных, дешёвые замены) нет" % NEXT)
         cap = capacity(tz)
         more = section(handoff, MORE)
         if cap is not None and more is not None:
