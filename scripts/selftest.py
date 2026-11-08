@@ -836,6 +836,64 @@ def audit_tests(root):
     expect("аудит: reviewer=human — каждое место идёт человеку с оценкой проверяющего",
            r.returncode == 0 and r.stdout.count("Человеку:") == 3 and "частично (про другой рынок)" in r.stdout, r.stdout)
 
+    # рабочий уровень: выборка lite — три места одного артефакта
+    d2 = os.path.join(root, "tasks", "aud-lite")
+    os.makedirs(d2)
+    open(os.path.join(d2, "02c-validation.md"), "w", encoding="utf-8").write("\n".join(lines))
+    open(os.path.join(d2, "03-backlog.md"), "w", encoding="utf-8").write(
+        "\n".join("| %d | «клиенты платят по счёту и карту не берут» [F-00%d] |" % (i, i) for i in range(1, 6)))
+    r = run([au, d2, "--lite"])
+    plan_l = open(os.path.join(d2, "audit-plan.md"), encoding="utf-8").read()
+    expect("аудит lite: три места и один артефакт — 02c-validation.md",
+           "мест 3 в 1 артефактах" in r.stdout and "03-backlog.md" not in plan_l and "Режим: lite" in plan_l, r.stdout + plan_l)
+    r = run([au, d2])
+    plan_f = open(os.path.join(d2, "audit-plan.md"), encoding="utf-8").read()
+    expect("аудит: без --lite план по-прежнему полный (оба артефакта)",
+           "03-backlog.md" in plan_f and "Режим: полный" in plan_f, r.stdout + plan_f)
+
+
+def survey_and_coverage_tests(root):
+    """Сводка по задачам и сверка «обязательных источников» запроса с реестром."""
+    base = os.path.join(root, "tasks-survey")
+    t = os.path.join(base, "2026-01-01-demo")
+    os.makedirs(t)
+    open(os.path.join(t, "02c-validation.md"), "w", encoding="utf-8").write(
+        "Вердикт:    сузить\nВердикт:    сузить\nВердикт:    держится на бумаге\n")
+    open(os.path.join(t, "log.md"), "w", encoding="utf-8").write("Результат: совпал — х\nРезультат: частичный промах — у\n")
+    open(os.path.join(t, "08-handoff.md"), "w", encoding="utf-8").write(
+        "# Итог\n\n## Что нужно, чтобы двигаться дальше\n\nБез ваших данных выводы — оценки.\n\n## Лучшая версия и следующий шаг\n\nх\n")
+    r = run([os.path.join(HERE, "task_survey.py"), base])
+    expect("сводка по задачам: вердикты, исходы, версия вторым разделом, данные первыми",
+           r.returncode == 0 and "сузить 2" in r.stdout and "совпал 1" in r.stdout and "| 2 | да |" in r.stdout
+           and "Доля «сузить»: 67%" in r.stdout, r.stdout)
+    r = run([os.path.join(HERE, "task_survey.py"), os.path.join(root, "нет-такой-папки")])
+    expect("сводка по задачам: нет папки — понятная ошибка", r.returncode == 1 and "нет папки" in r.stdout, r.stdout)
+
+    svc = os.path.join(HERE, "handoff_service.py")
+    c = os.path.join(root, "tasks", "cover")
+    os.makedirs(c)
+    add = os.path.join(HERE, "add_source.py")
+    run([add, "--task", c, "--kind", "web", "--location", "https://a.ru/x", "--level", "1", "--pub-date", "2026-01-02"], "Один текст.\n")
+    tzs = lambda web: open(os.path.join(c, "00-tz.md"), "w", encoding="utf-8").write("ТЗ\n\nВЕБ:        " + web + "\n")
+    tzs("да — пункт 1; поле: рынок; обязательные источники из запроса: не меньше 3 чужих репозиториев; ")
+    run([svc, c])
+    sv = open(os.path.join(c, "08-service.md"), encoding="utf-8").read()
+    expect("сдача: недобор обязательных источников назван (названо 3, в реестре 1)",
+           "## Источники из запроса" in sv and "В реестре веб-источников: 1" in sv and "Не добрано" in sv, sv)
+    tzs("да — пункт 1; обязательные источники из запроса: нет")
+    run([svc, c])
+    sv = open(os.path.join(c, "08-service.md"), encoding="utf-8").read()
+    expect("сдача: «обязательные источники: нет» — не заданы человеком", "не заданы человеком" in sv and "Не добрано" not in sv, sv)
+    open(os.path.join(c, "00-tz.md"), "w", encoding="utf-8").write("ТЗ\n\nВЕБ: да — пункт 1\n")
+    run([svc, c])
+    sv = open(os.path.join(c, "08-service.md"), encoding="utf-8").read()
+    expect("сдача: в ТЗ нет строки об источниках — это видно", "нет строки «обязательные источники»" in sv, sv)
+    open(os.path.join(c, "state.json"), "w", encoding="utf-8").write(json.dumps({"profile": {"validation": "web"}}))
+    run([svc, c])
+    sv = open(os.path.join(c, "08-service.md"), encoding="utf-8").read()
+    expect("сдача: validation=web без плана — «выборка не проводилась», а не «не входит в профиль»",
+           "выборка из трёх мест не проводилась" in sv and "не входит в профиль" not in sv, sv)
+
 
 def rules_tests():
     """Реестр правил: id в тексте и в реестре совпадают; новое правило без прогона не проходит; срабатывания по логам."""
@@ -2172,6 +2230,7 @@ def main():
         data_block_tests(root)
         rules_tests()
         audit_tests(root)
+        survey_and_coverage_tests(root)
         message_tests()
         polygon_more_tests(root)
         effort_tests(root)
