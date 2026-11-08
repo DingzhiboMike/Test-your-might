@@ -6,7 +6,8 @@
 Из файлов задачи собираются разделы: «Путь — исходы» (таблица из log.md), «Чек-лист готовности» (итог
 `route.py ready`), «Маршрут» (шаги из state.json), «Расход» (`trace_summary.py --save`), «Запросы данных» (блоки
 D-N из лога), «Числа» (numbers.csv), «Смысл, аудит и опоры» (строки «Смысл:» лога, `audit_sample.py --check`,
-сводка `checks/quotes.md`). Четыре раздела требуют суждения и остаются за оркестратором: «Обещанное и полученное»,
+сводка `checks/quotes.md`), «Источники из запроса» (строка ТЗ «обязательные источники» против реестра `sources.csv`:
+скрипт считает веб-строки реестра, а какие это источники — видно по реестру). Четыре раздела требуют суждения и остаются за оркестратором: «Обещанное и полученное»,
 «Что профиль не покрыл», «Перенесено в контекст», «Замечания к системе»: если они уже заполнены в существующем
 `08-service.md`, скрипт их сохраняет, иначе ставит заглушку «— заполнить». Печатает, сколько заглушек осталось.
 Повторный запуск безопасен: механические разделы пересобираются, заполненные руками не трогаются.
@@ -106,8 +107,12 @@ def meaning_audit(task, log):
     parts = ["Смысл: " + x.split(":", 1)[1].strip() for x in re.findall(r"^Смысл:.*$", log, re.M)] or ["проверка смысла не шла"]
     sys.path.insert(0, HERE)
     import profile_lib
-    if profile_lib.has_profile(task) and profile_lib.load(task)["validation"] != "full":
-        parts.append("Аудит: не входит в профиль (validation=%s)" % profile_lib.load(task)["validation"])
+    level = profile_lib.load(task)["validation"] if profile_lib.has_profile(task) else "full"
+    if level == "web" and not os.path.exists(os.path.join(task, "audit-plan.md")):
+        parts.append("Аудит: выборка из трёх мест не проводилась (validation=web); строит её "
+                     "`audit_sample.py --lite`, один вызов проверки смысла из резерва")
+    elif level not in ("full", "web"):
+        parts.append("Аудит: не входит в профиль (validation=%s)" % level)
     else:
         code, out = run("audit_sample.py", task, "--check")
         parts.append("Аудит: " + (out.splitlines()[-1] if out else ("нет плана" if code else "—")))
@@ -116,6 +121,27 @@ def meaning_audit(task, log):
     first = next((l.strip("# ").strip() for l in q.splitlines() if l.strip()), "")
     parts.append("Опоры: " + (first or "checks/quotes.md нет"))
     return "\n".join("- " + p for p in parts)
+
+
+def source_coverage(task):
+    """Строка ТЗ «обязательные источники» против веб-строк реестра: недобор виден в сдаче, а не молчит."""
+    tz = read(os.path.join(task, "00-tz.md"))
+    m = re.search(r"обязательные источники[^:\n]*:\s*([^;\n]+)", tz, re.I)
+    if not m:
+        return "в ТЗ нет строки «обязательные источники»"
+    asked = m.group(1).strip().rstrip(".")
+    if re.match(r"(нет|—|-)\b", asked, re.I):
+        return "не заданы человеком"
+    try:
+        rows = list(csv.DictReader(open(os.path.join(task, "sources.csv"), encoding="utf-8", newline="")))
+    except OSError:
+        rows = []
+    web = [r for r in rows if r.get("kind") == "web"]
+    n = re.search(r"\d+", asked)
+    line = "Названо: %s. В реестре веб-источников: %d." % (asked, len(web))
+    if n and len(web) < int(n.group()):
+        line += " Не добрано: названо не меньше %s, в реестре %d — написать в «Что профиль не покрыл»." % (n.group(), len(web))
+    return line
 
 
 def checklist(task):
@@ -146,6 +172,7 @@ def main():
         ("Запросы данных", data_requests(log)),
         ("Числа", numbers(task)),
         ("Смысл, аудит и опоры", meaning_audit(task, log)),
+        ("Источники из запроса", source_coverage(task)),
     ]
     out = ["# Служебная сдача", ""]
     stubs = 0

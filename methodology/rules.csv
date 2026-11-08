@@ -77,3 +77,6 @@ R-075,orchestrator/routes/sources.md,Вопрос шага сверяется с
 R-076,orchestrator/SKILL.md,Старт в чистой сессии.,2026-11-06,не закоммичено,system-notes.md 2026-11-06 — чистая сессия и recheck,только прогон,активно
 R-077,orchestrator/routes/handoff.md,Тупик — не вывод.,2026-11-06,не закоммичено,system-notes.md 2026-11-06 — тупики в сдаче,selftest: handoff_concrete_tests,активно
 R-078,orchestrator/SKILL.md,Веб не зависит от уровня.,2026-10-18,d4607a2,—,—,активно
+R-079,orchestrator/routes/coverage.md,Обязательные источники из запроса.,2026-11-08,не закоммичено,разбор прогона про систему 2026-11-08 и разметка завершённых задач,selftest: survey_and_coverage_tests,активно
+R-080,orchestrator/routes/coverage.md,Запрос про саму систему.,2026-11-08,не закоммичено,разбор прогона про систему 2026-11-08 и разметка завершённых задач,selftest: survey_and_coverage_tests,активно
+R-081,orchestrator/routes/coverage.md,Выборка смысла на рабочем уровне.,2026-11-08,не закоммичено,разбор прогона про систему 2026-11-08 и разметка завершённых задач,selftest: audit_tests (lite),активно

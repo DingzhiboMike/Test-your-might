@@ -3,6 +3,7 @@
 
   python3 scripts/audit_sample.py tasks/<папка>           # план аудита: audit-plan.md (места и seed)
   python3 scripts/audit_sample.py tasks/<папка> --check   # audit.md закрывает каждое место плана; строка для сдачи
+  python3 scripts/audit_sample.py tasks/<папка> --lite    # рабочий уровень (validation=web): три места одного артефакта
 
 Скрипты гарантируют форму: цитата есть в источнике, поле заполнено. Держит ли цитата вывод и не подогнано ли поле
 под проверку («возражений не найдено — искал: везде»), скрипт не видит. Поэтому после проверок формы — выборка:
@@ -36,6 +37,7 @@ OPEN = ("частично", "не держит", "нерепрезентатив
 ARTIFACTS = ("02c-validation.md", "02g-ideas-check.md", "03-backlog.md", "06-research.md", "06-validation.md",
              "06-directions.md")
 PER_ARTIFACT = 3
+LITE_ORDER = ("02c-validation.md", "06-validation.md", "06-research.md")  # --lite: первый из имеющихся, больше не берём
 LIGHT_ROLES = ("document-mapper", "brief-writer", "test-kit")  # механическая раскладка, выводов не пишут
 PLACE = re.compile(r"«[^»]{8,}»\s*\[(?:F-\d+|A)|^\s*Вердикт\s*:|^\|\s*\d+\s*\|", re.M)
 PLAN = "audit-plan.md"
@@ -61,8 +63,10 @@ def places(text):
     return out
 
 
-def plan(task):
+def plan(task, lite=False):
     present = [a for a in ARTIFACTS if os.path.exists(os.path.join(task, a))]
+    if lite:
+        present = [a for a in LITE_ORDER if a in present][:1]
     h = hashlib.sha256(os.path.basename(task).encode())
     for a in present:
         h.update(read(os.path.join(task, a)).encode())
@@ -76,9 +80,10 @@ def plan(task):
     return seed, present, chosen
 
 
-def write_plan(task):
-    seed, present, chosen = plan(task)
+def write_plan(task, lite=False):
+    seed, present, chosen = plan(task, lite)
     out = ["# План аудита: " + os.path.basename(task), "", "seed: %d" % seed,
+           "Режим: " + ("lite — три места одного артефакта (рабочий уровень)" if lite else "полный"),
            "Артефакты: " + (", ".join(present) or "нет"), "",
            "По каждому месту: держит ли фрагмент утверждение и не подогнано ли поле под проверку. Ответ — audit.md с "
            "блоком данных «аудит»: артефакт, строка, оценка (держит / частично / не держит / нерепрезентативно / подогнано), почему.", ""]
@@ -157,7 +162,7 @@ def main():
         sys.stderr.write(__doc__)
         return 2
     task = sys.argv[1].rstrip("/")
-    return check(task) if "--check" in sys.argv else write_plan(task)
+    return check(task) if "--check" in sys.argv else write_plan(task, "--lite" in sys.argv)
 
 
 if __name__ == "__main__":
