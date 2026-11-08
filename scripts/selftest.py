@@ -709,14 +709,15 @@ def path_tests(root):
     hs = os.path.join(HERE, "handoff_service.py")
     r = run([hs, d])
     sv = open(os.path.join(d, "08-service.md"), encoding="utf-8").read()
-    expect("сдача: служебный файл собран скриптом — путь из лога, четыре раздела под заполнение",
-           r.returncode == 0 and "П-1 | GAP 1, 2" in sv and sv.count("— заполнить") == 4, r.stdout + sv)
+    expect("сдача: служебный файл собран скриптом — путь из лога, пять разделов под заполнение (с «Рекомендации и пункты»)",
+           r.returncode == 0 and "П-1 | GAP 1, 2" in sv and sv.count("— заполнить") == 5
+           and "## Рекомендации и пункты" in sv and "## Источники сдачи" in sv, r.stdout + sv)
     open(os.path.join(d, "08-service.md"), "w", encoding="utf-8").write(sv.replace(
         "## Замечания к системе\n\n— заполнить", "## Замечания к системе\n\nУказатель длинный."))
     r = run([hs, d])
     sv2 = open(os.path.join(d, "08-service.md"), encoding="utf-8").read()
     expect("сдача: заполненный руками раздел сохраняется при пересборке",
-           "Указатель длинный." in sv2 and sv2.count("— заполнить") == 3, sv2)
+           "Указатель длинный." in sv2 and sv2.count("— заполнить") == 4, sv2)
     open(os.path.join(d, "log.md"), "w", encoding="utf-8").write("# Лог\n")
     r = run([cp, d])
     expect("путь: нет раздела «ПУТЬ — ИСХОДЫ» — ошибка", r.returncode == 1 and "ПУТЬ — ИСХОДЫ" in r.stdout, r.stdout)
@@ -875,6 +876,42 @@ def audit_tests(root):
     plan_f = open(os.path.join(d2, "audit-plan.md"), encoding="utf-8").read()
     expect("аудит: без --lite план по-прежнему полный (оба артефакта)",
            "03-backlog.md" in plan_f and "Режим: полный" in plan_f, r.stdout + plan_f)
+
+
+def read_file(path):
+    with open(path, encoding="utf-8") as f:
+        return f.read()
+
+
+def handoff_sources_tests(root):
+    """Источники сдачи: id после цитаты — имя, ссылки и счёт веба — в 08-sources.md; несверенная цитата — без замены."""
+    hs, add = os.path.join(HERE, "handoff_sources.py"), os.path.join(HERE, "add_source.py")
+    t = os.path.join(root, "tasks", "hsrc")
+    os.makedirs(t)
+    run([add, "--task", t, "--kind", "web", "--location", "https://www.alpha.ru/a", "--level", "3", "--pub-date",
+         "2026-01-02"], "Клиенты пишут в день события и ждут ответа.\n")
+    run([add, "--task", t, "--kind", "web", "--location", "https://beta.com/b", "--level", "4", "--pub-date",
+         "2026-01-02", "--read", "snippet"], "Наш сервис лучший.\n")
+    run([add, "--task", t, "--kind", "web", "--location", "https://gamma.org/c", "--level", "2", "--pub-date",
+         "2026-01-02"], "Ничего полезного.\n")
+    pos = os.path.join(t, "02e-position.md")
+    open(pos, "w", encoding="utf-8").write("Ставка: «пишут в день события» [F-001].\n")
+    open(os.path.join(t, "02c-validation.md"), "w", encoding="utf-8").write("Основание: «сервис лучший» [F-002]\n")
+    r = run([hs, t])
+    text, src = read_file(pos), read_file(os.path.join(t, "08-sources.md"))
+    expect("источники: id после цитаты стал именем сайта, ссылка — в 08-sources.md",
+           r.returncode == 0 and "«пишут в день события» (alpha.ru)." in text and "[F-" not in text
+           and "https://www.alpha.ru/a" in src, r.stdout + text)
+    expect("источники: счёт веба — найдено 3, дошло 1, в разборе 1, нигде 1, слабый назван",
+           "Найдено в вебе: 3. Дошло до сдачи: 1. Осталось в разборе: 1. Нигде не использовано: 1." in src
+           and "Слабые" in src and "beta.com (F-002)" in src, src)
+    r = run([hs, t])
+    expect("источники: повторный запуск помнит, что источник стоял в сдаче",
+           r.returncode == 0 and "Дошло до сдачи: 1." in read_file(os.path.join(t, "08-sources.md")), r.stdout)
+    open(pos, "w", encoding="utf-8").write("Ставка: «пишут в любой день» [F-001].\n")
+    r = run([hs, t])
+    expect("источники: несверенная цитата — id не заменён, код 1",
+           r.returncode == 1 and "[F-001]" in read_file(pos), r.stdout)
 
 
 def survey_and_coverage_tests(root):
@@ -2256,6 +2293,7 @@ def main():
         rules_tests()
         audit_tests(root)
         survey_and_coverage_tests(root)
+        handoff_sources_tests(root)
         message_tests()
         polygon_more_tests(root)
         effort_tests(root)
