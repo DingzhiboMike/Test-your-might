@@ -741,6 +741,14 @@ def path_tests(root):
     open(os.path.join(d, "00-tz.md"), "w", encoding="utf-8").write(re.sub(r"ЦЕНА:.*\n", "", tz))
     r = run([cp, d, "--tz"])
     expect("ТЗ: без строки ЦЕНА — поймано", r.returncode == 1 and "ЦЕНА" in r.stdout, r.stdout)
+    heavy = tz + "КОНТЕКСТ:   объём: много — 30 документов\nНАГРУЗКА:   уровень: лёгкий; ответ человека: «лёгкий» (в запросе)\n"
+    open(os.path.join(d, "00-tz.md"), "w", encoding="utf-8").write(heavy + "ЧТО ПОЛУЧИШЬ: бэклог из трёх тестов\n")
+    r = run([cp, d, "--tz"])
+    expect("ТЗ: много материалов и лёгкий уровень без предупреждения — поймано", r.returncode == 1 and "лёгкий" in r.stdout, r.stdout)
+    open(os.path.join(d, "00-tz.md"), "w", encoding="utf-8").write(
+        heavy + "ЧТО ПОЛУЧИШЬ: бэклог; на лёгком ключевые находки из ваших материалов могут не дойти до сдачи\n")
+    r = run([cp, d, "--tz"])
+    expect("ТЗ: много материалов, лёгкий уровень и предупреждение — проходит", r.returncode == 0, r.stdout)
 
 
 def polygon_more_tests(root):
