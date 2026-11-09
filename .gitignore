@@ -19,6 +19,7 @@ __pycache__/
 .obsidian/
 .opencode/
 .publish-stopwords
+.publish-allow
 .map-terms
 system-notes.local.md
 *.bundle

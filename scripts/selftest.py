@@ -695,6 +695,23 @@ def publish_tests(root):
     r = subprocess.run([PY, cp, "--pre-push"], input="refs/heads/main %s refs/heads/main %s\n" % (head, "0" * 40),
                        capture_output=True, text=True, cwd=repo)
     expect("публикация: хук перед отправкой ловит имя в сообщении коммита", r.returncode == 1 and "сообщение коммита" in r.stdout, r.stdout)
+    g("reset", "-q", "--hard", "HEAD~2")
+    side = os.path.join(root, "pubrepo-side")
+    g("worktree", "add", "-q", "-b", "side", side)
+    os.makedirs(os.path.join(side, "tasks", "t2"))
+    open(os.path.join(side, "tasks", "t2", "private.txt"), "w", encoding="utf-8").write("Проектина\nОбщеслово\n")
+    open(os.path.join(repo, "a.md"), "a", encoding="utf-8").write("Пример про Проектину и общеслово.\n")
+    g("commit", "-q", "-am", "слово из задачи другой папки")
+    r = subprocess.run([PY, cp, "--all"], capture_output=True, text=True, cwd=repo)
+    expect("публикация: слово из задачи в другой рабочей папке поймано", r.returncode == 1 and "Проектин" in r.stdout, r.stdout)
+    open(os.path.join(repo, ".publish-allow"), "w", encoding="utf-8").write("# открытые\nОбщеслово\n")
+    r = subprocess.run([PY, cp, "--all"], capture_output=True, text=True, cwd=repo)
+    expect("публикация: слово из .publish-allow не останавливает", r.returncode == 1 and "Проектин" in r.stdout
+           and "Общеслов" not in r.stdout, r.stdout)
+    open(os.path.join(side, "a.md"), "a", encoding="utf-8").write("Сказала Тестине.\n")
+    subprocess.run(["git", "-C", side, "commit", "-q", "-am", "пример"], capture_output=True)
+    r = subprocess.run([PY, cp, "--all"], capture_output=True, text=True, cwd=side)
+    expect("публикация: из папки эксперимента читаются и списки корня", r.returncode == 1 and "Тестин" in r.stdout, r.stdout)
 
 
 def path_tests(root):

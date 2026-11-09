@@ -6,7 +6,12 @@
 
 Слова берутся из локальных файлов, которые в репозиторий не попадают:
 - tasks/*/private.txt и tasks/*/closed-web.txt — имена, партнёры, коды из задач;
-- .publish-stopwords в корне — свои слова, по одному в строке (названия продуктов, компаний); строки с # — комментарии.
+- .publish-stopwords в корне — свои слова, по одному в строке (названия продуктов, компаний); строки с # — комментарии;
+- .publish-allow в корне — слова, которые не останавливают отправку, хотя стоят в списках выше: открытое название
+  системы или репозитория, обычное слово, совпавшее с закрытым названием. Файл тоже локальный: по нему видно,
+  какие слова закрыты.
+Списки читаются из всех рабочих папок репозитория (`git worktree list`): корня и папок экспериментов. Иначе
+отправка из папки эксперимента сверяется только с задачами этой папки.
 
 Проверка только локальная: слова проектов не должны попадать на GitHub ни в каком виде, в том числе в секреты
 репозитория для CI.
@@ -42,17 +47,37 @@ def stem(term):
     return t
 
 
-def load_terms(root):
-    files = glob.glob(os.path.join(root, "tasks", "*", "private.txt")) + \
-        glob.glob(os.path.join(root, "tasks", "*", "closed-web.txt")) + [os.path.join(root, ".publish-stopwords")]
+def checkouts(root):
+    """Корень и все рабочие папки того же репозитория."""
+    out = [root]
+    for line in git("worktree", "list", "--porcelain", root=root).splitlines():
+        if line.startswith("worktree "):
+            path = line[len("worktree "):]
+            if os.path.isdir(path) and os.path.realpath(path) not in map(os.path.realpath, out):
+                out.append(path)
+    return out
+
+
+def read_terms(paths):
     terms = set()
-    for path in files:
+    for path in paths:
         if not os.path.exists(path):
             continue
         for line in open(path, encoding="utf-8"):
             t = line.strip()
             if t and not t.startswith("#"):
                 terms.add(stem(t))
+    return terms
+
+
+def load_terms(root):
+    files, allow = [], []
+    for d in checkouts(root):
+        files += glob.glob(os.path.join(d, "tasks", "*", "private.txt")) + \
+            glob.glob(os.path.join(d, "tasks", "*", "closed-web.txt")) + [os.path.join(d, ".publish-stopwords")]
+        allow.append(os.path.join(d, ".publish-allow"))
+    allowed = {norm(t) for t in read_terms(allow)}
+    terms = {t for t in read_terms(files) if norm(t) not in allowed}
     rx = []
     for t in sorted(terms, key=len, reverse=True):
         body = re.escape(norm(t))
