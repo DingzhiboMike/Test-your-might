@@ -68,9 +68,9 @@ R-066,orchestrator/routes/research.md,Строгость по тиру.,2026-10-
 R-067,orchestrator/routes/sources.md,Путь консультанта — план по умолчанию.,2026-10-18,702d22b,—,—,активно
 R-068,orchestrator/routes/sources.md,"Ключевые пункты пути — с достаточностью, а не с лимитом.",2026-10-18,702d22b,—,—,активно
 R-069,orchestrator/routes/sources.md,Плана ходов заранее нет.,2026-10-18,702d22b,—,—,активно
-R-070,orchestrator/routes/sources.md,Зависимости.,2026-10-18,702d22b,—,—,активно
-R-071,orchestrator/routes/sources.md,Риск.,2026-10-18,702d22b,—,—,активно
-R-072,orchestrator/routes/sources.md,Стоимость.,2026-10-18,702d22b,—,—,активно
+R-070,orchestrator/routes/sources.md,Зависимости.,2026-10-18,702d22b,удалено 2026-11-09 — дубль R-051 (слои приоритетов в ядре),—,удалено
+R-071,orchestrator/routes/sources.md,Риск.,2026-10-18,702d22b,удалено 2026-11-09 — дубль R-052 (слои приоритетов в ядре),—,удалено
+R-072,orchestrator/routes/sources.md,Стоимость.,2026-10-18,702d22b,удалено 2026-11-09 — дубль R-053 (слои приоритетов в ядре),—,удалено
 R-073,orchestrator/routes/sources.md,Запрос данных.,2026-10-18,702d22b,—,—,активно
 R-074,orchestrator/routes/sources.md,Инструмент методологии.,2026-10-18,702d22b,—,—,активно
 R-075,orchestrator/routes/sources.md,Вопрос шага сверяется скриптом до вызова.,2026-10-18,702d22b,—,—,активно
