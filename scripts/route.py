@@ -36,7 +36,7 @@ import time
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, HERE)
-from check_effort import ideas_required, output_type, tz_field  # noqa: E402
+from check_effort import ideas_required, outside_required, output_type, tz_field  # noqa: E402
 import profile_lib  # noqa: E402
 
 STATE = "state.json"
@@ -46,7 +46,8 @@ SERVICE = ("log.md", "state.json", "state.json.tmp", "trace.jsonl", "trace.jsonl
            "00m-model.md", "00m-model.json", "00i-impact.md", "00d-map.md")
 
 # Обязательные шаги по типу выхода: (роль, артефакт, условие). Условие: None — всегда; "ideas" — если новые идеи
-# нужны (check_effort.ideas_required); "rehearsal" — если в РЕЖИМЕ «пробный прогон: да».
+# нужны (check_effort.ideas_required); "outside" — валидация, в логе «Вне гипотез: да» (R-087);
+# "rehearsal" — если в РЕЖИМЕ «пробный прогон: да».
 AUDIT = ("meaning-review", "audit.md", None)  # выборочный аудит итоговых артефактов (audit_sample.py)
 TAIL_IDEAS = [("nostradamus", "02f-forecast.md", None), ("hypothesis-validator", "02g-ideas-check.md", "ideas")]
 REQUIRED = {
@@ -69,6 +70,7 @@ REQUIRED = {
     "валидация": [("b2b-consultant", "01-review.md", None), ("hypothesis-validator", "02c-validation.md", None),
                   ("meaning-review", "review-02c-validation.md", None),
                   ("hypothesis-generator", "02b-reinforced.md", None), ("project-analyst", "03-plan.md", None),
+                  ("nostradamus", "02f-forecast.md", "outside"), ("hypothesis-validator", "02g-ideas-check.md", "outside"),
                   ("research-report", "06-validation.md", None),
                   ("meaning-review", "review-06-validation.md", None), AUDIT],
     "исследование": [("b2b-consultant", "01-review.md", None)] + TAIL_IDEAS +
@@ -88,7 +90,8 @@ READY_CHECKS = {
                       ("check_ideas.py", []), ("check_effort.py", []), ("check_rehearsal.py", [])],
     "ТЗ на доработку": [("check_path.py", []), ("check_log_sources.py", []), ("check_forecast.py", []),
                         ("check_ideas.py", []), ("check_readable.py", []), ("check_effort.py", [])],
-    "валидация": [("check_path.py", []), ("check_log_sources.py", []), ("check_readable.py", [])],
+    "валидация": [("check_path.py", []), ("check_log_sources.py", []), ("check_forecast.py", []),
+                  ("check_ideas.py", []), ("check_readable.py", [])],
     "карта направлений": [("check_path.py", []), ("check_readable.py", [])],
     "исследование": [("check_path.py", []), ("check_log_sources.py", []), ("check_forecast.py", []),
                      ("check_ideas.py", []), ("check_effort.py", [])],
@@ -189,6 +192,8 @@ def required(task):
         if kind in PROFILED and not profile_keeps(prof, role, art):
             continue
         if cond == "ideas" and not ideas_required(task):
+            continue
+        if cond == "outside" and not outside_required(task):
             continue
         if cond == "rehearsal" and not modes(tz)["rehearsal"]:
             continue

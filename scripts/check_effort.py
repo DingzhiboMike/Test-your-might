@@ -95,6 +95,11 @@ def ideas_required(task):
     return ideas_ordered(read(os.path.join(task, "00-tz.md"))) or all_narrowed(task)
 
 
+def outside_required(task):
+    """Валидация: оркестратор записал «Вне гипотез: да» — есть версия, в которую не целится ни одна гипотеза человека."""
+    return bool(re.search(r"^\s*Вне гипотез\s*:\s*да\b", read(os.path.join(task, "log.md")), re.I | re.M))
+
+
 def output_type(tz):
     v = tz_field(tz, "ТИП ВЫХОДА").lower()
     found = [t for t in CHECKED + ("разбор", "валидация", "вердикты по проверке", "карта направлений") if t.lower() in v]
