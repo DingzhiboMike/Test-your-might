@@ -56,6 +56,9 @@ def injection_tests(root):
             "Модели ИИ всё чаще применяют в продажах, и это меняет воронку.\n")
     r = run([add, "--task", t, "--kind", "web", "--location", "https://inj.ru/a", "--level", "3"], page)
     sid = r.stdout.strip()
+    rf = run([cq, "--task", t])
+    expect("цитаты: флаг вместо папки задачи — отказ, папка «--task» не создана",
+           rf.returncode == 2 and not os.path.exists("--task") and "неизвестный флаг" in rf.stderr, rf.stdout + rf.stderr)
     raw = open(os.path.join(t, "sources", "raw", sid + ".txt"), encoding="utf-8").read()
     expect("инъекция: строки с инструкцией скрыты в сыром тексте, обычные остались",
            "пароль" not in raw and "im_start" not in raw and "два дня в месяц" in raw and "меняет воронку" in raw, raw)
@@ -444,16 +447,60 @@ def effort_tests(root):
     expect("усилие: без свободных вызовов пропуск — предупреждение, не ошибка", r.returncode == 0 and "предупреждение" in r.stdout, r.stdout)
     open(os.path.join(d, "02c-validation.md"), "w", encoding="utf-8").write("ГИПОТЕЗА 1 — а\nВердикт:    сузить\n")
     hand = lambda t: open(os.path.join(d, "08-handoff.md"), "w", encoding="utf-8").write(t)
-    hand("# Сдача\n\n## Что запускать\nПисьмо.\n\n## Служебное\n")
+    svc = lambda t: open(os.path.join(d, "08-service.md"), "w", encoding="utf-8").write(
+        "# Служебная сдача\n\n## Рекомендации и пункты\n\n| № | Отвечает на | Стоит на |\n|---|---|---|\n" + t + "\n")
+    log("ШАГ 2 — customer-path\nПункт GAP: GAP 1 — Как выбрать момент письма\nЗакрыто: GAP 2 — конкуренты пишут в день события\n")
+    rec = ("1. **Письмо в день события.** Отвечает на: когда писать. Почему: «пишут в день события» — так делают "
+           "конкуренты. Цена: вечер. Первый шаг: выбрать сто клиентов. Откажусь, если ответов меньше 2%.\n")
+    nxt = "## Что нужно, чтобы двигаться дальше\nВыгрузка событий.\n\n"
+    more = "## А ещё есть идеи\n1. Бухгалтеру\n2. Календарь\n3. Кнопка\n"
+    good = "# Сдача\n\n## Что я рекомендую сделать\n" + rec + "\n" + nxt + more + "\n## Служебное\n"
+    svc("| 1 | GAP 1 | GAP 2 |")
+    hand("# Сдача\n\n" + nxt + "## Что я рекомендую сделать\n" + rec + "\n## Служебное\n")
     r = run([ce, d])
-    expect("усилие: всё «сузить», а сдача не с запроса данных — поймано", r.returncode == 1 and "двигаться дальше" in r.stdout, r.stdout)
-    more = "## А ещё есть идеи\n1. Бухгалтеру\n2. Календарь\n3. Кнопка\n4. Чат\n"
-    hand("# Сдача\n\n## Что нужно, чтобы двигаться дальше\nВыгрузка событий.\n\n" + more + "\n## Служебное\n")
+    expect("усилие: сдача начинается с запроса данных, а не с рекомендации — поймано", r.returncode == 1 and "начинается не с" in r.stdout, r.stdout)
+    hand(good)
+    r = run([ce, d])
+    expect("усилие: рекомендация отвечает на ключевой пункт и стоит на закрытом, запрос данных следом — проходит", r.returncode == 0, r.stdout)
+    hand(good.replace("Отвечает на: когда писать. Почему:", "Суть:"))
+    r = run([ce, d])
+    expect("усилие: рекомендация без «Отвечает на» и «Почему» — плохой вывод, поймано", r.returncode == 1 and "Отвечает на" in r.stdout, r.stdout)
+    hand(good)
+    svc("| 1 | GAP 1 | GAP 1 |")
+    r = run([ce, d])
+    expect("усилие: рекомендация стоит на незакрытом пункте — поймано", r.returncode == 1 and "незакрытых" in r.stdout, r.stdout)
+    svc("| 1 | GAP 2 | GAP 2 |")
+    r = run([ce, d])
+    expect("усилие: ключевой пункт без рекомендации — поймано", r.returncode == 1 and "без рекомендации: GAP 1" in r.stdout, r.stdout)
+    svc("| 1 | GAP 1 | GAP 2 |")
+    hand(good.replace("1. **Письмо в день события.**", "1. **Запросить выгрузку событий.**"))
+    r = run([ce, d])
+    expect("усилие: запрос данных рекомендацией №1 — предупреждение", r.returncode == 0 and "начинается с запроса данных" in r.stdout, r.stdout)
+    log("ШАГ 2 — customer-path\nПункт GAP: GAP 1 — Как выбрать момент письма\n"
+        "Закрыто: этап «материалы»; пункты GAP не закрыты — GAP 2 частично покрыт\nЗакрыто: GAP 1 — ход; GAP 2 — не закрыт (D-1)\n")
+    svc("| 1 | GAP 1 | GAP 2 |")
+    r = run([ce, d])
+    expect("усилие: «GAP 2 частично» и «GAP 2 — не закрыт» закрытым не считаются", r.returncode == 1 and "незакрытых пунктах: GAP 2" in r.stdout, r.stdout)
+    log("ШАГ 2 — customer-path\nПункт GAP: GAP 1 — Как выбрать момент письма\nЗакрыто: GAP 1 — ход; GAP 2 — конкуренты пишут в день события\n")
+    hand(good.replace(rec, rec + rec.replace("1. **", "2. **")))
+    svc("| 1 | GAP 1 | GAP 2 |\n| 2 | GAP 1 | GAP 2 |")
+    r = run([ce, d])
+    expect("усилие: у всех рекомендаций одна опора — предупреждение", r.returncode == 0 and "одна и та же опора" in r.stdout, r.stdout)
+    svc("| 1 | GAP 1 | GAP 2 |")
+    neg = "Почему: в сети различий по отрасли не нашли."
+    hand(good.replace("Почему:", neg + " Почему:"))
+    r = run([ce, d])
+    expect("усилие: «в сети не нашли» без того, где искали — поймано", r.returncode == 1 and "в сети нет" in r.stdout, r.stdout)
+    hand(good.replace("Почему:", neg[:-1] + " (vc.ru, habr.com). Почему:"))
+    r = run([ce, d])
+    expect("усилие: «в сети не нашли» с сайтами — проходит", r.returncode == 0, r.stdout)
+    hand(good)
+    hand(good.replace(nxt, ""))
+    r = run([ce, d])
+    expect("усилие: всё «сузить», а раздела с запросами данных нет — поймано", r.returncode == 1 and "двигаться дальше" in r.stdout, r.stdout)
+    hand(good.replace("3. Кнопка\n", "3. Кнопка\n4. Чат\n"))
     r = run([ce, d])
     expect("усилие: идей в сдаче больше ёмкости + 1 — поймано", r.returncode == 1 and "4 идей" in r.stdout, r.stdout)
-    hand("# Сдача\n\n## Что нужно, чтобы двигаться дальше\nВыгрузка событий.\n\n" + more.replace("4. Чат\n", "В очереди: чат.\n") + "\n## Служебное\n")
-    r = run([ce, d])
-    expect("усилие: сдача с запроса данных и ёмкостью + 1 идей проходит", r.returncode == 0, r.stdout)
     open(os.path.join(d, "00-tz.md"), "w", encoding="utf-8").write(tz.replace("ТИП ВЫХОДА: гипотезы", "ТИП ВЫХОДА: валидация"))
     r = run([ce, d])
     expect("усилие: валидация не проверяется", r.returncode == 0 and "не из проверяемых" in r.stdout, r.stdout)
@@ -682,16 +729,26 @@ def path_tests(root):
     expect("путь: пункт без исхода пойман", r.returncode == 1 and "П-2" in r.stdout, r.stdout)
     open(os.path.join(d, "log.md"), "w", encoding="utf-8").write(log)
     hs = os.path.join(HERE, "handoff_service.py")
+    open(os.path.join(d, "log.md"), "w", encoding="utf-8").write(
+        log + "\nЗапрос данных D-1\nВопрос:      доля бросивших по тарифам\nЧто снять:   выгрузка подписок\n\nШАГ 5 — финиш\n")
     r = run([hs, d])
     sv = open(os.path.join(d, "08-service.md"), encoding="utf-8").read()
-    expect("сдача: служебный файл собран скриптом — путь из лога, четыре раздела под заполнение",
-           r.returncode == 0 and "П-1 | GAP 1, 2" in sv and sv.count("— заполнить") == 4, r.stdout + sv)
+    expect("сдача: блок «Запрос данных D-1» без отступа попал в служебный файл целиком",
+           "- Запрос данных D-1 Вопрос:      доля бросивших по тарифам Что снять:   выгрузка подписок" in sv
+           and "ШАГ 5" not in sv.split("Запрос данных D-1")[1][:200], sv)
+    open(os.path.join(d, "log.md"), "w", encoding="utf-8").write(log)
+    os.remove(os.path.join(d, "08-service.md"))
+    r = run([hs, d])
+    sv = open(os.path.join(d, "08-service.md"), encoding="utf-8").read()
+    expect("сдача: служебный файл собран скриптом — путь из лога, пять разделов под заполнение (с «Рекомендации и пункты»)",
+           r.returncode == 0 and "П-1 | GAP 1, 2" in sv and sv.count("— заполнить") == 5
+           and "## Рекомендации и пункты" in sv and "## Источники сдачи" in sv, r.stdout + sv)
     open(os.path.join(d, "08-service.md"), "w", encoding="utf-8").write(sv.replace(
         "## Замечания к системе\n\n— заполнить", "## Замечания к системе\n\nУказатель длинный."))
     r = run([hs, d])
     sv2 = open(os.path.join(d, "08-service.md"), encoding="utf-8").read()
     expect("сдача: заполненный руками раздел сохраняется при пересборке",
-           "Указатель длинный." in sv2 and sv2.count("— заполнить") == 3, sv2)
+           "Указатель длинный." in sv2 and sv2.count("— заполнить") == 4, sv2)
     open(os.path.join(d, "log.md"), "w", encoding="utf-8").write("# Лог\n")
     r = run([cp, d])
     expect("путь: нет раздела «ПУТЬ — ИСХОДЫ» — ошибка", r.returncode == 1 and "ПУТЬ — ИСХОДЫ" in r.stdout, r.stdout)
@@ -715,6 +772,14 @@ def path_tests(root):
     open(os.path.join(d, "00-tz.md"), "w", encoding="utf-8").write(re.sub(r"ЦЕНА:.*\n", "", tz))
     r = run([cp, d, "--tz"])
     expect("ТЗ: без строки ЦЕНА — поймано", r.returncode == 1 and "ЦЕНА" in r.stdout, r.stdout)
+    heavy = tz + "КОНТЕКСТ:   объём: много — 30 документов\nНАГРУЗКА:   уровень: лёгкий; ответ человека: «лёгкий» (в запросе)\n"
+    open(os.path.join(d, "00-tz.md"), "w", encoding="utf-8").write(heavy + "ЧТО ПОЛУЧИШЬ: бэклог из трёх тестов\n")
+    r = run([cp, d, "--tz"])
+    expect("ТЗ: много материалов и лёгкий уровень без предупреждения — поймано", r.returncode == 1 and "лёгкий" in r.stdout, r.stdout)
+    open(os.path.join(d, "00-tz.md"), "w", encoding="utf-8").write(
+        heavy + "ЧТО ПОЛУЧИШЬ: бэклог; на лёгком ключевые находки из ваших материалов могут не дойти до сдачи\n")
+    r = run([cp, d, "--tz"])
+    expect("ТЗ: много материалов, лёгкий уровень и предупреждение — проходит", r.returncode == 0, r.stdout)
 
 
 def polygon_more_tests(root):
@@ -850,6 +915,42 @@ def audit_tests(root):
     plan_f = open(os.path.join(d2, "audit-plan.md"), encoding="utf-8").read()
     expect("аудит: без --lite план по-прежнему полный (оба артефакта)",
            "03-backlog.md" in plan_f and "Режим: полный" in plan_f, r.stdout + plan_f)
+
+
+def read_file(path):
+    with open(path, encoding="utf-8") as f:
+        return f.read()
+
+
+def handoff_sources_tests(root):
+    """Источники сдачи: id после цитаты — имя, ссылки и счёт веба — в 08-sources.md; несверенная цитата — без замены."""
+    hs, add = os.path.join(HERE, "handoff_sources.py"), os.path.join(HERE, "add_source.py")
+    t = os.path.join(root, "tasks", "hsrc")
+    os.makedirs(t)
+    run([add, "--task", t, "--kind", "web", "--location", "https://www.alpha.ru/a", "--level", "3", "--pub-date",
+         "2026-01-02"], "Клиенты пишут в день события и ждут ответа.\n")
+    run([add, "--task", t, "--kind", "web", "--location", "https://beta.com/b", "--level", "4", "--pub-date",
+         "2026-01-02", "--read", "snippet"], "Наш сервис лучший.\n")
+    run([add, "--task", t, "--kind", "web", "--location", "https://gamma.org/c", "--level", "2", "--pub-date",
+         "2026-01-02"], "Ничего полезного.\n")
+    pos = os.path.join(t, "02e-position.md")
+    open(pos, "w", encoding="utf-8").write("Ставка: «пишут в день события» [F-001].\n")
+    open(os.path.join(t, "02c-validation.md"), "w", encoding="utf-8").write("Основание: «сервис лучший» [F-002]\n")
+    r = run([hs, t])
+    text, src = read_file(pos), read_file(os.path.join(t, "08-sources.md"))
+    expect("источники: id после цитаты стал именем сайта, ссылка — в 08-sources.md",
+           r.returncode == 0 and "«пишут в день события» (alpha.ru)." in text and "[F-" not in text
+           and "https://www.alpha.ru/a" in src, r.stdout + text)
+    expect("источники: счёт веба — найдено 3, дошло 1, в разборе 1, нигде 1, слабый назван",
+           "Найдено в вебе: 3. Дошло до сдачи: 1. Осталось в разборе: 1. Нигде не использовано: 1." in src
+           and "Слабые" in src and "beta.com (F-002)" in src, src)
+    r = run([hs, t])
+    expect("источники: повторный запуск помнит, что источник стоял в сдаче",
+           r.returncode == 0 and "Дошло до сдачи: 1." in read_file(os.path.join(t, "08-sources.md")), r.stdout)
+    open(pos, "w", encoding="utf-8").write("Ставка: «пишут в любой день» [F-001].\n")
+    r = run([hs, t])
+    expect("источники: несверенная цитата — id не заменён, код 1",
+           r.returncode == 1 and "[F-001]" in read_file(pos), r.stdout)
 
 
 def survey_and_coverage_tests(root):
@@ -2231,6 +2332,7 @@ def main():
         rules_tests()
         audit_tests(root)
         survey_and_coverage_tests(root)
+        handoff_sources_tests(root)
         message_tests()
         polygon_more_tests(root)
         effort_tests(root)

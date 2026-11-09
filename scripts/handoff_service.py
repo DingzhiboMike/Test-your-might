@@ -7,9 +7,12 @@
 `route.py ready`), «Маршрут» (шаги из state.json), «Расход» (`trace_summary.py --save`), «Запросы данных» (блоки
 D-N из лога), «Числа» (numbers.csv), «Смысл, аудит и опоры» (строки «Смысл:» лога, `audit_sample.py --check`,
 сводка `checks/quotes.md`), «Источники из запроса» (строка ТЗ «обязательные источники» против реестра `sources.csv`:
-скрипт считает веб-строки реестра, а какие это источники — видно по реестру). Четыре раздела требуют суждения и остаются за оркестратором: «Обещанное и полученное»,
+скрипт считает веб-строки реестра, а какие это источники — видно по реестру). Пять разделов требуют суждения и остаются за оркестратором: «Обещанное и полученное», «Рекомендации и пункты»,
 «Что профиль не покрыл», «Перенесено в контекст», «Замечания к системе»: если они уже заполнены в существующем
 `08-service.md`, скрипт их сохраняет, иначе ставит заглушку «— заполнить». Печатает, сколько заглушек осталось.
+Первым зовёт `handoff_sources.py`: id источников в текстах для человека становятся именами, ссылки и счёт веба —
+в `08-sources.md`. Раздел «Рекомендации и пункты» (какой пункт GAP закрывает каждая рекомендация и на каких закрытых
+стоит, его сверяет `check_effort.py`) — тоже за оркестратором.
 Повторный запуск безопасен: механические разделы пересобираются, заполненные руками не трогаются.
 """
 import csv
@@ -19,7 +22,7 @@ import subprocess
 import sys
 
 HERE = os.path.dirname(os.path.abspath(__file__))
-MANUAL = ("Обещанное и полученное", "Что профиль не покрыл", "Перенесено в контекст", "Замечания к системе")
+MANUAL = ("Обещанное и полученное", "Рекомендации и пункты", "Что профиль не покрыл", "Перенесено в контекст", "Замечания к системе")
 STUB = "— заполнить"
 
 
@@ -82,10 +85,10 @@ def spend(task):
 def data_requests(log):
     blocks, cur = [], None
     for line in log.splitlines():
-        if re.match(r"^\s*\**D-\d+\b", line):
+        if re.match(r"^\s*[#*]*\s*(?:Запрос данных\s+)?D-\d+\b", line, re.I):
             cur = [line.strip()]
             blocks.append(cur)
-        elif cur is not None and line.startswith((" ", "\t")) and line.strip():
+        elif cur is not None and line.strip():
             cur.append(line.strip())
         else:
             cur = None
@@ -161,6 +164,7 @@ def main():
         sys.stderr.write(__doc__)
         return 2
     task = sys.argv[1].rstrip("/")
+    code, src = run("handoff_sources.py", task)
     log = read(os.path.join(task, "log.md"))
     path = os.path.join(task, "08-service.md")
     old = sections(read(path))
@@ -173,16 +177,17 @@ def main():
         ("Числа", numbers(task)),
         ("Смысл, аудит и опоры", meaning_audit(task, log)),
         ("Источники из запроса", source_coverage(task)),
+        ("Источники сдачи", (src or "handoff_sources.py не дал вывода") + "; подробно — 08-sources.md"),
     ]
     out = ["# Служебная сдача", ""]
     stubs = 0
-    for name in MANUAL[:1]:
+    for name in MANUAL[:2]:
         body = old.get(name) or STUB
         stubs += body == STUB
         out += ["## " + name, "", body, ""]
     for name, body in auto:
         out += ["## " + name, "", body, ""]
-    for name in MANUAL[1:]:
+    for name in MANUAL[2:]:
         body = old.get(name) or STUB
         stubs += body == STUB
         out += ["## " + name, "", body, ""]
