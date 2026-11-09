@@ -168,11 +168,37 @@ def gap_numbers(text):
     return got
 
 
+GAP_REF = re.compile(r"GAP\s*(\d+(?:\s*(?:,|и)\s*(?:GAP\s*)?\d+)*)")
+NOT_CLOSED = re.compile(r"не\s+закрыт|частичн|открыт", re.I)
+WEB_NEG = re.compile(r"(в сети|в вебе|в интернете|в открытых источник)", re.I)
+NEG = re.compile(r"\b(не|ни|нет)\b", re.I)
+WEB_MARK = re.compile(r"\[F-\d+\]|\([^)]*\w\.[a-zа-я]{2,}[^)]*\)|08-sources", re.I)
+
+
 def closed_gaps(log):
-    return set().union(*[gap_numbers(l) for l in re.findall(r"^\s*Закрыто\s*:(.*)$", log, re.M)] or [set()])
+    """Пункты из строк «Закрыто:», кроме тех, рядом с которыми «не закрыт», «частично», «открыт»
+    (до номера — в своём куске строки, после — до «;», «.» или следующего упоминания GAP)."""
+    got = set()
+    for line in re.findall(r"^\s*Закрыто\s*:(.*)$", log, re.M):
+        refs = list(GAP_REF.finditer(line))
+        for i, m in enumerate(refs):
+            start = max(line.rfind(";", 0, m.start()), line.rfind(". ", 0, m.start()),
+                        refs[i - 1].end() if i else -1) + 1
+            end = refs[i + 1].start() if i + 1 < len(refs) else len(line)
+            stop = re.search(r";|\.(\s|$)", line[m.end():end])
+            tail = line[m.end():m.end() + stop.start()] if stop else line[m.end():end]
+            if not NOT_CLOSED.search(line[start:m.start()]) and not NOT_CLOSED.search(tail[:60]):
+                got.update(int(n) for n in re.findall(r"\d+", m.group(1)))
+    return got
 
 
-def link_errors(task, tz, log, recs):
+def web_negatives(text):
+    """Фразы «в сети не нашли / нет» без того, где искали: ни id, ни сайта в скобках, ни ссылки на 08-sources.md."""
+    return [s.strip()[:80] for s in re.split(r"(?<=[.!?])\s+|\n", text)
+            if WEB_NEG.search(s) and NEG.search(s) and not WEB_MARK.search(s)]
+
+
+def link_errors(task, tz, log, recs, warns):
     """Таблица «Рекомендации и пункты» в 08-service.md: каждая рекомендация отвечает на пункт и стоит на закрытом."""
     if not recs:
         return ["в разделе «%s» нет пунктов «1.», «2.» …" % FIRST]
@@ -185,6 +211,10 @@ def link_errors(task, tz, log, recs):
         if len(cells) >= 3 and cells[0].isdigit():
             rows[int(cells[0])] = (gap_numbers(cells[1]), gap_numbers(cells[2]))
     errors, closed, answered = [], closed_gaps(log), set()
+    bases = [rows[n][1] for n in recs if n in rows]
+    if len(bases) > 1 and all(b and b == bases[0] for b in bases):
+        warns.append("«%s»: у всех рекомендаций одна и та же опора (%s) — проверь, что каждая стоит на своём"
+                     % (LINKS, ", ".join("GAP %d" % k for k in sorted(bases[0]))))
     for n in recs:
         if n not in rows:
             errors.append("«%s»: нет строки для рекомендации %d" % (LINKS, n))
@@ -247,7 +277,10 @@ def check(task):
                                   % (n, "», «".join(lack)))
             if recs and DATA_FIRST.search(re.sub(r"[*_]", "", recs[0][1])):
                 warns.append("рекомендация 1 начинается с запроса данных — запрос данных идёт в «%s»" % NEXT)
-            errors += link_errors(task, tz, log, [n for n, _ in recs])
+            errors += link_errors(task, tz, log, [n for n, _ in recs], warns)
+        for frag in web_negatives(handoff):
+            errors.append("сдача: «%s…» — вывод «в сети нет» без того, где искали: сайт после фразы или ссылка на 08-sources.md"
+                          % frag)
         if all_narrowed(task) and section(handoff, NEXT) is None:
             errors.append("все вердикты «сузить / не держится», а раздела «%s» (запросы данных, дешёвые замены) нет" % NEXT)
         cap = capacity(tz)

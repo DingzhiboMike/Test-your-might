@@ -84,6 +84,11 @@ def main():
         sys.exit(2)
     args = [x for x in sys.argv[1:] if x != "--check-a"]
     check_a = "--check-a" in sys.argv
+    bad = [x for x in args if x.startswith("-")]
+    if bad or not os.path.isdir(args[0] if args else ""):
+        sys.stderr.write("check_quotes: %s — первым аргументом нужна существующая папка задачи\n"
+                         % ("неизвестный флаг " + bad[0] if bad else "нет папки «%s»" % (args[0] if args else "")))
+        sys.exit(2)
     task = args[0].rstrip("/")
     names = args[1:] or sorted(n for n in os.listdir(task) if n.endswith(".md") and n not in SKIP)
     reg = load_registry(task)

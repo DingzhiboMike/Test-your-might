@@ -56,6 +56,9 @@ def injection_tests(root):
             "Модели ИИ всё чаще применяют в продажах, и это меняет воронку.\n")
     r = run([add, "--task", t, "--kind", "web", "--location", "https://inj.ru/a", "--level", "3"], page)
     sid = r.stdout.strip()
+    rf = run([cq, "--task", t])
+    expect("цитаты: флаг вместо папки задачи — отказ, папка «--task» не создана",
+           rf.returncode == 2 and not os.path.exists("--task") and "неизвестный флаг" in rf.stderr, rf.stdout + rf.stderr)
     raw = open(os.path.join(t, "sources", "raw", sid + ".txt"), encoding="utf-8").read()
     expect("инъекция: строки с инструкцией скрыты в сыром тексте, обычные остались",
            "пароль" not in raw and "im_start" not in raw and "два дня в месяц" in raw and "меняет воронку" in raw, raw)
@@ -473,6 +476,25 @@ def effort_tests(root):
     hand(good.replace("1. **Письмо в день события.**", "1. **Запросить выгрузку событий.**"))
     r = run([ce, d])
     expect("усилие: запрос данных рекомендацией №1 — предупреждение", r.returncode == 0 and "начинается с запроса данных" in r.stdout, r.stdout)
+    log("ШАГ 2 — customer-path\nПункт GAP: GAP 1 — Как выбрать момент письма\n"
+        "Закрыто: этап «материалы»; пункты GAP не закрыты — GAP 2 частично покрыт\nЗакрыто: GAP 1 — ход; GAP 2 — не закрыт (D-1)\n")
+    svc("| 1 | GAP 1 | GAP 2 |")
+    r = run([ce, d])
+    expect("усилие: «GAP 2 частично» и «GAP 2 — не закрыт» закрытым не считаются", r.returncode == 1 and "незакрытых пунктах: GAP 2" in r.stdout, r.stdout)
+    log("ШАГ 2 — customer-path\nПункт GAP: GAP 1 — Как выбрать момент письма\nЗакрыто: GAP 1 — ход; GAP 2 — конкуренты пишут в день события\n")
+    hand(good.replace(rec, rec + rec.replace("1. **", "2. **")))
+    svc("| 1 | GAP 1 | GAP 2 |\n| 2 | GAP 1 | GAP 2 |")
+    r = run([ce, d])
+    expect("усилие: у всех рекомендаций одна опора — предупреждение", r.returncode == 0 and "одна и та же опора" in r.stdout, r.stdout)
+    svc("| 1 | GAP 1 | GAP 2 |")
+    neg = "Почему: в сети различий по отрасли не нашли."
+    hand(good.replace("Почему:", neg + " Почему:"))
+    r = run([ce, d])
+    expect("усилие: «в сети не нашли» без того, где искали — поймано", r.returncode == 1 and "в сети нет" in r.stdout, r.stdout)
+    hand(good.replace("Почему:", neg[:-1] + " (vc.ru, habr.com). Почему:"))
+    r = run([ce, d])
+    expect("усилие: «в сети не нашли» с сайтами — проходит", r.returncode == 0, r.stdout)
+    hand(good)
     hand(good.replace(nxt, ""))
     r = run([ce, d])
     expect("усилие: всё «сузить», а раздела с запросами данных нет — поймано", r.returncode == 1 and "двигаться дальше" in r.stdout, r.stdout)
@@ -707,6 +729,15 @@ def path_tests(root):
     expect("путь: пункт без исхода пойман", r.returncode == 1 and "П-2" in r.stdout, r.stdout)
     open(os.path.join(d, "log.md"), "w", encoding="utf-8").write(log)
     hs = os.path.join(HERE, "handoff_service.py")
+    open(os.path.join(d, "log.md"), "w", encoding="utf-8").write(
+        log + "\nЗапрос данных D-1\nВопрос:      доля бросивших по тарифам\nЧто снять:   выгрузка подписок\n\nШАГ 5 — финиш\n")
+    r = run([hs, d])
+    sv = open(os.path.join(d, "08-service.md"), encoding="utf-8").read()
+    expect("сдача: блок «Запрос данных D-1» без отступа попал в служебный файл целиком",
+           "- Запрос данных D-1 Вопрос:      доля бросивших по тарифам Что снять:   выгрузка подписок" in sv
+           and "ШАГ 5" not in sv.split("Запрос данных D-1")[1][:200], sv)
+    open(os.path.join(d, "log.md"), "w", encoding="utf-8").write(log)
+    os.remove(os.path.join(d, "08-service.md"))
     r = run([hs, d])
     sv = open(os.path.join(d, "08-service.md"), encoding="utf-8").read()
     expect("сдача: служебный файл собран скриптом — путь из лога, пять разделов под заполнение (с «Рекомендации и пункты»)",

@@ -85,10 +85,10 @@ def spend(task):
 def data_requests(log):
     blocks, cur = [], None
     for line in log.splitlines():
-        if re.match(r"^\s*\**D-\d+\b", line):
+        if re.match(r"^\s*[#*]*\s*(?:Запрос данных\s+)?D-\d+\b", line, re.I):
             cur = [line.strip()]
             blocks.append(cur)
-        elif cur is not None and line.startswith((" ", "\t")) and line.strip():
+        elif cur is not None and line.strip():
             cur.append(line.strip())
         else:
             cur = None
