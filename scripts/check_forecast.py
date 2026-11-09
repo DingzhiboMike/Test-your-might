@@ -19,6 +19,12 @@
    если в ТЗ РЕЖИМ «новые идеи: да» или все итоговые вердикты «сузить / не держится» (check_effort.ideas_required).
    В режиме «только версии» раздела «НОВЫЕ ИДЕИ» нет, и пункт 4 не проверяется.
 
+6. Тип «валидация» [R-087]: в логе строка «Вне гипотез: да — У-k: <версия>» или «Вне гипотез: нет — <почему>»
+   (есть ли версия «Скорее» из проверки по сути, в которую не целится ни одна гипотеза человека). При «да» —
+   `02f-forecast.md` с «РЕЖИМ: вне гипотез»: одна–три идеи, у каждой «Повод: У-k» и те же поля, что в пункте 4;
+   РАМКА и разделы GAP не нужны — версии по утверждениям уже есть в проверке по сути. Живая идея из отсева —
+   в сдаче разделом «Замечено вне ваших гипотез», не больше двух пунктов. Режим «вне гипотез» — только в валидации.
+
 Цитаты в файле проверяет `check_quotes.py`, как в любом артефакте. Ошибка — код возврата 1.
 Отчёт: tasks/<папка>/checks/forecast.md. Нет `02f-forecast.md` — проверять нечего (код 0); есть ли он на финише,
 сверяет чек-лист готовности.
@@ -29,7 +35,11 @@ import sys
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from check_path import gap_items  # noqa: E402
-from check_effort import all_narrowed, ideas_ordered  # noqa: E402
+from check_effort import all_narrowed, ideas_ordered, output_type  # noqa: E402
+
+OUTSIDE = "Замечено вне ваших гипотез"
+OUTSIDE_LINE = re.compile(r"^\s*Вне гипотез\s*:\s*(да|нет)\b\s*[—-]?\s*(.*)$", re.I | re.M)
+LIVE = re.compile(r"кажется валидной|переделать первый шаг", re.I)
 
 FIELDS = ("Лучшая версия", "Уверенность", "На чём стоит", "Альтернативы", "Что различит", "Следующий шаг",
           "Если версия неверна")
@@ -87,9 +97,16 @@ def gap_sections(text):
 
 def check(task):
     fc = read(os.path.join(task, "02f-forecast.md"))
+    tz = read(os.path.join(task, "00-tz.md"))
+    if output_type(tz) == "валидация":
+        errors, moves = check_outside(task)
+        return (None if not fc and not errors else []), errors, moves
     if not fc:
         return None, [], 0
     errors = []
+    mode0 = re.search(r"^\s*РЕЖИМ\s*:\s*(.*)$", fc, re.M)
+    if mode0 and "вне гипотез" in mode0.group(1).lower():
+        return [], ["режим «вне гипотез» — только в типе «валидация»"], 0
 
     m = re.search(r"^#{0,3}\s*РАМКА\b", fc, re.M)
     if not m:
@@ -148,30 +165,81 @@ def check(task):
     elif not more:
         errors.append("нет раздела «НОВЫЕ ИДЕИ» — главного выхода режима с новыми идеями")
     else:
-        body = fc[more.end():]
-        stop = re.search(r"^#{1,3}\s|^РАМКА\b", body, re.M)
-        body = body[:stop.start()] if stop else body
-        starts = list(re.finditer(r"^(\d+)[.)]\s*\S", body, re.M))
-        moves = len(starts)
-        if moves < 5:
-            errors.append("«НОВЫЕ ИДЕИ»: идей %d, нужно не меньше пяти" % moves)
-        need = (("не повтор", "не повторяет", "чем отличается от проверенного"),
-                ("уточн", "уточнит", "какие данные или наблюдение уточнят идею"),
-                ("первый шаг", "первый шаг", "что сделать на этой неделе"))
-        for i, m in enumerate(starts):
-            item = body[m.start():starts[i + 1].start() if i + 1 < len(starts) else len(body)]
-            for stem, label, why in need:
-                fm = re.search(r"%s\w*\s*:\s*(.*)" % stem, item, re.I)
-                if not fm or not meaningful(fm.group(1)):
-                    errors.append("«НОВЫЕ ИДЕИ», идея %s: нет «%s:» — %s" % (m.group(1), label, why))
-            on = re.search(r"на\s+ч[её]м\s*:\s*(.*)", item, re.I)
-            if not on or not meaningful(on.group(1)):
-                errors.append("«НОВЫЕ ИДЕИ», идея %s: нет «На чём:» — на каком поле источника или новом сборе делается "
-                              "первый шаг" % m.group(1))
-            elif not re.search(r"«[^»]+»\s*\[F-\d+\]", on.group(1)) and not re.search(r"новый\s+сбор", on.group(1), re.I):
-                errors.append("«НОВЫЕ ИДЕИ», идея %s: первый шаг не опирается ни на поле источника, ни на новый сбор"
-                              % m.group(1))
+        moves = idea_errors(fc, more, errors, 5, 10)
     return keys, errors, moves
+
+
+def idea_errors(fc, more, errors, low, high, cause=False):
+    """Поля каждой идеи раздела «НОВЫЕ ИДЕИ»; возвращает число идей."""
+    body = fc[more.end():]
+    stop = re.search(r"^#{1,3}\s|^РАМКА\b", body, re.M)
+    body = body[:stop.start()] if stop else body
+    starts = list(re.finditer(r"^(\d+)[.)]\s*\S", body, re.M))
+    moves = len(starts)
+    if moves < low:
+        errors.append("«НОВЫЕ ИДЕИ»: идей %d, нужно не меньше %s" % (moves, "пяти" if low == 5 else low))
+    elif moves > high and high < 10:
+        errors.append("«НОВЫЕ ИДЕИ»: идей %d, в этом режиме не больше %d" % (moves, high))
+    need = (("не повтор", "не повторяет", "чем отличается от проверенного"),
+            ("уточн", "уточнит", "какие данные или наблюдение уточнят идею"),
+            ("первый шаг", "первый шаг", "что сделать на этой неделе"))
+    for i, m in enumerate(starts):
+        item = body[m.start():starts[i + 1].start() if i + 1 < len(starts) else len(body)]
+        for stem, label, why in need:
+            fm = re.search(r"%s\w*\s*:\s*(.*)" % stem, item, re.I)
+            if not fm or not meaningful(fm.group(1)):
+                errors.append("«НОВЫЕ ИДЕИ», идея %s: нет «%s:» — %s" % (m.group(1), label, why))
+        on = re.search(r"на\s+ч[её]м\s*:\s*(.*)", item, re.I)
+        if not on or not meaningful(on.group(1)):
+            errors.append("«НОВЫЕ ИДЕИ», идея %s: нет «На чём:» — на каком поле источника или новом сборе делается "
+                          "первый шаг" % m.group(1))
+        elif not re.search(r"«[^»]+»\s*\[F-\d+\]", on.group(1)) and not re.search(r"новый\s+сбор", on.group(1), re.I):
+            errors.append("«НОВЫЕ ИДЕИ», идея %s: первый шаг не опирается ни на поле источника, ни на новый сбор"
+                          % m.group(1))
+        if cause and not re.search(r"Повод\s*:.*У-\d+", item):
+            errors.append("«НОВЫЕ ИДЕИ», идея %s: нет «Повод: У-k» — из какой версии проверки по сути она выросла" % m.group(1))
+    return moves
+
+
+def check_outside(task):
+    """Тип «валидация»: строка «Вне гипотез» в логе, режим «вне гипотез» и раздел в сдаче."""
+    errors, moves = [], 0
+    log = read(os.path.join(task, "log.md"))
+    fc = read(os.path.join(task, "02f-forecast.md"))
+    line = OUTSIDE_LINE.search(log)
+    if not line:
+        if os.path.exists(os.path.join(task, "02c-validation.md")):
+            errors.append("в логе нет строки «Вне гипотез: да — У-k: … / нет — почему»: не решено, есть ли версия, "
+                          "в которую не целится ни одна гипотеза человека")
+    elif line.group(1).lower() == "нет" and len(line.group(2).strip()) < 10:
+        errors.append("«Вне гипотез: нет» без причины")
+    elif line.group(1).lower() == "да":
+        if not re.search(r"У-\d+", line.group(2)):
+            errors.append("«Вне гипотез: да» без утверждения У-k, из версии которого вырос повод")
+        if not fc:
+            errors.append("«Вне гипотез: да», а 02f-forecast.md нет — Нострадамус в режиме «вне гипотез» не вызван")
+    if fc:
+        mode = re.search(r"^\s*РЕЖИМ\s*:\s*(.*)$", fc, re.M)
+        if not mode or "вне гипотез" not in mode.group(1).lower():
+            errors.append("в валидации у Нострадамуса только режим «вне гипотез» — первая строка «РЕЖИМ: вне гипотез»")
+        more = re.search(r"^#{0,3}\s*НОВЫЕ ИДЕИ\b.*$", fc, re.M | re.I)
+        if not more:
+            errors.append("нет раздела «НОВЫЕ ИДЕИ» — главного выхода режима «вне гипотез»")
+        else:
+            moves = idea_errors(fc, more, errors, 1, 3, cause=True)
+    live = len(LIVE.findall(read(os.path.join(task, "02g-ideas-check.md"))))
+    hand = read(os.path.join(task, "08-handoff.md"))
+    if live and hand:
+        sec = re.search(r"^#{2,}\s*%s.*$" % OUTSIDE, hand, re.M)
+        if not sec:
+            errors.append("отсев оставил живые идеи, а в сдаче нет раздела «%s»" % OUTSIDE)
+        else:
+            body = hand[sec.end():]
+            nxt = re.search(r"^#{2,}\s", body, re.M)
+            n = len(re.findall(r"^\s*(?:\d+[.)]|[-—•*])\s+\S", body[:nxt.start()] if nxt else body, re.M))
+            if n > 2:
+                errors.append("«%s»: %d пунктов — не больше двух" % (OUTSIDE, n))
+    return errors, moves
 
 
 def main():
