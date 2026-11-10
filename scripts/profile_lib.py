@@ -16,6 +16,8 @@
   reviewer:   same | other | human          — проверка смысла и аудит: same (по умолчанию на всех уровнях) — модель по умолчанию; other — модель
                                               сильнее, чем у авторов, того же производителя (sonnet → opus;
                                               audit_sample.py --check сверяет по трассе); human — то же, и места аудита идут человеку в сдачу
+  audit:      off | on                      — аудит находок до генерации (00a-audit.md): проверка по сути сверяет ключевые
+                                              находки разбора материалов до генератора; по умолчанию off на всех уровнях
   ceiling:    произвольная строка           — потолок вызовов и модель (подсказка оркестратору)
 
 Шкала «креатив ↔ точность» (К5 … Т5) — язык для человека; уровни нагрузки — её готовые наборы:
@@ -24,13 +26,13 @@
 import json
 import os
 
-KEYS = ("level", "generation", "evidence", "validation", "forecast", "lenses", "data", "ceiling", "run", "reviewer")
+KEYS = ("level", "generation", "evidence", "validation", "forecast", "lenses", "data", "ceiling", "run", "reviewer", "audit")
 DEFAULT = {"level": "strict", "generation": "wide", "evidence": "quotes", "validation": "full", "forecast": "on",
-           "lenses": "0", "data": "context", "ceiling": "", "run": "steps", "reviewer": "same"}
+           "lenses": "0", "data": "context", "ceiling": "", "run": "steps", "reviewer": "same", "audit": "off"}
 CHOICES = {"level": ("fast", "light", "work", "strict"), "generation": ("narrow", "medium", "wide"),
            "evidence": ("none", "links", "quotes"), "validation": ("none", "method", "web", "full"),
            "forecast": ("on", "off"), "lenses": ("0", "1", "2", "3"), "data": ("none", "context", "public"), "run": ("steps", "solo"),
-           "reviewer": ("same", "other", "human")}
+           "reviewer": ("same", "other", "human"), "audit": ("off", "on")}
 # Готовые наборы по уровню. fast — без маршрута (ответ диспетчера/оркестратора без исполнителей, 0–2 вызова).
 LEVELS = {
     "fast": {"generation": "narrow", "evidence": "none", "validation": "none", "forecast": "off", "lenses": "0", "run": "steps", "reviewer": "same"},
