@@ -12,4 +12,4 @@
 
 Высота окна и имя файла для остальных схем: маршруты — `952,900` и `architecture-2-routes`; пример прогона (валидация идеи) — `952,560` и `architecture-3-example`; картография документов — `952,580` и `architecture-4-document-mapping`. Для роли и хранилищ (`architecture-1-roles`) — `952,1000`. Chromium под Linux съедает около 88 px высоты на рамку окна: добавь их к высоте, а пустое поле снизу обрежь.
 
-Предложения: по картографии документов — `proposal-document-dossiers.md`, по синтетическому стенду — `proposal-synthetic-stand.md`. Актуальное описание системы — `AGENTS.md` в корне; указатель исполнителей — `.claude/skills/orchestrator/registry.md`, контракт каждого — в конце его `SKILL.md`, маршруты оркестратора — `.claude/skills/orchestrator/routes/`.
+Предложение по картографии документов — `proposal-document-dossiers.md` в этой папке. Актуальное описание системы — `AGENTS.md` в корне; указатель исполнителей — `.claude/skills/orchestrator/registry.md`, контракт каждого — в конце его `SKILL.md`, маршруты оркестратора — `.claude/skills/orchestrator/routes/`.
