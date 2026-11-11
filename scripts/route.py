@@ -25,6 +25,7 @@ state.json пишет только этот скрипт. Шаг — роль, �
 Обязательные шаги и артефакты готовности — по типу выхода (REQUIRED). Решения, какой источник звать, остаются
 за оркестратором: скрипт проверяет только допустимость и полноту. Код возврата 1 — ошибки.
 """
+import csv
 import fnmatch
 import hashlib
 import json
@@ -47,22 +48,25 @@ SERVICE = ("log.md", "state.json", "state.json.tmp", "trace.jsonl", "trace.jsonl
 
 # Обязательные шаги по типу выхода: (роль, артефакт, условие). Условие: None — всегда; "ideas" — если новые идеи
 # нужны (check_effort.ideas_required); "outside" — валидация, в логе «Вне гипотез: да» (R-087);
-# "rehearsal" — если в РЕЖИМЕ «пробный прогон: да».
+# "rehearsal" — если в РЕЖИМЕ «пробный прогон: да»; "tests" — в реестре не меньше TESTS_MIN отчётов о тестах
+# (ctx_type=result) и прогон не одиночный; "audit" — профиль audit=on (аудит находок до генерации).
 AUDIT = ("meaning-review", "audit.md", None)  # выборочный аудит итоговых артефактов (audit_sample.py)
 TAIL_IDEAS = [("nostradamus", "02f-forecast.md", None), ("hypothesis-validator", "02g-ideas-check.md", "ideas")]
+TESTS_MIN = 3
+PRE_GEN = [("experiment-review", "src-experiments.md", "tests"), ("hypothesis-validator", "00a-audit.md", "audit")]
 REQUIRED = {
     "разбор": [("b2b-consultant", "01-review.md", None)],
-    "гипотезы": [("b2b-consultant", "01-review.md", None), ("hypothesis-generator", "02-hypotheses.md", None),
+    "гипотезы": [("b2b-consultant", "01-review.md", None)] + PRE_GEN + [("hypothesis-generator", "02-hypotheses.md", None),
                  ("hypothesis-validator", "02c-validation.md", None),
                  ("meaning-review", "review-02c-validation.md", None)] + TAIL_IDEAS +
                 [("b2b-consultant", "02e-position.md", None), ("project-analyst", "03-backlog.md", None),
                  ("synthetic-interviews", "03c-rehearsal.md", "rehearsal"), AUDIT],
-    "план проверки": [("b2b-consultant", "01-review.md", None), ("hypothesis-generator", "02-hypotheses.md", None),
+    "план проверки": [("b2b-consultant", "01-review.md", None)] + PRE_GEN + [("hypothesis-generator", "02-hypotheses.md", None),
                       ("hypothesis-validator", "02c-validation.md", None),
                       ("meaning-review", "review-02c-validation.md", None)] + TAIL_IDEAS +
                      [("project-analyst", "03-plan.md", None), ("test-kit", "03b-test-kit.md", None),
                       ("synthetic-interviews", "03c-rehearsal.md", "rehearsal"), AUDIT],
-    "ТЗ на доработку": [("b2b-consultant", "01-review.md", None), ("hypothesis-generator", "02-hypotheses.md", None),
+    "ТЗ на доработку": [("b2b-consultant", "01-review.md", None)] + PRE_GEN + [("hypothesis-generator", "02-hypotheses.md", None),
                         ("hypothesis-validator", "02c-validation.md", None),
                         ("meaning-review", "review-02c-validation.md", None)] + TAIL_IDEAS +
                        [("b2b-consultant", "02e-position.md", None), ("brief-writer", "07a-analyst.md", None),
@@ -162,6 +166,15 @@ def allowed_writes(task):
     return masks
 
 
+def tests_in_context(task):
+    """Сколько отчётов о тестах (ctx_type=result) зарегистрировано источниками контекста."""
+    try:
+        with open(os.path.join(task, "sources.csv"), encoding="utf-8", newline="") as f:
+            return sum(1 for r in csv.DictReader(f) if r.get("ctx_type") == "result" and r.get("kind") in ("context", "from-tasks"))
+    except OSError:
+        return 0
+
+
 def modes(tz):
     return {"rehearsal": bool(re.search(r"пробный прогон:\s*да", tz_field(tz, "РЕЖИМ")))}
 
@@ -196,6 +209,10 @@ def required(task):
         if cond == "outside" and not outside_required(task):
             continue
         if cond == "rehearsal" and not modes(tz)["rehearsal"]:
+            continue
+        if cond == "tests" and (prof.get("run") == "solo" or tests_in_context(task) < TESTS_MIN):
+            continue
+        if cond == "audit" and (prof.get("run") == "solo" or prof.get("audit") != "on"):
             continue
         out.append((role, art))
     if kind == "гипотезы" and prof.get("run") == "solo":
@@ -448,6 +465,7 @@ def cmd_ready(task):
         checks.append(("check_path.py", ["--tz"]))
     if os.path.exists(os.path.join(task, "00k-knowledge.md")):
         checks.append(("check_knowledge.py", []))
+        checks.append(("check_carry.py", []))
     if os.path.exists(os.path.join(task, "numbers.csv")):
         checks.append(("check_numbers.py", []))
     if prof["evidence"] != "quotes":

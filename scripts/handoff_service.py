@@ -23,6 +23,7 @@ import sys
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 MANUAL = ("Обещанное и полученное", "Рекомендации и пункты", "Что профиль не покрыл", "Перенесено в контекст", "Замечания к системе")
+FATE = "Судьба находок"
 STUB = "— заполнить"
 
 
@@ -187,13 +188,16 @@ def main():
         out += ["## " + name, "", body, ""]
     for name, body in auto:
         out += ["## " + name, "", body, ""]
-    for name in MANUAL[2:]:
+    tail = list(MANUAL[2:])
+    if re.search(r"^\|\s*Н-\d", read(os.path.join(task, "00k-knowledge.md")), re.M):
+        tail.insert(0, FATE)  # реестр находок есть — раздел за оркестратором, сверяет check_carry.py
+    for name in tail:
         body = old.get(name) or STUB
         stubs += body == STUB
         out += ["## " + name, "", body, ""]
     open(path, "w", encoding="utf-8").write("\n".join(out).rstrip() + "\n")
     print("08-service.md собран: разделов %d, заглушек для оркестратора %d (%s)" % (
-        len(auto) + len(MANUAL), stubs, ", ".join(n for n in MANUAL if (old.get(n) or STUB) == STUB) or "нет"))
+        len(auto) + 2 + len(tail), stubs, ", ".join(n for n in list(MANUAL[:2]) + tail if (old.get(n) or STUB) == STUB) or "нет"))
     return 0
 
 

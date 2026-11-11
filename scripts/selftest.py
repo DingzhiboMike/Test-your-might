@@ -1168,6 +1168,72 @@ def route_tests():
         shutil.rmtree(proj, ignore_errors=True)
 
 
+def carry_tests():
+    """Реестр находок, аудит до генерации и обязательный разбор тестов."""
+    proj = tempfile.mkdtemp(prefix="polygon-carry-")
+    try:
+        open(os.path.join(proj, "AGENTS.md"), "w", encoding="utf-8").write("#\n")
+        t = os.path.join(proj, "tasks", "cr")
+        os.makedirs(t)
+        cc, rt = os.path.join(HERE, "check_carry.py"), os.path.join(HERE, "route.py")
+        w = lambda name, text: open(os.path.join(t, name), "w", encoding="utf-8").write(text)
+        r = run([cc, t])
+        expect("находки: нет реестра — проверять нечего", r.returncode == 0 and "нет" in r.stdout, r.stdout)
+        table = ("## КЛЮЧЕВЫЕ НАХОДКИ\n| № | Находка | Опора | Чем ключевая |\n| --- | --- | --- | --- |\n"
+                 "| Н-01 | в контроле часть возвращается сама | «возвращаются сами» [F-001] | число с контролем |\n"
+                 "| Н-02 | доля посчитана без ушедших | «без ушедших» [F-002] | спорит с утверждением команды |\n")
+        w("00k-knowledge.md", table)
+        r = run([cc, t])
+        expect("находки: реестр без сдачи и аудита — без ошибок", r.returncode == 0 and "Находок: 2" in r.stdout, r.stdout)
+        w("00k-knowledge.md", table + "| Н-03 | находка без опоры | пересказ | число с базой |\n")
+        r = run([cc, t])
+        expect("находки: строка без дословной опоры — ошибка", r.returncode == 1 and "Н-03" in r.stdout, r.stdout)
+        w("00k-knowledge.md", table)
+        w("00a-audit.md", "Н-01 | выжила | сверено с таблицей итогов теста\n")
+        r = run([cc, t])
+        expect("аудит: находка без статуса — ошибка", r.returncode == 1 and "Н-02" in r.stdout, r.stdout)
+        w("00a-audit.md", "Н-01 | выжила | сверено с таблицей итогов теста\nН-02 | снята | в источнике доля по всей базе\n")
+        w("02-hypotheses.md", "Гипотеза 1\nСтоит на:   Н-02\n\nГипотеза 2\nСтоит на:   вне находок\n")
+        r = run([cc, t])
+        expect("аудит: гипотеза на снятой находке — ошибка", r.returncode == 1 and "снятой аудитом" in r.stdout, r.stdout)
+        w("02-hypotheses.md", "Гипотеза 1\nСтоит на:   Н-01\n\nГипотеза 2\nСтоит на:   вне находок\n")
+        r = run([cc, t])
+        expect("аудит: гипотезы на выживших находках — без ошибок", r.returncode == 0, r.stdout)
+        w("08-handoff.md", "# Сдача\n\nБез воздействия часть клиентов возвращается сама за две недели.\n")
+        w("08-service.md", "# Служебная сдача\n\n## Маршрут\n\n—\n")
+        r = run([cc, t])
+        expect("судьба: сдача есть, раздела нет — ошибка", r.returncode == 1 and "Судьба находок" in r.stdout, r.stdout)
+        fate = "# Служебная сдача\n\n## Судьба находок\n\n| № | Судьба | Где |\n| --- | --- | --- |\n%s\n## Маршрут\n\n—\n"
+        w("08-service.md", fate % "| Н-01 | в сдаче | «клиенты уходят к конкурентам» |\n| Н-02 | снята | аудит: в источнике доля по всей базе |\n")
+        r = run([cc, t])
+        expect("судьба: фразы нет в сдаче — ошибка", r.returncode == 1 and "нет в 08-handoff.md" in r.stdout, r.stdout)
+        w("08-service.md", fate % "| Н-01 | в сдаче | «часть клиентов возвращается сама» |\n")
+        r = run([cc, t])
+        expect("судьба: находка без строки — ошибка", r.returncode == 1 and "нет строки для Н-02" in r.stdout, r.stdout)
+        w("08-service.md", fate % "| Н-01 | в сдаче | «часть клиентов возвращается сама» |\n| Н-02 | снята | аудит: в источнике доля по всей базе |\n")
+        r = run([cc, t])
+        expect("судьба: у каждой находки фраза из сдачи или причина — без ошибок", r.returncode == 0, r.stdout)
+
+        t2 = os.path.join(proj, "tasks", "rq")
+        os.makedirs(t2)
+        open(os.path.join(t2, "00-tz.md"), "w", encoding="utf-8").write("ТЗ\nТИП ВЫХОДА: гипотезы\nСОГЛАСОВАНО: да\n")
+        run([rt, "init", t2])
+        run([rt, "profile", t2, "level=work"])
+        nxt = lambda: run([rt, "next", t2]).stdout
+        expect("маршрут: без отчётов о тестах разбор тестов не обязателен", "experiment-review" not in nxt(), nxt())
+        rows = "id,kind,ctx_type\n" + "".join("F-%03d,context,result\n" % i for i in range(1, 4))
+        open(os.path.join(t2, "sources.csv"), "w", encoding="utf-8").write(rows)
+        expect("маршрут: три отчёта о тестах — разбор тестов обязателен", "experiment-review → src-experiments.md" in nxt(), nxt())
+        expect("маршрут: аудит находок по умолчанию выключен", "00a-audit.md" not in nxt(), nxt())
+        run([rt, "profile", t2, "audit=on"])
+        expect("маршрут: audit=on — аудит находок обязателен", "hypothesis-validator → 00a-audit.md" in nxt(), nxt())
+        run([rt, "profile", t2, "run=solo"])
+        expect("маршрут: одиночный прогон — без разбора тестов и аудита",
+               "experiment-review" not in nxt() and "00a-audit.md" not in nxt(), nxt())
+    finally:
+        shutil.rmtree(proj, ignore_errors=True)
+
+
 def profile_tests():
     """Уровни нагрузки: обязательные шаги, оценка вызовов и профиль в state.json меняются по уровню; нет профиля — v1."""
     proj = tempfile.mkdtemp(prefix="polygon-profile-")
@@ -2380,6 +2446,7 @@ def main():
         trace_tests()
         roles_tests()
         route_tests()
+        carry_tests()
         profile_tests()
         data_block_tests(root)
         rules_tests()
