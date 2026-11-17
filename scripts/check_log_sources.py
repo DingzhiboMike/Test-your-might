@@ -39,7 +39,7 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from check_path import ANSWER, gap_answers, gap_items  # noqa: E402
 
 SOURCES = ("interview-analyst", "interview-synthesis", "market-analyze", "target-audience-analyst",
-           "alternatives-analyst", "customer-path", "market-sizing", "experiment-review")
+           "alternatives-analyst", "customer-path", "market-sizing", "experiment-review", "field-scan")
 FIELDS = ("Вопрос", "Зачем", "Уже известно", "Пункт GAP")
 STEP = re.compile(r"^ШАГ\s+(\d+)\s*[—-]\s*([\w-]+)", re.M)
 # Пачка разборов интервью идёт по файлам контекста, а не по вопросу пункта GAP — для неё пункт GAP не сверяется.
