@@ -15,6 +15,7 @@
   процесса без клиентских рамок, разброс по узлам и осям, строка «Перенос:» и планка вердикта по ступени опоры;
 - check_refute.py — если шаг пишет 02c-validation.md или 02d-validation2.md: не меньше двух опровержений, засчитанное — из
   другого источника и сайта, без засчитанного уверенность только «низкая» (при validation=web|full);
+- check_humanize.py — если шаг пишет 08-handoff.md (humanizer): числа, цитаты, ссылки, разделы и таблицы как в копии до правки;
 - check_field.py — если шаг пишет src-field.md (разведка поля): ширина карты, домены, контраргумент из другого источника;
 - trace_summary.py --since — строка «Расход: …» за шаг из трассы (хук scripts/hooks/trace.py).
 
@@ -75,6 +76,8 @@ def main():
         checks.append(("check_process", run("check_process.py", [task])))
     if "02c-validation.md" in files or "02d-validation2.md" in files:
         checks.append(("check_refute", run("check_refute.py", [task])))
+    if "08-handoff.md" in files:
+        checks.append(("check_humanize", run("check_humanize.py", [task])))
     if "src-field.md" in files:
         checks.append(("check_field", run("check_field.py", [task])))
     if "02c-validation.md" in files or "06-directions.md" in files or (os.path.exists(c02) and os.path.getmtime(c02) >= since_ > 0):
