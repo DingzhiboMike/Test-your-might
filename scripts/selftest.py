@@ -622,6 +622,38 @@ def result_tests(root):
     expect("что получишь: согласованное ТЗ задним числом не проверяется", r.returncode == 0, r.stdout)
 
 
+def humanize_tests(root):
+    """Язык сдачи: humanizer переписал сдачу, а числа, цитаты, ссылки, разделы и таблицы целы (check_humanize.py)."""
+    ch = os.path.join(HERE, "check_humanize.py")
+    t = os.path.join(root, "tasks", "humanize")
+    os.makedirs(os.path.join(t, "checks"))
+    before = ("## Что я рекомендую сделать\n\nОсуществить проведение пилота на 4 кейсах с порогом 20%. "
+              "«клиенты бросают настройку на втором шаге» (опрос, 2026)\n\n| Тест | Успех |\n| --- | --- |\n| пилот | 2 из 4 |\n\n"
+              "Подробности: `03-backlog.md`, https://example.org/x\n\n## Что лежит в папке задачи\n\n| Файл | Что |\n| --- | --- |\n| `03-backlog.md` | тесты |\n")
+    good = before.replace("Осуществить проведение пилота на 4 кейсах", "Запустите пилот на 4 кейсах")
+    w = lambda name, txt: open(os.path.join(t, name), "w", encoding="utf-8").write(txt)
+    w("08-handoff.md", before)
+    r = run([ch, t])
+    expect("язык сдачи: сдача без копии до humanizer — поймано", r.returncode == 1 and "не прошла humanizer" in r.stdout, r.stdout)
+    w("checks/08-handoff.before-humanizer.md", before)
+    w("08-handoff.md", good)
+    r = run([ch, t])
+    expect("язык сдачи: переписано, факты целы — проходит", r.returncode == 0, r.stdout)
+    w("08-handoff.md", good.replace("порогом 20%", "порогом 25%"))
+    r = run([ch, t])
+    expect("язык сдачи: подменённое число — поймано", r.returncode == 1 and "пропали числа: 20" in r.stdout
+           and "новые числа: 25" in r.stdout, r.stdout)
+    w("08-handoff.md", good.replace("бросают настройку на втором шаге", "бросают настройку"))
+    r = run([ch, t])
+    expect("язык сдачи: изменённая цитата — поймана", r.returncode == 1 and "пропала цитата" in r.stdout, r.stdout)
+    w("08-handoff.md", good.replace("## Что я рекомендую сделать", "## Рекомендации"))
+    r = run([ch, t])
+    expect("язык сдачи: переименованный раздел — пойман", r.returncode == 1 and "заголовки разделов" in r.stdout, r.stdout)
+    w("08-handoff.md", good.replace("| пилот | 2 из 4 |\n", ""))
+    r = run([ch, t])
+    expect("язык сдачи: пропавшая строка таблицы — поймана", r.returncode == 1 and "строк таблиц" in r.stdout, r.stdout)
+
+
 def process_tests(root):
     """Гипотезы о процессе: слоты без клиентских рамок, разброс по узлам, «Перенос:» и планка по ступени (check_process.py)."""
     cp = os.path.join(HERE, "check_process.py")
@@ -1731,15 +1763,15 @@ def trace_tests():
         open(os.path.join(cst, "00-tz.md"), "w", encoding="utf-8").write(tz)
         ce = os.path.join(HERE, "cost_estimate.py")
         r = run([ce, cst, "--detail"])
-        expect("цена: вызовы по структуре маршрута — свободная часть 10, резерв 18, потолок 37 (углубление пачками по 3)",
-               r.returncode == 0 and "~28 вызовов" in r.stdout and "резерв 18" in r.stdout and "потолок 37" in r.stdout, r.stdout)
+        expect("цена: вызовы по структуре маршрута — свободная часть 10, резерв 19 (с языком сдачи), потолок 38 (углубление пачками по 3)",
+               r.returncode == 0 and "~29 вызовов" in r.stdout and "резерв 19" in r.stdout and "потолок 38" in r.stdout, r.stdout)
         expect("цена: продолжительность словами, ни минут, ни токенов не обещается (токены только в --detail и в трассе)",
                "прогон " in r.stdout and "время и токены не обещаем" in r.stdout and
                "млн токенов" not in r.stdout and " минут" not in r.stdout, r.stdout)
         open(os.path.join(cst, "00-tz.md"), "w", encoding="utf-8").write(tz.replace("ТИП ВЫХОДА: гипотезы", "ТИП ВЫХОДА: разбор / гипотезы"))
         open(os.path.join(cst, "00-tz.md"), "w", encoding="utf-8").write(tz + "            новые идеи: да\n")
         r = run([ce, cst])
-        expect("цена: с заказом новых идей — плюс вызов на отсев", "~29 вызовов" in r.stdout and "резерв 19" in r.stdout, r.stdout)
+        expect("цена: с заказом новых идей — плюс вызов на отсев", "~30 вызовов" in r.stdout and "резерв 20" in r.stdout, r.stdout)
         open(os.path.join(cst, "00-tz.md"), "w", encoding="utf-8").write(tz.replace("ТИП ВЫХОДА: гипотезы", "ТИП ВЫХОДА: разбор / гипотезы"))
         base_tz = tz + "            новые идеи: нет\n"
         open(os.path.join(cst, "00-tz.md"), "w", encoding="utf-8").write(base_tz + "НАГРУЗКА:   уровень: рабочий\n")
@@ -1751,8 +1783,8 @@ def trace_tests():
                bool(n0 and n2) and int(n2.group(1)) == int(n0.group(1)) + 2, c0 + c2)
         open(os.path.join(cst, "00-tz.md"), "w", encoding="utf-8").write(base_tz + "НАГРУЗКА:   уровень: лёгкий\n")
         cl_ = run([ce, cst]).stdout
-        expect("цена: light, тип «гипотезы» — один проход (run=solo): ~2 вызова, свободная часть 1",
-               "~2 вызова" in cl_ and "свободная часть 1" in cl_, cl_)
+        expect("цена: light, тип «гипотезы» — один проход (run=solo) и язык сдачи: ~3 вызова, свободная часть 1",
+               "~3 вызова" in cl_ and "свободная часть 1" in cl_, cl_)
         open(os.path.join(cst, "00-tz.md"), "w", encoding="utf-8").write(tz.replace("ТИП ВЫХОДА: гипотезы", "ТИП ВЫХОДА: разбор / гипотезы"))
         r = run([ce, cst])
         expect("цена: тип выхода не выбран — отказ, а не догадка", r.returncode == 1 and "ТИП ВЫХОДА" in r.stdout, r.stdout)
@@ -1762,12 +1794,12 @@ def trace_tests():
         open(os.path.join(cst, "trace.jsonl"), "w", encoding="utf-8").write(
             "".join(line(ts=1, agent_id="d%d" % i, role="document-mapper", out=10) for i in range(3)))
         r = run([ce, cst, "--left"])
-        expect("остаток: потрачено 3, резерв впереди 15, свободных 19",
-               "Потрачено: 3 вызова" in r.stdout and "резерв впереди 15" in r.stdout and "до потолка 19" in r.stdout, r.stdout + price)
+        expect("остаток: потрачено 3, резерв впереди 16, свободных 19",
+               "Потрачено: 3 вызова" in r.stdout and "резерв впереди 16" in r.stdout and "до потолка 19" in r.stdout, r.stdout + price)
         r = run([os.path.join(HERE, "trace_summary.py"), cst, "--save"])
         c = json.load(open(os.path.join(cst, "checks", "cost.json"), encoding="utf-8"))
-        expect("сдача: cost.json с оценкой и фактом", c.get("estimate_calls") == 28 and c.get("calls") == 3
-               and "из ~28" in r.stdout, r.stdout)
+        expect("сдача: cost.json с оценкой и фактом", c.get("estimate_calls") == 29 and c.get("calls") == 3
+               and "из ~29" in r.stdout, r.stdout)
         open(os.path.join(cst, "01-review.md"), "w", encoding="utf-8").write("# Разбор\n\n" + "Разрыв логики между первым запуском и использованием. " * 10 + "\n")
         r = run([os.path.join(HERE, "check_step.py"), cst, "01-review.md", "--since", "0"])
         expect("шаг: под строкой проверок — строка «Расход»", "\nРасход: 3 вызова" in r.stdout, r.stdout)
@@ -2720,6 +2752,7 @@ def main():
         field_tests(root)
         refute_tests(root)
         process_tests(root)
+        humanize_tests(root)
         width_tests(root)
         result_tests(root)
         knowledge_tests(root)
