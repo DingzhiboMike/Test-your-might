@@ -25,9 +25,9 @@ MEDIUM = ("context-reader", "subject-model", "experiment-review", "b2b-consultan
           "hypothesis-generator", "hypothesis-validator", "results-reviewer", "interview-synthesis",
           "meaning-review", "research-report", "document-deepener", "market-analyze", "target-audience-analyst",
           "alternatives-analyst", "customer-path", "market-sizing", "interview-analyst", "synthetic-interviews",
-          "project-analyst", "light-run")
+          "project-analyst", "light-run", "field-scan")
 WEB = ("market-analyze", "target-audience-analyst", "alternatives-analyst", "customer-path", "market-sizing",
-       "hypothesis-validator")
+       "hypothesis-validator", "field-scan")
 MAIN_SESSION = ("dispatcher", "orchestrator")
 
 BASE_TOOLS = ("Read", "Grep", "Glob", "Write", "Edit", "Bash")

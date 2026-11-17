@@ -50,23 +50,25 @@ SERVICE = ("log.md", "state.json", "state.json.tmp", "trace.jsonl", "trace.jsonl
 # нужны (check_effort.ideas_required); "outside" — валидация, в логе «Вне гипотез: да» (R-087);
 # "rehearsal" — если в РЕЖИМЕ «пробный прогон: да»; "tests" — в реестре не меньше TESTS_MIN отчётов о тестах
 # (ctx_type=result) и прогон не одиночный; "audit" — профиль audit=on (аудит находок до генерации).
+# "field" — в РЕЖИМЕ «разведка поля: да» (field-scan до консультанта; в одиночном проходе остаётся отдельным шагом).
 AUDIT = ("meaning-review", "audit.md", None)  # выборочный аудит итоговых артефактов (audit_sample.py)
 TAIL_IDEAS = [("nostradamus", "02f-forecast.md", None), ("hypothesis-validator", "02g-ideas-check.md", "ideas")]
 TESTS_MIN = 3
+FIELD = [("field-scan", "src-field.md", "field")]  # разведка поля — до консультанта
 PRE_GEN = [("experiment-review", "src-experiments.md", "tests"), ("hypothesis-validator", "00a-audit.md", "audit")]
 REQUIRED = {
     "разбор": [("b2b-consultant", "01-review.md", None)],
-    "гипотезы": [("b2b-consultant", "01-review.md", None)] + PRE_GEN + [("hypothesis-generator", "02-hypotheses.md", None),
+    "гипотезы": FIELD + [("b2b-consultant", "01-review.md", None)] + PRE_GEN + [("hypothesis-generator", "02-hypotheses.md", None),
                  ("hypothesis-validator", "02c-validation.md", None),
                  ("meaning-review", "review-02c-validation.md", None)] + TAIL_IDEAS +
                 [("b2b-consultant", "02e-position.md", None), ("project-analyst", "03-backlog.md", None),
                  ("synthetic-interviews", "03c-rehearsal.md", "rehearsal"), AUDIT],
-    "план проверки": [("b2b-consultant", "01-review.md", None)] + PRE_GEN + [("hypothesis-generator", "02-hypotheses.md", None),
+    "план проверки": FIELD + [("b2b-consultant", "01-review.md", None)] + PRE_GEN + [("hypothesis-generator", "02-hypotheses.md", None),
                       ("hypothesis-validator", "02c-validation.md", None),
                       ("meaning-review", "review-02c-validation.md", None)] + TAIL_IDEAS +
                      [("project-analyst", "03-plan.md", None), ("test-kit", "03b-test-kit.md", None),
                       ("synthetic-interviews", "03c-rehearsal.md", "rehearsal"), AUDIT],
-    "ТЗ на доработку": [("b2b-consultant", "01-review.md", None)] + PRE_GEN + [("hypothesis-generator", "02-hypotheses.md", None),
+    "ТЗ на доработку": FIELD + [("b2b-consultant", "01-review.md", None)] + PRE_GEN + [("hypothesis-generator", "02-hypotheses.md", None),
                         ("hypothesis-validator", "02c-validation.md", None),
                         ("meaning-review", "review-02c-validation.md", None)] + TAIL_IDEAS +
                        [("b2b-consultant", "02e-position.md", None), ("brief-writer", "07a-analyst.md", None),
@@ -77,11 +79,11 @@ REQUIRED = {
                   ("nostradamus", "02f-forecast.md", "outside"), ("hypothesis-validator", "02g-ideas-check.md", "outside"),
                   ("research-report", "06-validation.md", None),
                   ("meaning-review", "review-06-validation.md", None), AUDIT],
-    "исследование": [("b2b-consultant", "01-review.md", None)] + TAIL_IDEAS +
+    "исследование": FIELD + [("b2b-consultant", "01-review.md", None)] + TAIL_IDEAS +
                     [("research-report", "06-research.md", None), ("meaning-review", "review-06-research.md", None),
                      AUDIT],
     "вердикты по проверке": [("results-reviewer", "04-results.md", None)],
-    "карта направлений": [("b2b-consultant", "01-review.md", None), ("hypothesis-generator", "02-long-list.md", None),
+    "карта направлений": FIELD + [("b2b-consultant", "01-review.md", None), ("hypothesis-generator", "02-long-list.md", None),
                           ("b2b-consultant", "06-directions.md", None)],
 }
 # Проверки готовности по типу: скрипт и аргументы после папки задачи.
@@ -101,7 +103,9 @@ READY_CHECKS = {
                      ("check_ideas.py", []), ("check_effort.py", [])],
     "вердикты по проверке": [],
 }
-COMMON_CHECKS = [("check_quotes.py", []), ("check_private.py", []), ("check_concrete.py", [])]  # concrete: «нет данных» и тупики сдачи
+COMMON_CHECKS = [("check_quotes.py", []), ("check_private.py", []), ("check_concrete.py", []),
+                 ("check_refute.py", []),  # refute: опровержение из другого источника, если есть 02c/02d
+                 ("check_process.py", [])]  # process: форма гипотез при «ПРЕДМЕТ: процесс»  # concrete: «нет данных» и тупики сдачи
 for _kind in ("гипотезы", "план проверки", "ТЗ на доработку", "валидация", "исследование"):
     READY_CHECKS[_kind].append(("audit_sample.py", ["--check"]))
 
@@ -176,7 +180,9 @@ def tests_in_context(task):
 
 
 def modes(tz):
-    return {"rehearsal": bool(re.search(r"пробный прогон:\s*да", tz_field(tz, "РЕЖИМ")))}
+    mode = tz_field(tz, "РЕЖИМ")
+    return {"rehearsal": bool(re.search(r"пробный прогон:\s*да", mode)),
+            "field": bool(re.search(r"разведка поля:\s*да", mode))}
 
 
 PROFILED = ("гипотезы", "план проверки", "ТЗ на доработку", "валидация", "исследование")
@@ -210,13 +216,15 @@ def required(task):
             continue
         if cond == "rehearsal" and not modes(tz)["rehearsal"]:
             continue
+        if cond == "field" and not modes(tz)["field"]:
+            continue
         if cond == "tests" and (prof.get("run") == "solo" or tests_in_context(task) < TESTS_MIN):
             continue
         if cond == "audit" and (prof.get("run") == "solo" or prof.get("audit") != "on"):
             continue
         out.append((role, art))
     if kind == "гипотезы" and prof.get("run") == "solo":
-        out = [("light-run", art) for _, art in out]  # один агент пишет все артефакты типа
+        out = [(r if r == "field-scan" else "light-run", art) for r, art in out]  # один агент пишет все артефакты типа, кроме разведки поля
     return kind, out
 
 
@@ -463,6 +471,8 @@ def cmd_ready(task):
         checks = [c for c in checks if c[0] not in ("check_forecast.py", "check_ideas.py")]
     if kind != "вердикты по проверке":
         checks.append(("check_path.py", ["--tz"]))
+    if modes(read(os.path.join(task, "00-tz.md")))["field"]:
+        checks.append(("check_field.py", []))
     if os.path.exists(os.path.join(task, "00k-knowledge.md")):
         checks.append(("check_knowledge.py", []))
         checks.append(("check_carry.py", []))

@@ -565,6 +565,252 @@ def hyp_concrete_tests(root):
     expect("гипотезы: --step не смотрит сдачу", r.returncode == 0, r.stdout)
 
 
+def width_tests(root):
+    """Ёмкость режет запускаемое, а не ширину: запрос «предложи / лучшие / исследуй» требует ширины (check_path.py --tz)."""
+    cp = os.path.join(HERE, "check_path.py")
+    t = os.path.join(root, "tasks", "width")
+    os.makedirs(t)
+    base = ("ТЗ\nЗАПРОС: %s\nЧТО ПОЛУЧИШЬ: список изменений и как проверить каждое (черновик)\nGAP:\n  1. Что сделать? [ключевой] {ответ: контекст}\nДОПУЩЕНИЯ: %s\nРЕШЕНИЕ: варианты: А — да; Б — нет\n"
+            "ВЕБ: нет — сеть не нужна\nТИП ВЫХОДА: гипотезы\n%sРЕЖИМ: %s\n"
+            "ЦЕНА: ~9 вызовов исполнителей (свободная часть 3, резерв 6, потолок 12)\n")
+    w = lambda ask, assume, cap, mode: open(os.path.join(t, "00-tz.md"), "w", encoding="utf-8").write(base % (ask, assume, cap, mode))
+    w("предложи лучшие идеи роста", "нет", "ЁМКОСТЬ: 2\n", "новые идеи: нет · генерация: обычная")
+    r = run([cp, t, "--tz"])
+    expect("ширина: запрос «предложи лучшие» без ширины — поймано", r.returncode == 1 and "ширины и новых идей" in r.stdout, r.stdout)
+    w("предложи лучшие идеи роста", "нет", "ЁМКОСТЬ: 2\n", "новые идеи: да · генерация: ширина")
+    r = run([cp, t, "--tz"])
+    expect("ширина: запрос «предложи» с шириной и новыми идеями — проходит", r.returncode == 0, r.stdout)
+    w("предложи лучшие идеи роста", "ширина не нужна: человек сам назвал три варианта", "ЁМКОСТЬ: 2\n",
+      "новые идеи: нет · генерация: обычная")
+    r = run([cp, t, "--tz"])
+    expect("ширина: причина в допущениях — проходит", r.returncode == 0, r.stdout)
+    w("проверь письмо для ушедших", "нет", "ЁМКОСТЬ: 1\n", "новые идеи: нет · генерация: обычная")
+    r = run([cp, t, "--tz"])
+    expect("ширина: узкий запрос без ширины — проходит", r.returncode == 0, r.stdout)
+    w("проверь письмо для ушедших", "нет", "", "новые идеи: нет · генерация: обычная")
+    r = run([cp, t, "--tz"])
+    expect("ширина: нет строки ЁМКОСТЬ в гипотезах — поймано", r.returncode == 1 and "ЁМКОСТЬ" in r.stdout, r.stdout)
+
+
+def result_tests(root):
+    """Что человек получит на руки: первым после ЗАПРОСА, без слов системы, тип не противоречит (check_path.py --tz)."""
+    cp = os.path.join(HERE, "check_path.py")
+    t = os.path.join(root, "tasks", "result")
+    os.makedirs(t)
+    base = ("ТЗ\nЗАПРОС: что известно про онбординг у конкурентов\n%sGAP:\n  1. Как устроено? [ключевой] {ответ: контекст}\n"
+            "РЕШЕНИЕ: варианты: А — да; Б — нет\nВЕБ: нет — сеть не нужна\nТИП ВЫХОДА: %s\nЁМКОСТЬ: 2\nРЕЖИМ: новые идеи: нет\n"
+            "ЦЕНА: ~9 вызовов исполнителей (свободная часть 3, резерв 6, потолок 12)\n")
+    w = lambda got, kind: open(os.path.join(t, "00-tz.md"), "w", encoding="utf-8").write(base % (got, kind))
+    w("ЧТО ПОЛУЧИШЬ: обзор, как онбординг устроен у других, без выбора (ответ)\n", "исследование")
+    r = run([cp, t, "--tz"])
+    expect("что получишь: обзор и тип «исследование» — проходит", r.returncode == 0, r.stdout)
+    w("", "исследование")
+    r = run([cp, t, "--tz"])
+    expect("что получишь: нет строки после ЗАПРОСА — поймано", r.returncode == 1 and "сразу после ЗАПРОСА" in r.stdout, r.stdout)
+    w("ЧТО ПОЛУЧИШЬ: гипотезы с вердиктами и бэклог (черновик)\n", "гипотезы")
+    r = run([cp, t, "--tz"])
+    expect("что получишь: слова системы в первой строке — пойманы", r.returncode == 1 and "слова системы" in r.stdout
+           and "гипотез" in r.stdout and "бэклог" in r.stdout, r.stdout)
+    w("ЧТО ПОЛУЧИШЬ: 3–5 изменений онбординга и как проверить каждое (ответ)\n", "исследование")
+    r = run([cp, t, "--tz"])
+    expect("что получишь: «изменения» при типе «исследование» — поймано", r.returncode == 1 and "«исследование»" in r.stdout, r.stdout)
+    w("ЧТО ПОЛУЧИШЬ: только обзор, как устроено у других (ответ)\n", "гипотезы")
+    r = run([cp, t, "--tz"])
+    expect("что получишь: «только обзор» при типе «гипотезы» — поймано", r.returncode == 1 and "без выбора" in r.stdout, r.stdout)
+
+
+def process_tests(root):
+    """Гипотезы о процессе: слоты без клиентских рамок, разброс по узлам, «Перенос:» и планка по ступени (check_process.py)."""
+    cp = os.path.join(HERE, "check_process.py")
+    t = os.path.join(root, "tasks", "process")
+    os.makedirs(t)
+    tz = lambda subj: open(os.path.join(t, "00-tz.md"), "w", encoding="utf-8").write(
+        "ТЗ\nПРЕДМЕТ:    %s\nТИП ВЫХОДА: гипотезы\nСОГЛАСОВАНО: да\n" % subj)
+
+    def hyp(k, node, axis, extra=""):
+        return ("### Г-%d — правка\n- **Узел:** %s\n- **Изменение:** добавить шаг\n- **Эффект:** меньше ошибок на тех же кейсах\n"
+                "- **Ось:** %s\n- **Механизм:** ранняя сверка\n- **Цена внедрения:** один вызов\n"
+                "- **Риск регресса:** дольше прогон\n- **Опровергнет:** доля ошибок не изменится\n"
+                "- **Опора:** сравнение — «текст» [F-001]\n%s\n" % (k, node, axis, extra))
+
+    good = hyp(1, "поиск", "качество") + hyp(2, "проверка", "цена") + hyp(3, "синтез", "качество")
+    w = lambda name, txt: open(os.path.join(t, name), "w", encoding="utf-8").write(txt)
+    tz("рынок")
+    w("02-hypotheses.md", "### Г-1 — x\n- **Субъект:** клиент\n")
+    r = run([cp, t])
+    expect("процесс: при «рынок» не проверяется", r.returncode == 0 and "не «процесс»" in r.stdout, r.stdout)
+    tz("процесс")
+    w("02-hypotheses.md", good)
+    r = run([cp, t])
+    expect("процесс: полные гипотезы в разных узлах проходят", r.returncode == 0, r.stdout)
+    w("02-hypotheses.md", good.replace("- **Риск регресса:** дольше прогон\n", "", 1))
+    r = run([cp, t])
+    expect("процесс: нет риска регресса — поймано", r.returncode == 1 and "Г-1: не заполнено — Риск регресса" in r.stdout, r.stdout)
+    w("02-hypotheses.md", hyp(1, "поиск", "качество") + hyp(2, "поиск", "цена") + hyp(3, "синтез", "качество"))
+    r = run([cp, t])
+    expect("процесс: больше половины в одном узле — поймано", r.returncode == 1 and "в одном узле" in r.stdout, r.stdout)
+    w("02-hypotheses.md", good.replace("- **Узел:** поиск", "- **Субъект:** владелец процесса\n- **Рамка:** inertia\n- **Узел:** поиск", 1))
+    r = run([cp, t])
+    expect("процесс: клиентский субъект и рамка — пойманы", r.returncode == 1 and "«Субъект»" in r.stdout
+           and "клиентская рамка" in r.stdout, r.stdout)
+    w("02-hypotheses.md", good.replace("- **Узел:** поиск", "- **Узел:** маркетинг", 1))
+    r = run([cp, t])
+    expect("процесс: узел не из списка — поймано", r.returncode == 1 and "узел не из списка" in r.stdout, r.stdout)
+    w("02-hypotheses.md", good)
+    val = lambda verdict, carry: ("ГИПОТЕЗА 1 — правка\nВердикт:    %s\nМетодология: пройдена\n%sУверенность: низкая\n"
+                                  % (verdict, carry))
+    w("02c-validation.md", val("держится на бумаге", "Перенос:    ступень — сравнение «текст» [F-001]; условия у нас — частично: объём\n"))
+    r = run([cp, t])
+    expect("процесс: «держится» при ступени «сравнение» — проходит", r.returncode == 0, r.stdout)
+    w("02c-validation.md", val("держится на бумаге", "Перенос:    ступень — вендор «текст» [F-001]; условия у нас — есть: всё\n"))
+    r = run([cp, t])
+    expect("процесс: «держится» на вендоре — поймано", r.returncode == 1 and "не выше «сузить»" in r.stdout, r.stdout)
+    w("02c-validation.md", val("держится на бумаге", "Перенос:    ступень — кейс «текст» [F-001]; условия у нас — частично: роли\n"))
+    r = run([cp, t])
+    expect("процесс: «держится» на кейсе без условий «есть» — поймано", r.returncode == 1 and "ступени «кейс»" in r.stdout, r.stdout)
+    w("02c-validation.md", val("сузить", ""))
+    r = run([cp, t])
+    expect("процесс: нет строки «Перенос:» — поймано", r.returncode == 1 and "нет строки «Перенос:»" in r.stdout, r.stdout)
+
+
+def refute_tests(root):
+    """Опровержение в проверке по сути: из другого источника и сайта, не меньше двух строк (check_refute.py)."""
+    add, cr = os.path.join(HERE, "add_source.py"), os.path.join(HERE, "check_refute.py")
+    t = os.path.join(root, "tasks", "refute")
+    os.makedirs(t)
+    src = {}
+    for key, loc in (("a", "https://alpha.org/x"), ("a2", "https://alpha.org/y"), ("b", "https://beta.org/z")):
+        r = run([add, "--task", t, "--kind", "web", "--location", loc, "--level", "3", "--pub-date", "2026-04-01"],
+                "Текст источника %s о подходе и его границах.\n" % key)
+        src[key] = r.stdout.strip()
+    a, a2, b = src["a"], src["a2"], src["b"]
+
+    def hyp(r1, r2, conf="средняя", field="Сверка"):
+        return ("ГИПОТЕЗА 1 — проверка\nВердикт:    сузить\nМетодология: пройдена\n"
+                "%s:     триггер → `за подход` → подтверждено → «о подходе» [%s], уровень 3\n"
+                "            %s\n            %s\nУверенность: %s\nОснование:  коротко\n" % (field, a, r1, r2, conf))
+
+    w = lambda txt: open(os.path.join(t, "02c-validation.md"), "w", encoding="utf-8").write(txt)
+    good1 = "опровержение: `без подхода` → «его границах» [%s]" % b
+    miss = "опровержение: `подход не нужен` → не найдено"
+    w(hyp(good1, miss))
+    r = run([cr, t])
+    expect("опровержение: другое место и «не найдено» — проходит", r.returncode == 0, r.stdout)
+    w(hyp("опровержение: `без подхода` → «его границах» [%s]" % a, miss))
+    r = run([cr, t])
+    expect("опровержение: тот же источник, что опора «за», — поймано",
+           r.returncode == 1 and "из того же источника или сайта" in r.stdout, r.stdout)
+    w(hyp("опровержение: `без подхода` → «его границах» [%s]" % a2, miss))
+    r = run([cr, t])
+    expect("опровержение: другой источник с того же сайта — поймано", r.returncode == 1 and "того же источника или сайта" in r.stdout, r.stdout)
+    w(hyp(good1, "Уверенность-заглушка").replace("            Уверенность-заглушка\n", ""))
+    r = run([cr, t])
+    expect("опровержение: одна строка вместо двух — поймано", r.returncode == 1 and "нужно не меньше 2" in r.stdout, r.stdout)
+    w(hyp(miss, "опровержение: `зачем подход` → не найдено"))
+    r = run([cr, t])
+    expect("опровержение: только «не найдено» при средней уверенности — поймано",
+           r.returncode == 1 and "допустима только «низкая»" in r.stdout, r.stdout)
+    w(hyp(miss, "опровержение: `зачем подход` → не найдено", conf="низкая"))
+    r = run([cr, t])
+    expect("опровержение: только «не найдено» при низкой уверенности — проходит", r.returncode == 0, r.stdout)
+    w(hyp(good1.replace("`", ""), miss))
+    r = run([cr, t])
+    expect("опровержение: без запроса в обратных кавычках — поймано", r.returncode == 1 and "обратных кавычках" in r.stdout, r.stdout)
+    w("ГИПОТЕЗА 1 — x\nВердикт:    держится на бумаге\nСверка:     не требовалась: внутренняя механика\nУверенность: средняя\n")
+    r = run([cr, t])
+    expect("опровержение: «не требовалась» — не проверяется", r.returncode == 0, r.stdout)
+    w(hyp(good1, "опровержение: `без подхода` → «о подходе» [%s]" % a, field="Из сети").replace("ГИПОТЕЗА 1 — проверка", "У-1 — утверждение"))
+    r = run([cr, t])
+    expect("опровержение: утверждение валидации читается по «Из сети», ошибка во второй строке поймана",
+           r.returncode == 1 and "У-1: опровержение 2 из того же источника" in r.stdout, r.stdout)
+    w(hyp("опровержение: `без подхода` → «о подходе» [%s]" % a, miss))
+    r = run([os.path.join(HERE, "check_step.py"), t, "02c-validation.md"])
+    expect("опровержение: check_step запускает проверку на шаге проверки по сути", "check_refute — ОШИБКИ" in r.stdout, r.stdout)
+    open(os.path.join(t, "00-tz.md"), "w", encoding="utf-8").write("ТЗ\nТИП ВЫХОДА: гипотезы\nСОГЛАСОВАНО: да\n")
+    run([os.path.join(HERE, "route.py"), "init", t])
+    run([os.path.join(HERE, "route.py"), "profile", t, "level=light"])
+    r = run([cr, t])
+    expect("опровержение: при validation=method не проверяется", r.returncode == 0 and "validation=method" in r.stdout, r.stdout)
+
+
+def field_tests(root):
+    """Разведка поля: форма карты (check_field.py), шаг до консультанта в маршруте, учёт в цене."""
+    add, cf, rt = os.path.join(HERE, "add_source.py"), os.path.join(HERE, "check_field.py"), os.path.join(HERE, "route.py")
+    t = os.path.join(root, "tasks", "field")
+    os.makedirs(t)
+    ids = []
+    for i in range(1, 9):
+        r = run([add, "--task", t, "--kind", "web", "--location", "https://site%d.org/p" % i, "--level", "3",
+                 "--pub-date", "2026-05-01"], "Подход %d снижает число ошибок в выводах на сравнении двух вариантов.\n" % i)
+        ids.append(r.stdout.strip())
+    expect("поле: источники зарегистрированы", all(re.match(r"^F-\d+$", x) for x in ids), " ".join(ids))
+
+    def card(k, sup, cnt, step="сравнение"):
+        return ("## НП-%d — подход %d\n- **Суть:** делают так\n- **Механизм:** через раннюю сверку\n"
+                "- **Где применяли:** в исследовании «Подход %d снижает» [%s]\n"
+                "- **Сила опоры:** %s — «число ошибок в выводах» [%s]\n- **Контраргумент:** %s\n"
+                "- **Цена:** неделя работы\n- **Перенос к нам:** оценка — переносится частично\n- **Уверенность:** средняя\n\n"
+                % (k, k, k, sup, step, sup, cnt))
+
+    def build(n=6, same_counter=False, one_domain=False, refute=3, steps=None):
+        cards = ""
+        for k in range(1, n + 1):
+            sup = ids[0] if one_domain else ids[k - 1]
+            other = sup if same_counter else ids[k % len(ids)]
+            step = (steps or ["сравнение", "кейс"])[k % len(steps or ["сравнение", "кейс"])]
+            cards += card(k, sup, "«на других данных эффекта нет» [%s]" % other, step)
+        qs = "".join("- `запрос %d` — дал источник\n" % i for i in range(1, 16 - refute))
+        qs += "".join("- `без подхода %d` [опровержение] — дал критику\n" % i for i in range(refute))
+        return ("# ОСИ\n- наука: запросы\n- инженерия: запросы\n- консалтинг: запросы\n\n# КАРТА ПОЛЯ\n\n" + cards
+                + "# БЕЛЫЕ ПЯТНА\n- обзоров по теме не нашли\n\n# СПОРНЫЕ МЕСТА\n- источники расходятся в цене\n\n"
+                + "# ЗАПРОСЫ\n" + qs)
+
+    w = lambda txt: open(os.path.join(t, "src-field.md"), "w", encoding="utf-8").write(txt)
+    w(build())
+    r = run([cf, t])
+    expect("поле: полная карта проходит", r.returncode == 0, r.stdout)
+    w(build(n=5))
+    r = run([cf, t])
+    expect("поле: пять направлений — поймано", r.returncode == 1 and "направлений 5" in r.stdout, r.stdout)
+    w(build(same_counter=True))
+    r = run([cf, t])
+    expect("поле: контраргумент из того же источника — поймано",
+           r.returncode == 1 and "из того же источника или домена" in r.stdout, r.stdout)
+    w(build(one_domain=True))
+    r = run([cf, t])
+    expect("поле: опоры с одного домена — поймано", r.returncode == 1 and "доменов" in r.stdout and "больше 30%" in r.stdout, r.stdout)
+    w(build(refute=1))
+    r = run([cf, t])
+    expect("поле: мало запросов против подхода — поймано", r.returncode == 1 and "[опровержение] 1" in r.stdout, r.stdout)
+    w(build(steps=["вендор"]))
+    r = run([cf, t])
+    expect("поле: одна ступень силы опоры — поймано", r.returncode == 1 and "одна ступень" in r.stdout, r.stdout)
+    w(build().replace("- **Цена:** неделя работы\n", "", 1))
+    r = run([cf, t])
+    expect("поле: незаполненное поле направления — поймано", r.returncode == 1 and "НП-1: не заполнено — Цена" in r.stdout, r.stdout)
+
+    tz = ("ТЗ\nЗАПРОС: исследуй лучшие практики\nGAP:\n  1. Как это делают другие? [ключевой] {ответ: веб}\n"
+          "ВЕБ: да\nТИП ВЫХОДА: план проверки\nТИР: Tier 1\nЁМКОСТЬ: 2\n%sСОГЛАСОВАНО: 2026-11-17\n")
+    m = os.path.join(root, "tasks", "field-route")
+    os.makedirs(m)
+    open(os.path.join(m, "00-tz.md"), "w", encoding="utf-8").write(tz % "РЕЖИМ: новые идеи: нет · разведка поля: да\n")
+    run([rt, "init", m])
+    nxt = run([rt, "next", m]).stdout
+    expect("поле: при «разведка поля: да» шаг field-scan стоит до консультанта",
+           "field-scan → src-field.md" in nxt and nxt.index("field-scan") < nxt.index("b2b-consultant"), nxt)
+    r = run([os.path.join(HERE, "cost_estimate.py"), m, "--detail"])
+    expect("поле: разведка учтена в цене", r.returncode == 0 and "разведка поля" in r.stdout, r.stdout + r.stderr)
+    open(os.path.join(m, "00-tz.md"), "w", encoding="utf-8").write(tz % "РЕЖИМ: новые идеи: нет · разведка поля: нет\n")
+    nxt = run([rt, "next", m]).stdout
+    expect("поле: без режима шага разведки нет", "field-scan" not in nxt and "b2b-consultant" in nxt, nxt)
+    open(os.path.join(m, "00-tz.md"), "w", encoding="utf-8").write(
+        (tz % "РЕЖИМ: разведка поля: да\n").replace("план проверки", "гипотезы"))
+    run([rt, "profile", m, "level=light"])
+    nxt = run([rt, "next", m]).stdout
+    expect("поле: в одиночном проходе разведка остаётся отдельным шагом", "field-scan → src-field.md" in nxt
+           and "light-run" in nxt, nxt)
+
+
 def directions_tests(root):
     """Тип «карта направлений»: маршрут в коде, цена, форма карты, читаемость."""
     cc, rt = os.path.join(HERE, "check_concrete.py"), os.path.join(HERE, "route.py")
@@ -794,7 +1040,7 @@ def path_tests(root):
     r = run([cp, d, "--tz"])
     expect("ТЗ: много материалов и лёгкий уровень без предупреждения — поймано", r.returncode == 1 and "лёгкий" in r.stdout, r.stdout)
     open(os.path.join(d, "00-tz.md"), "w", encoding="utf-8").write(
-        heavy + "ЧТО ПОЛУЧИШЬ: бэклог; на лёгком ключевые находки из ваших материалов могут не дойти до сдачи\n")
+        heavy + "ЧТО ПОЛУЧИШЬ: три теста с порогами; на лёгком ключевые находки из ваших материалов могут не дойти до сдачи\n")
     r = run([cp, d, "--tz"])
     expect("ТЗ: много материалов, лёгкий уровень и предупреждение — проходит", r.returncode == 0, r.stdout)
 
@@ -1739,6 +1985,11 @@ def knowledge_tests(root):
     open(os.path.join(d, "00k-knowledge.md"), "w", encoding="utf-8").write(good.replace("Чего нет:\n  - кто подписывает оплату в малых командах\n", "Чего нет:\n"))
     r = run([ck, d])
     expect("материалы: пустое «Чего нет» поймано", r.returncode == 1 and "GAP 2" in r.stdout, r.stdout)
+    md = (good.replace("1. ПОКРЫТИЕ ФАЙЛОВ", "## 1. ПОКРЫТИЕ ФАЙЛОВ").replace("2. ПО ПУНКТАМ GAP", "## 2. ПО ПУНКТАМ GAP")
+          + "\n## КЛЮЧЕВЫЕ НАХОДКИ\n\n| Н-01 | расхождение | «не нашли, где настроить отчёт» [F-001] |\n")
+    open(os.path.join(d, "00k-knowledge.md"), "w", encoding="utf-8").write(md)
+    r = run([ck, d])
+    expect("материалы: заголовки «## N.» и строки находок с F-id не ломают таблицу покрытия", r.returncode == 0, r.stdout)
 
 
 def polygon_tests(root):
@@ -2460,6 +2711,11 @@ def main():
         handoff_concrete_tests(root)
         hyp_concrete_tests(root)
         directions_tests(root)
+        field_tests(root)
+        refute_tests(root)
+        process_tests(root)
+        width_tests(root)
+        result_tests(root)
         knowledge_tests(root)
         map_tests(root)
         model_tests(root)

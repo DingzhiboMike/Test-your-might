@@ -68,7 +68,8 @@ def section(text, title_re):
     if not m:
         return ""
     rest = text[m.end():]
-    stop = re.search(r"^\**\d+\.\s+[А-ЯЁA-Z]{3,}", rest, re.M)
+    # конец раздела — следующий нумерованный раздел («2. ПО ПУНКТАМ», «## 2. …») или любой заголовок markdown
+    stop = re.search(r"^(?:#{1,6}[ \t]+\S|\**\d+\.\s+[А-ЯЁA-Z]{3,})", rest, re.M)
     return rest[:stop.start()] if stop else rest
 
 
@@ -92,7 +93,7 @@ def main():
             continue
         m = re.search(r"\bF-\d+\b", line)
         if m:
-            rows[m.group(0)] = [c.strip() for c in line.strip().strip("|").split("|")]
+            rows.setdefault(m.group(0), [c.strip() for c in line.strip().strip("|").split("|")])  # первая строка файла
     for fid in context_ids(task):
         if fid not in rows:
             errors.append("%s: файла контекста нет в таблице покрытия" % fid)

@@ -11,6 +11,11 @@
 - check_numbers.py — по задаче, если есть numbers.csv;
 - check_concrete.py --step — если шаг пишет 02c-validation.md (в том числе одиночный проход light-run): у «сузить»,
   «нет данных», «не держится» есть версия и путь к ответу;
+- check_process.py — если шаг пишет 02-hypotheses.md или 02c-validation.md и в ТЗ «ПРЕДМЕТ: процесс»: слоты
+  процесса без клиентских рамок, разброс по узлам и осям, строка «Перенос:» и планка вердикта по ступени опоры;
+- check_refute.py — если шаг пишет 02c-validation.md или 02d-validation2.md: не меньше двух опровержений, засчитанное — из
+  другого источника и сайта, без засчитанного уверенность только «низкая» (при validation=web|full);
+- check_field.py — если шаг пишет src-field.md (разведка поля): ширина карты, домены, контраргумент из другого источника;
 - trace_summary.py --since — строка «Расход: …» за шаг из трассы (хук scripts/hooks/trace.py).
 
 Печатает строку «Проверки: …» — её и пиши в лог. У check_quotes в строке счётчики: цитат, без id, источников,
@@ -66,6 +71,12 @@ def main():
         checks.append(("check_numbers", run("check_numbers.py", [task])))
     c02 = os.path.join(task, "02c-validation.md")
     since_ = float(rest[rest.index("--since") + 1]) if "--since" in rest else 0
+    if "02-hypotheses.md" in files or "02c-validation.md" in files:
+        checks.append(("check_process", run("check_process.py", [task])))
+    if "02c-validation.md" in files or "02d-validation2.md" in files:
+        checks.append(("check_refute", run("check_refute.py", [task])))
+    if "src-field.md" in files:
+        checks.append(("check_field", run("check_field.py", [task])))
     if "02c-validation.md" in files or "06-directions.md" in files or (os.path.exists(c02) and os.path.getmtime(c02) >= since_ > 0):
         checks.append(("check_concrete", run("check_concrete.py", [task, "--step"])))
 
