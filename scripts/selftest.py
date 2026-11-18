@@ -324,6 +324,37 @@ def fresh_tests(root):
            r.returncode == 1 and "F-001" in r.stdout and "F-003 без даты" in r.stdout, r.stdout)
 
 
+def doi_tests(root):
+    import importlib.util
+    spec = importlib.util.spec_from_file_location("check_doi", os.path.join(HERE, "check_doi.py"))
+    cd = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(cd)
+    expect("doi: адрес издателя приводится к DOI",
+           cd.clean_doi("https://doi.org/10.1000/Abc.123/full.") == "10.1000/abc.123")
+    expect("doi: строка без DOI пуста", cd.clean_doi("https://a.example/page") == "")
+    m = {"registered": True, "title": "Effects of sleep on memory consolidation", "year": 2020,
+         "retracted": False, "answered": 2}
+    raw = "Effects of sleep on memory consolidation. Abstract. We study sleep."
+    expect("doi: та же работа проходит", cd.judge(m, raw, "", 2020)[0] == "ok")
+    expect("doi: другая работа по DOI поймана",
+           cd.judge(m, "Quarterly pricing of cloud storage tariffs in retail banks", "", 2020)[0] == "ошибка")
+    expect("doi: выдуманный DOI пойман", cd.judge(dict(m, registered=False), raw, "", 2020)[0] == "ошибка")
+    expect("doi: отозванная работа поймана", cd.judge(dict(m, retracted=True), raw, "", 2020)[0] == "ошибка")
+    expect("doi: расхождение года — предупреждение", cd.judge(m, raw, "", 2015)[0] == "предупреждение")
+    expect("doi: базы молчат — не проверено, не ошибка",
+           cd.judge({"registered": None, "title": "", "year": None, "retracted": False, "answered": 0},
+                    raw, "", 2020)[0] == "не проверено")
+    expect("doi: заявленное название сверяется с базами",
+           cd.judge(m, "", "Sleep and memory consolidation: effects", 2020)[0] == "ok"
+           and cd.judge(m, "", "Brand loyalty programs in retail", 2020)[0] == "ошибка")
+    d = os.path.join(root, "tasks", "doi")
+    os.makedirs(d)
+    open(os.path.join(d, "sources.csv"), "w", encoding="utf-8").write(
+        "id,kind,location,pub_date\nF-001,web,https://a.example,2025-01-01\n")
+    r = run([os.path.join(HERE, "check_doi.py"), d])
+    expect("doi: в реестре нет DOI — нечего проверять, код 0", r.returncode == 0 and "нет источников с DOI" in r.stdout, r.stdout)
+
+
 def long_list_tests(root):
     cl = os.path.join(HERE, "check_long_list.py")
     d = os.path.join(root, "tasks", "lng")
@@ -2777,6 +2808,7 @@ def main():
         rehearsal_tests(root)
         ideas_tests(root)
         fresh_tests(root)
+        doi_tests(root)
         long_list_tests(root)
         backlog_tests(root)
         publish_tests(root)
