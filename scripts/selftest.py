@@ -1787,6 +1787,14 @@ def trace_tests():
         n0, n2 = re.search(r"~(\d+) вызов", c0), re.search(r"~(\d+) вызов", c2)
         expect("цена: линзы из ТЗ (РЕЖИМ: линзы: 2) добавляют вызовы, без строки линз нет",
                bool(n0 and n2) and int(n2.group(1)) == int(n0.group(1)) + 2, c0 + c2)
+        res_tz = base_tz.replace("ТИП ВЫХОДА: гипотезы", "ТИП ВЫХОДА: исследование").replace("Tier 1", "Tier 2")
+        nums = {}
+        for lv in ("лёгкий", "рабочий", "строгий"):
+            open(os.path.join(cst, "00-tz.md"), "w", encoding="utf-8").write(res_tz + "НАГРУЗКА:   уровень: %s\n" % lv)
+            m_ = re.search(r"~(\d+) вызов", run([ce, cst]).stdout)
+            nums[lv] = int(m_.group(1)) if m_ else -1
+        expect("цена: исследование — уровни нагрузки различаются (лёгкий < рабочий < строгий)",
+               0 < nums["лёгкий"] < nums["рабочий"] < nums["строгий"], str(nums))
         open(os.path.join(cst, "00-tz.md"), "w", encoding="utf-8").write(base_tz + "НАГРУЗКА:   уровень: лёгкий\n")
         cl_ = run([ce, cst]).stdout
         expect("цена: light, тип «гипотезы» — один проход (run=solo) и язык сдачи: ~3 вызова, свободная часть 1",

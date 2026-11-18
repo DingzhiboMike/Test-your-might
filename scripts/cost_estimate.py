@@ -159,13 +159,17 @@ def _structure(kind, tier, docs, interviews, modes, mapped, prof=None):
         items.append(("длинный список", 1, "резерв"))
     if modes.get("rehearsal") and kind in ("гипотезы", "план проверки"):
         items.append(("пробный прогон и исправление по нему", 2, "резерв"))
+    # профиль (нагрузка) режет проверку смысла, аудит и Нострадамуса и в типах без своей структуры (исследование, валидация):
+    # проверка смысла и аудит — только при validation=full, Нострадамус — только при forecast=on; без профиля — как в v1
+    full = prof is None or prof.get("validation") == "full"
+    forecast_on = prof is None or prof.get("forecast") == "on"
     reviews = {"гипотезы": 1, "план проверки": 1, "ТЗ на доработку": 1, "исследование": 1, "валидация": 2}
-    if kind in reviews:
+    if kind in reviews and full:
         n = reviews[kind] + (1 if tier == 1 else 0)
         items.append(("проверка смысла с исправлением", 2 * n, "резерв"))
-    if kind in reviews:
+    if kind in reviews and full:
         items.append(("выборочный аудит итоговых артефактов", 1, "резерв"))
-    if kind in ("гипотезы", "план проверки", "ТЗ на доработку", "исследование"):
+    if kind in ("гипотезы", "план проверки", "ТЗ на доработку", "исследование") and forecast_on:
         if modes.get("ideas"):
             items.append(("Нострадамус с новыми идеями и отсев идей", 2, "резерв"))
         else:
@@ -361,7 +365,7 @@ def levels_table(task):
     kind, tier = tz_type(tz), tz_tier(tz) or 2
     docs, interviews = context_docs(task)
     root = os.path.dirname(os.path.dirname(os.path.abspath(task)))
-    _, _, _, ratios_level, _ = history_levels(root, exclude=task)
+    _, _, _, ratios_level, _ = history_levels(root, exclude=task, kind=kind)
     out = ["| Уровень | Подойдёт, если | Что будет сделано | Что получите | Чего не будет | Прогон |",
            "|---|---|---|---|---|---|"]
     for key in ("fast", "light", "work", "strict"):
@@ -381,8 +385,8 @@ def levels_table(task):
     return "\n".join(out)
 
 
-def history_levels(root, exclude=None):
-    """Поправка «факт / оценка» по уровням из tasks/*/checks/cost.json (поле level, пишет trace_summary --save)."""
+def history_levels(root, exclude=None, kind=None):
+    """Поправка «факт / оценка» по уровням из tasks/*/checks/cost.json (поле level, пишет trace_summary --save); с kind — только прогоны того же типа выхода: у одиночного прохода «гипотез» факт другой, чем у исследования."""
     by_level = {}
     for cj in glob.glob(os.path.join(root, "tasks", "*", "checks", "cost.json")):
         if exclude and os.path.abspath(os.path.dirname(os.path.dirname(cj))) == os.path.abspath(exclude):
@@ -390,6 +394,8 @@ def history_levels(root, exclude=None):
         try:
             c = json.load(open(cj, encoding="utf-8"))
         except (OSError, ValueError):
+            continue
+        if kind and c.get("type") and c.get("type") != kind:
             continue
         if c.get("level") and c.get("estimate_calls") and c.get("calls"):
             by_level.setdefault(c["level"], []).append(c["calls"] / c["estimate_calls"])
