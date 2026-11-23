@@ -245,6 +245,9 @@ def read_mhtml(path):
     return text
 
 
+BLOCK_RE = re.compile(r"(?i)доступ запрещ|access denied|just a moment|enable javascript|включите javascript|"
+                      r"captcha|verify you are human|подтвердите, что вы не робот|403 forbidden")
+
 SECRET_RE = re.compile(
     r"(?i)(парол[ьяюе]|password|passwd|pwd|логин|login|secret|api[_ -]?key|токен|token)\s*[:=)(-]+\s*\S{3,}"
     r"|\bBearer\s+[A-Za-z0-9._-]{12,}|\bsk-[A-Za-z0-9]{16,}")
@@ -252,6 +255,10 @@ SECRET_RE = re.compile(
 
 def warn_secrets(text, label):
     """Предупреждение, если в тексте похоже на пароль, логин или ключ: номера строк, без значений."""
+    # у страниц смотрим видимый текст, а не разметку: в атрибутах тегов «token=», «login:» — не пароли
+    if re.search(r"(?i)<(html|div|script|body)\b", text):
+        text = re.sub(r"(?is)<(script|style).*?</\1>", " ", text)
+        text = re.sub(r"(?s)<[^>]+>", " ", text)
     lines = [i for i, ln in enumerate(text.splitlines(), 1) if SECRET_RE.search(ln)]
     if lines:
         sys.stderr.write("add_source: ВНИМАНИЕ {}: похоже на пароль, логин или ключ в строках {} — значения в артефакты "
@@ -373,6 +380,9 @@ def main():
         # пустой текст = не прочитано, а не «на странице ничего нет» (web-protocol.md, 2а)
         if a.read != "not-read":
             fail("текст пустой: регистрируй с --read not-read, а не как прочитанный")
+    elif a.kind == "web" and a.read == "full" and BLOCK_RE.search(text[:1500]):
+        fail("в начале текста страница блокировки или проверка бота («доступ запрещён», captcha, «включите JavaScript»): "
+             "это не источник. Регистрируй с --read not-read или найди страницу без блокировки (web-protocol.md, 2а)")
     elif a.kind == "web" and a.read == "full" and len(text) < 1500:
         sys.stderr.write("add_source: внимание — текста меньше 1500 знаков. Проверь, что это не заглушка, "
                          "не аннотация вместо статьи и не «включите JavaScript» (web-protocol.md, 2а). "

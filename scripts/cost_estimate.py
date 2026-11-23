@@ -98,6 +98,8 @@ def tz_modes(tz):
         "width": bool(re.search(r"генерация:\s*ширина", v)),
         "ideas": bool(re.search(r"новые идеи:\s*да", v, re.I)),
         "field": bool(re.search(r"разведка поля:\s*да", v)),
+        # человек велел не разбирать материалы заново: карта знания прошлой задачи лежит в папке (00k-knowledge.md)
+        "knowledge_ready": bool(re.search(r"разбор материалов не повторяется", tz, re.I)),
         # веб от уровня не зависит: по ходу к источнику на пункт GAP с «веб» при «ВЕБ: да», не больше трёх
         "web_points": min(3, len(re.findall(r"\{ответ:[^}]*веб[^}]*\}", tz))) if tz_field(tz, "ВЕБ").lower().startswith("да") else 0,
     }
@@ -139,8 +141,11 @@ def _structure(kind, tier, docs, interviews, modes, mapped, prof=None):
     elif kind == "вердикты по проверке":
         free = 3
     items = [("шаги по тиру", free, "свободная")]
-    if docs and kind != "вердикты по проверке":
-        if mapped:
+    # в карте направлений модель предмета строится только на строгом уровне (orchestrator, Шаг 0): ниже — один разбор
+    # материалов; перенесённая карта знания (knowledge_ready) снимает и его
+    model_ok = mapped and (kind != "карта направлений" or (prof is not None and prof.get("validation") == "full" and docs >= 8))
+    if docs and kind != "вердикты по проверке" and not modes.get("knowledge_ready"):
+        if model_ok:
             items.append(("картография документов", math.ceil(docs / MAP_BATCH), "резерв"))
             items.append(("углубление документов", math.ceil(min(DEEPEN_CAP.get(tier, 8), docs) / DEEPEN_BATCH), "резерв"))
             items.append(("модель предмета", 1, "резерв"))
@@ -163,12 +168,16 @@ def _structure(kind, tier, docs, interviews, modes, mapped, prof=None):
     # проверка смысла и аудит — только при validation=full, Нострадамус — только при forecast=on; без профиля — как в v1
     full = prof is None or prof.get("validation") == "full"
     forecast_on = prof is None or prof.get("forecast") == "on"
-    reviews = {"гипотезы": 1, "план проверки": 1, "ТЗ на доработку": 1, "исследование": 1, "валидация": 2}
+    reviews = {"гипотезы": 1, "план проверки": 1, "ТЗ на доработку": 1, "исследование": 1, "валидация": 2,
+               "карта направлений": 1}  # карта: проверка смысла и аудит — только на строгом уровне
     if kind in reviews and full:
         n = reviews[kind] + (1 if tier == 1 else 0)
         items.append(("проверка смысла с исправлением", 2 * n, "резерв"))
     if kind in reviews and full:
         items.append(("выборочный аудит итоговых артефактов", 1, "резерв"))
+    if kind == "карта направлений" and forecast_on and modes.get("ideas"):
+        # в карте Нострадамус звучит только с новыми идеями: версии по вопросам в ней уже есть
+        items.append(("Нострадамус с новыми идеями и отсев идей", 2, "резерв"))
     if kind in ("гипотезы", "план проверки", "ТЗ на доработку", "исследование") and forecast_on:
         if modes.get("ideas"):
             items.append(("Нострадамус с новыми идеями и отсев идей", 2, "резерв"))

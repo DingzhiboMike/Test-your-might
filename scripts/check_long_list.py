@@ -15,6 +15,10 @@
 4. Дней до сигнала больше 30 или не число — отсеян «дороже месяца».
 5. Ход дословно повторяет предыдущий (после нормализации) — отсеян «повтор».
 
+6. Только в типе «карта направлений»: ход-запрет («не предлагать X», «не включать Y») — ограничение, а не ход:
+   отсеян «ограничение, а не ход» и не считается за широту. Таких строк не больше пятой части списка (целое
+   деление на 5): запреты место в «Убьёт» и «Границах» направления, а не в длинном списке.
+
 Прошедшие сортируются: больше разных опор [F-id] — выше; при равенстве — меньше дней до сигнала; при равенстве —
 порядок в списке. В глубину идут `--top` ходов (по умолчанию 5): сначала лучший ход каждого варианта решения из
 ТЗ (по этому порядку), потом остальные по порядку; остальные прошедшие — «в запасе». Так выбор не схлопывается в один
@@ -31,6 +35,16 @@ import sys
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from check_path import decision_variants  # noqa: E402
+from check_effort import output_type  # noqa: E402
+
+# ход-запрет: подлежащее («Для …») и сразу «не <делать>» в первых 90 знаках — «Для автопарка не включать …»
+BAN = re.compile(r"\bне\s+(?:предлагать|включать|приписывать|подавать|обещать|считать|делать|использовать|выдавать|"
+                 r"вводить|рекомендовать|продавать|заводить|выносить)\b", re.I)
+
+
+def is_ban(move):
+    m = BAN.search(move)
+    return bool(m and m.start() <= 90)
 
 
 def pick_deep(passed, top, by_variant):
@@ -92,6 +106,11 @@ def main():
     if not 15 <= len(table) <= 25:
         errors.append("строк в списке %d, нужно 15–25" % len(table))
     passed, dropped, seen = [], [], set()
+    in_map = output_type(tz) == "карта направлений"
+    bans = [c[0] for c in table if in_map and is_ban(c[1])]
+    if len(bans) > len(table) // 5:
+        errors.append("ходов-запретов %d из %d (№ %s): запрет — не ход, он идёт в «Убьёт» и границы направления; "
+                      "замените их действиями, не больше пятой части списка" % (len(bans), len(table), ", ".join(bans)))
     for idx, c in enumerate(table):
         num, move, _who, var, support, cheap, days = c[:7]
         reason = ""
@@ -99,7 +118,9 @@ def main():
         refs = set(re.findall(r"\bF-\d+\b", support))
         d = re.match(r"^\s*(\d+)", days)
         key = norm(move)
-        if variants and not (letters & set(variants)):
+        if in_map and num in bans:
+            reason = "ограничение, а не ход"
+        elif variants and not (letters & set(variants)):
             reason = "не сдвигает решение"
         elif not refs and empty(cheap):
             reason = "не на чем стоять и нечем проверить"
