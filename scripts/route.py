@@ -88,7 +88,9 @@ REQUIRED = {
     "карта направлений": FIELD + [("b2b-consultant", "01-review.md", None), ("hypothesis-generator", "02-long-list.md", None),
                           ("nostradamus", "02f-forecast.md", "ideas"),
                           ("hypothesis-validator", "02g-ideas-check.md", "ideas"),
-                          ("b2b-consultant", "06-directions.md", None)],
+                          ("b2b-consultant", "06-directions.md", None),
+                          # проверка смысла карты и выборочный аудит — только при validation=full (строгий уровень)
+                          ("meaning-review", "review-06-directions.md", None), AUDIT],
 }
 # Проверки готовности по типу: скрипт и аргументы после папки задачи.
 READY_CHECKS = {
@@ -112,7 +114,7 @@ COMMON_CHECKS = [("check_quotes.py", []), ("check_private.py", []), ("check_conc
                  ("check_refute.py", []),  # refute: опровержение из другого источника, если есть 02c/02d
                  ("check_process.py", []),  # process: форма гипотез при «ПРЕДМЕТ: процесс»
                  ("check_humanize.py", [])]  # сдача прошла humanizer и не потеряла фактов  # concrete: «нет данных» и тупики сдачи
-for _kind in ("гипотезы", "план проверки", "ТЗ на доработку", "валидация", "исследование"):
+for _kind in ("гипотезы", "план проверки", "ТЗ на доработку", "валидация", "исследование", "карта направлений"):
     READY_CHECKS[_kind].append(("audit_sample.py", ["--check"]))
 
 

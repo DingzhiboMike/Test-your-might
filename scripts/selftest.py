@@ -964,6 +964,24 @@ def directions_tests(root):
     r = run([rt, "ready", di])
     expect("карта: профиль без прогноза снимает Нострадамуса из обязательных артефактов",
            "02f-forecast.md" not in r.stdout and "02g-ideas-check.md" not in r.stdout, r.stdout)
+    # уровни карты различаются по смыслу: строгий добавляет проверку смысла и аудит; перенесённая карта знания снимает разбор
+    def price(task, lvl):
+        out = run([os.path.join(HERE, "cost_estimate.py"), task, "--level", lvl]).stdout
+        m = re.search(r"~(\d+) вызов", out)
+        return int(m.group(1)) if m else -1
+    open(os.path.join(di, "sources.csv"), "w", encoding="utf-8").write(
+        "id,kind,location,level,ctx_type,author,pub_date,data_date,opened,read,method,root,status,fetched,sha256,chars,note,ts\n"
+        + "".join("F-%03d,context,context/f%d.md,,other,a,unknown,unknown,2026-11-06,full,raw,self,unknown,file,h%d,10,,1\n" % (i, i, i)
+                  for i in range(1, 13)))
+    lo, wk, st = price(di, "light"), price(di, "work"), price(di, "strict")
+    expect("цена карты: лёгкий < рабочий < строгий, строгий не меньше рабочего + 3", 0 < lo < wk and st >= wk + 3, "%s %s %s" % (lo, wk, st))
+    open(os.path.join(di, "00-tz.md"), "a", encoding="utf-8").write("КОНТЕКСТ:   разбор материалов не повторяется\n")
+    wk2 = price(di, "work")
+    expect("цена карты: «разбор материалов не повторяется» снимает вызов разбора", 0 < wk2 < wk, "%s %s" % (wk, wk2))
+    run([rt, "profile", di, "level=strict"])
+    r = run([rt, "ready", di])
+    expect("карта: на строгом уровне обязательны проверка смысла карты и аудит",
+           "review-06-directions.md" in r.stdout and "audit.md" in r.stdout, r.stdout)
     # диспетчер: вопрос «какие ещё есть» без разведки и новых идей — ошибка ТЗ; с ними или с причиной — нет
     tz_q = ("ТЗ\nЗАПРОС: какие еще есть сценарии, может быть мы не знаем\nТИП ВЫХОДА: карта направлений\n"
             "РЕЖИМ: новые идеи: нет · разведка поля: нет\n")
