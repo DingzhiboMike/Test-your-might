@@ -168,7 +168,7 @@ def check_directions(text):
         who = got.get("Кому", ("", ""))[1].strip()
         if who:
             tuples.append((m.group(1), axes_of(who)))
-    return errors + check_distinct(tuples)
+    return errors + check_distinct(tuples) + check_axes(text, tuples)
 
 
 MAX_PER_VALUE = 3
@@ -215,6 +215,43 @@ def check_distinct(tuples):
     if len(tuples) >= 6 and len(firsts) < 3:
         errors.append("06-directions.md: у %d направлений всего %d значений первой оси в «Кому» — нужно не меньше трёх"
                       % (len(tuples), len(firsts)))
+    return errors
+
+
+def declared_axes(text):
+    """Оси из раздела «КАК ДЕЛИТЬ»: строки вида «Ситуация оплаты: …» → первые слова названия оси."""
+    m = re.search(r"^\s*(?:#{1,4}\s*)?\**КАК ДЕЛИТЬ[^\n]*\n(.*?)(?=^\s*(?:#{1,4}\s*)?\**(?:НАПРАВЛЕНИЕ|С ЧЕГО НАЧАТЬ|ЧЕГО НЕ ХВАТАЕТ)|\Z)",
+                  text, re.M | re.S)
+    out = []
+    for line in (m.group(1) if m else "").splitlines():
+        mm = re.match(r"^\s*(?:[-*]\s*)?\**([^:\n]{2,40}?)\**\s*:", line)
+        if mm:
+            out.append(_norm(mm.group(1)).split(" ")[0])
+    return out
+
+
+def check_axes(text, tuples):
+    """Оси должны пересекаться: иначе карта — список, где у каждого направления своя уникальная метка.
+    И каждая ось из «КАК ДЕЛИТЬ» должна встречаться в «Кому» хотя бы у двух направлений."""
+    errors = []
+    if len(tuples) < 6:
+        return errors
+    values = {}
+    for num, axes in tuples:
+        for axis, value in axes:
+            if axis:
+                values.setdefault(axis, {}).setdefault(value, []).append(num)
+    crossing = [a for a, vs in values.items() if any(len(n) >= 2 for n in vs.values())]
+    if len(crossing) < 2:
+        errors.append("06-directions.md: оси не пересекаются — у каждого из %d направлений своё значение почти по всем "
+                      "осям, то есть это список, а не разложение. Нужны хотя бы две оси, по которым несколько направлений "
+                      "сходятся на одном значении, и среди них ось другого вопроса (например, зачем карте это направление "
+                      "или какая группа клиентов), а не только «кто и в каком процессе платит»" % len(tuples))
+    used = {a.split(" ")[0] for a in values}
+    for axis in declared_axes(text):
+        if axis not in used:
+            errors.append("06-directions.md: ось «%s» названа в «КАК ДЕЛИТЬ», но ни у одного направления нет её значения "
+                          "в «Кому» — либо проставить, либо убрать ось" % axis)
     return errors
 
 
