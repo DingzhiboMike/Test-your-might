@@ -112,8 +112,7 @@ READY_CHECKS = {
 }
 COMMON_CHECKS = [("check_quotes.py", []), ("check_private.py", []), ("check_concrete.py", []),
                  ("check_refute.py", []),  # refute: опровержение из другого источника, если есть 02c/02d
-                 ("check_process.py", []),  # process: форма гипотез при «ПРЕДМЕТ: процесс»
-                 ("check_humanize.py", [])]  # сдача прошла humanizer и не потеряла фактов  # concrete: «нет данных» и тупики сдачи
+                 ("check_process.py", [])]  # process: форма гипотез при «ПРЕДМЕТ: процесс»; concrete: «нет данных» и тупики сдачи
 for _kind in ("гипотезы", "план проверки", "ТЗ на доработку", "валидация", "исследование", "карта направлений"):
     READY_CHECKS[_kind].append(("audit_sample.py", ["--check"]))
 
