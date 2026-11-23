@@ -169,6 +169,9 @@ def _structure(kind, tier, docs, interviews, modes, mapped, prof=None):
         items.append(("проверка смысла с исправлением", 2 * n, "резерв"))
     if kind in reviews and full:
         items.append(("выборочный аудит итоговых артефактов", 1, "резерв"))
+    if kind == "карта направлений" and forecast_on and modes.get("ideas"):
+        # в карте Нострадамус звучит только с новыми идеями: версии по вопросам в ней уже есть
+        items.append(("Нострадамус с новыми идеями и отсев идей", 2, "резерв"))
     if kind in ("гипотезы", "план проверки", "ТЗ на доработку", "исследование") and forecast_on:
         if modes.get("ideas"):
             items.append(("Нострадамус с новыми идеями и отсев идей", 2, "резерв"))

@@ -16,6 +16,10 @@
    «Скорее», «Что даст ответ», «Где посмотреть»; у «не держится» — «Скорее»: что верно вместо.
 4. `06-directions.md` (тип «карта направлений»): разделы «КАК ДЕЛИТЬ» и «С ЧЕГО НАЧАТЬ», не меньше трёх
    «НАПРАВЛЕНИЕ N», у каждого — «На чём стоит», «Скорее» с уверенностью, «Что различит», «Первый шаг», «Убьёт».
+   Различимость: в «Кому» оси и значения («контур — X; роль — Y»); у двух направлений весь набор совпал — ошибка
+   (слить или развести по оси); одно значение первой оси у более чем MAX_PER_VALUE направлений — ошибка; при
+   шести направлениях и больше значений первой оси меньше трёх — ошибка. Считаются уникальные значения осей,
+   а не число заголовков «НАПРАВЛЕНИЕ N».
 5. `08-handoff.md`, любой тип выхода [R-077 «Тупик — не вывод»]: пункт списка или абзац с тупиковой формулировкой
    («не измерен», «нет данных», «на границе случайности», «спорит», «не верит», «сужены», «эффекта нет» …) несёт
    версию или действие: «→ скорее: … (уверенность …)», «→ шаг: …», «вероятно», «значит», «следующий шаг»,
@@ -144,7 +148,7 @@ DIR_REQUIRED = ("На чём стоит", "Скорее", "Что различи
 def check_directions(text):
     """06-directions.md: у каждого «НАПРАВЛЕНИЕ N» — на чём стоит, версия с уверенностью, что различит, первый шаг,
     что убьёт; есть оси деления и «С чего начать». Ни одно направление не остаётся без предположения и действия."""
-    errors = []
+    errors, tuples = [], []
     heads = list(re.finditer(r"^\s*(?:#{1,4}\s*)?\**НАПРАВЛЕНИЕ\s+(\d+)\b", text, re.M))
     if len(heads) < 3:
         errors.append("06-directions.md: направлений %d — карте нужно не меньше трёх («НАПРАВЛЕНИЕ N — …»)" % len(heads))
@@ -161,6 +165,56 @@ def check_directions(text):
         got = fields(block, DIR_FIELDS)
         errors += [e.replace("Направление", "06-directions.md, направление") for e in
                    check_fields("Направление %s" % m.group(1), got, DIR_REQUIRED)]
+        who = got.get("Кому", ("", ""))[1].strip()
+        if who:
+            tuples.append((m.group(1), axes_of(who)))
+    return errors + check_distinct(tuples)
+
+
+MAX_PER_VALUE = 3
+
+
+def _norm(s):
+    return re.sub(r"\s+", " ", re.sub(r"[«»\"*_`.,;:!?()]", "", s.replace("ё", "е").lower())).strip()
+
+
+def axes_of(who):
+    """«контур — регулярное списание; роль — владелец» → [(ось, значение), …] в порядке записи.
+    Без названия оси («ушедшие») ось пустая: значение всё равно считается."""
+    out = []
+    for part in re.split(r"[;\n]", who):
+        part = part.strip()
+        if not part:
+            continue
+        m = re.match(r"^([^:—–]{1,40}?)\s*(?::|—|–| - )\s*(.+)$", part)
+        out.append((_norm(m.group(1)), _norm(m.group(2))) if m else ("", _norm(part)))
+    return out
+
+
+def check_distinct(tuples):
+    """Карта должна различать направления по осям, а не по заголовкам: [(номер, [(ось, значение), …])]."""
+    errors, seen = [], {}
+    for num, axes in tuples:
+        if not axes:
+            continue
+        key = tuple(axes)
+        if key in seen:
+            errors.append("06-directions.md: направления %s и %s совпали по всем осям в «Кому» — слить или развести "
+                          "по оси (ситуация, роль или ограничение процесса)" % (seen[key], num))
+        else:
+            seen[key] = num
+    firsts = {}
+    for num, axes in tuples:
+        if axes:
+            firsts.setdefault(axes[0], []).append(num)
+    for (axis, value), nums in sorted(firsts.items()):
+        if len(nums) > MAX_PER_VALUE:
+            errors.append("06-directions.md: %d направлений (%s) стоят на одном значении первой оси «%s» — карта "
+                          "не различает их; слить повторы или добавить другие значения оси"
+                          % (len(nums), ", ".join(nums), (axis + " — " if axis else "") + value))
+    if len(tuples) >= 6 and len(firsts) < 3:
+        errors.append("06-directions.md: у %d направлений всего %d значений первой оси в «Кому» — нужно не меньше трёх"
+                      % (len(tuples), len(firsts)))
     return errors
 
 

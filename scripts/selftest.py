@@ -388,6 +388,24 @@ def long_list_tests(root):
     open(os.path.join(d, "02-long-list.md"), "w", encoding="utf-8").write(head + body.split("| 6 |")[0])
     r = run([cl, d])
     expect("длинный список: меньше 15 строк — ошибка", r.returncode == 1 and "15–25" in r.stdout, r.stdout)
+    # тип «карта направлений»: ходы-запреты — не ходы
+    open(os.path.join(d, "00-tz.md"), "w", encoding="utf-8").write("ТЗ\nТИП ВЫХОДА: карта направлений\n")
+    mp = ""
+    for i in range(1, 19):
+        mv = "Для автопарка не включать ход %d в базу" % i if i <= 4 else "Для владельца завести ход номер %d" % i
+        mp += "| %d | %s | малые | — | нет | опрос | 10 |\n" % (i, mv)
+    open(os.path.join(d, "02-long-list.md"), "w", encoding="utf-8").write(head + mp)
+    r = run([cl, d])
+    rep = open(os.path.join(d, "checks", "long-list.md"), encoding="utf-8").read()
+    expect("длинный список карты: четыре запрета из 18 — ошибка и «ограничение, а не ход»",
+           r.returncode == 1 and "ходов-запретов 4" in r.stdout and "ограничение, а не ход" in rep, r.stdout + rep)
+    open(os.path.join(d, "02-long-list.md"), "w", encoding="utf-8").write(head + mp.replace("не включать", "включать", 3))
+    r = run([cl, d])
+    expect("длинный список карты: один запрет из 18 — допустим", r.returncode == 0, r.stdout)
+    open(os.path.join(d, "00-tz.md"), "w", encoding="utf-8").write("ТЗ\nТИП ВЫХОДА: гипотезы\n")
+    open(os.path.join(d, "02-long-list.md"), "w", encoding="utf-8").write(head + mp)
+    r = run([cl, d])
+    expect("длинный список гипотез: «не делать» остаётся ходом — правило только для карты", "ходов-запретов" not in r.stdout, r.stdout)
 
 
 def backlog_tests(root):
@@ -901,10 +919,10 @@ def directions_tests(root):
            and "03-backlog" not in nxt and "nostradamus" not in nxt, r.stdout + nxt)
     r = run([os.path.join(HERE, "cost_estimate.py"), d])
     expect("карта: цена считается для нового типа", r.returncode == 0 and "вызов" in r.stdout, r.stdout + r.stderr)
-    block = ("НАПРАВЛЕНИЕ %d — Ход %d\nСуть:          вернуть ушедшие салоны по причине\nКому:          состояние: ушедшие\n"
+    block = ("НАПРАВЛЕНИЕ %d — Ход %d\nСуть:          вернуть ушедшие салоны по причине\nКому:          состояние: ушедшие; причина: %d\n"
              "На чём стоит:  опрос ушедших салонов\nСкорее:        сработает для ушедших на бумажный журнал; уверенность низкая\n"
              "Что различит:  доля причин в звонках\nПервый шаг:    10 звонков, неделя\nУбьёт:         одна причина у всех\n\n")
-    good = ("КАК ДЕЛИТЬ\nсостояние: ушедшие / новые — видна в таблице салонов\n\n" + "".join(block % (i, i) for i in (1, 2, 3))
+    good = ("КАК ДЕЛИТЬ\nсостояние: ушедшие / новые — видна в таблице салонов\n\n" + "".join(block % (i, i, i) for i in (1, 2, 3))
             + "С ЧЕГО НАЧАТЬ\nЗвонки — различат направления 1 и 2.\n\nЧЕГО НЕ ХВАТАЕТ\nвыгрузки возвратов.\n")
     w = lambda t: open(os.path.join(d, "06-directions.md"), "w", encoding="utf-8").write(t)
     w(good)
@@ -921,6 +939,46 @@ def directions_tests(root):
     w(good.replace("опрос ушедших салонов", "опрос [F-003]", 1))
     r = run([os.path.join(HERE, "check_readable.py"), d])
     expect("карта: id источника в документе для человека — поймано", r.returncode == 1 and "06-directions.md" in r.stdout, r.stdout)
+    # различимость: одинаковый набор значений осей у двух направлений, и четыре на одном значении первой оси
+    w(good.replace("причина: 2", "причина: 1", 1))
+    r = run([cc, d, "--step"])
+    expect("карта: два направления с одним набором значений осей — поймано",
+           r.returncode == 1 and "направления 1 и 2" in r.stdout and "совпали" in r.stdout, r.stdout)
+    four = ("КАК ДЕЛИТЬ\nсостояние: ушедшие / новые\n\n" + "".join(block % (i, i, i) for i in (1, 2, 3, 4))
+            + "С ЧЕГО НАЧАТЬ\nЗвонки.\n")
+    w(four)
+    r = run([cc, d, "--step"])
+    expect("карта: четыре направления на одном значении первой оси — поймано",
+           r.returncode == 1 and "4 направлений" in r.stdout and "первой оси" in r.stdout, r.stdout)
+    # маршрут: Нострадамус и отсев — только при «новые идеи: да», и профиль без прогноза их снимает
+    ideas_tz = ("ТЗ\nЗАПРОС: какие ещё есть варианты\nGAP:\n  1. Какие ещё есть? [ключевой] {ответ: контекст}\n"
+                "ТИП ВЫХОДА: карта направлений\nТИР: Tier 2\nЁМКОСТЬ: 0\nСОГЛАСОВАНО: 2026-11-06\n"
+                "РЕЖИМ: новые идеи: да · разведка поля: да\n")
+    di = os.path.join(root, "tasks", "dirs-ideas")
+    os.makedirs(di)
+    open(os.path.join(di, "00-tz.md"), "w", encoding="utf-8").write(ideas_tz)
+    run([rt, "init", di])
+    nxt = run([rt, "next", di]).stdout
+    expect("карта: при «новые идеи: да» в маршруте Нострадамус и отсев", "02f-forecast.md" in nxt or "nostradamus" in nxt, nxt)
+    run([rt, "profile", di, "level=light"])
+    r = run([rt, "ready", di])
+    expect("карта: профиль без прогноза снимает Нострадамуса из обязательных артефактов",
+           "02f-forecast.md" not in r.stdout and "02g-ideas-check.md" not in r.stdout, r.stdout)
+    # диспетчер: вопрос «какие ещё есть» без разведки и новых идей — ошибка ТЗ; с ними или с причиной — нет
+    tz_q = ("ТЗ\nЗАПРОС: какие еще есть сценарии, может быть мы не знаем\nТИП ВЫХОДА: карта направлений\n"
+            "РЕЖИМ: новые идеи: нет · разведка поля: нет\n")
+    dq = os.path.join(root, "tasks", "dirs-q")
+    os.makedirs(dq)
+    open(os.path.join(dq, "00-tz.md"), "w", encoding="utf-8").write(tz_q)
+    r = run([os.path.join(HERE, "check_path.py"), dq, "--tz"])
+    expect("ТЗ карты: «какие ещё есть» без разведки поля и новых идей — поймано", "разведка поля" in r.stdout and "какие ещё" in r.stdout, r.stdout)
+    open(os.path.join(dq, "00-tz.md"), "w", encoding="utf-8").write(tz_q.replace("нет · разведка поля: нет", "да · разведка поля: да"))
+    r = run([os.path.join(HERE, "check_path.py"), dq, "--tz"])
+    expect("ТЗ карты: с разведкой поля и новыми идеями правило не срабатывает", "какие ещё" not in r.stdout, r.stdout)
+    open(os.path.join(dq, "00-tz.md"), "w", encoding="utf-8").write(
+        tz_q + "ДОПУЩЕНИЯ: разведка поля не нужна: все сценарии уже собраны в материалах\n")
+    r = run([os.path.join(HERE, "check_path.py"), dq, "--tz"])
+    expect("ТЗ карты: причина «разведка поля не нужна» снимает правило", "какие ещё" not in r.stdout, r.stdout)
 
 
 def concrete_tests(root):

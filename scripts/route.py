@@ -83,7 +83,11 @@ REQUIRED = {
                     [("research-report", "06-research.md", None), ("meaning-review", "review-06-research.md", None),
                      AUDIT],
     "вердикты по проверке": [("results-reviewer", "04-results.md", None)],
+    # новые идеи после длинного списка — только если заказаны («новые идеи: да»): карта «какие ещё есть» без них
+    # перекладывает то, что нашла разведка поля; идеи идут консультанту до свода карты
     "карта направлений": FIELD + [("b2b-consultant", "01-review.md", None), ("hypothesis-generator", "02-long-list.md", None),
+                          ("nostradamus", "02f-forecast.md", "ideas"),
+                          ("hypothesis-validator", "02g-ideas-check.md", "ideas"),
                           ("b2b-consultant", "06-directions.md", None)],
 }
 # Проверки готовности по типу: скрипт и аргументы после папки задачи.
@@ -98,7 +102,8 @@ READY_CHECKS = {
                         ("check_ideas.py", []), ("check_readable.py", []), ("check_effort.py", [])],
     "валидация": [("check_path.py", []), ("check_log_sources.py", []), ("check_forecast.py", []),
                   ("check_ideas.py", []), ("check_readable.py", [])],
-    "карта направлений": [("check_path.py", []), ("check_readable.py", [])],
+    "карта направлений": [("check_path.py", []), ("check_long_list.py", []), ("check_forecast.py", []),
+                          ("check_ideas.py", []), ("check_readable.py", [])],
     "исследование": [("check_path.py", []), ("check_log_sources.py", []), ("check_forecast.py", []),
                      ("check_ideas.py", []), ("check_effort.py", [])],
     "вердикты по проверке": [],
@@ -186,7 +191,7 @@ def modes(tz):
             "field": bool(re.search(r"разведка поля:\s*да", mode))}
 
 
-PROFILED = ("гипотезы", "план проверки", "ТЗ на доработку", "валидация", "исследование")
+PROFILED = ("гипотезы", "план проверки", "ТЗ на доработку", "валидация", "исследование", "карта направлений")
 
 
 def profile_keeps(prof, role, art):
