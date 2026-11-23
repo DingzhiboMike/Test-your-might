@@ -904,6 +904,27 @@ def field_tests(root):
            and "light-run" in nxt, nxt)
 
 
+def source_guard_tests(root):
+    """Страница блокировки не регистрируется как прочитанная; разметка страницы не даёт ложного «пароль»."""
+    add = os.path.join(HERE, "add_source.py")
+    t = os.path.join(root, "tasks", "srcguard")
+    os.makedirs(t)
+    filler = "Обычный текст статьи о платежах. " * 60
+    block = "<html><head><title>Сайт | Доступ запрещен</title></head><body>" + filler + "</body></html>"
+    r = run([add, "--task", t, "--kind", "web", "--location", "https://b.example/a", "--level", "3"], block)
+    expect("реестр: страница блокировки как прочитанная — отказ", r.returncode != 0 and "блокировки" in (r.stdout + r.stderr),
+           r.stdout + r.stderr)
+    r = run([add, "--task", t, "--kind", "web", "--location", "https://b.example/a", "--level", "3", "--read", "not-read"], block)
+    expect("реестр: страница блокировки с --read not-read регистрируется", r.returncode == 0, r.stdout + r.stderr)
+    markup = '<div data-token="abcdef123456" class="x">' + filler + "</div>"
+    r = run([add, "--task", t, "--kind", "web", "--location", "https://m.example/a", "--level", "3"], markup)
+    expect("реестр: «token=» в атрибуте тега — не пароль", r.returncode == 0 and "похоже на пароль" not in r.stderr,
+           r.stdout + r.stderr)
+    r = run([add, "--task", t, "--kind", "web", "--location", "https://m.example/b", "--level", "3"],
+            "Статья. пароль: qwerty12345\n" + filler)
+    expect("реестр: пароль в видимом тексте по-прежнему замечен", "похоже на пароль" in r.stderr, r.stderr)
+
+
 def directions_tests(root):
     """Тип «карта направлений»: маршрут в коде, цена, форма карты, читаемость."""
     cc, rt = os.path.join(HERE, "check_concrete.py"), os.path.join(HERE, "route.py")
@@ -1797,6 +1818,13 @@ def roles_tests():
         expect("хук: WebSearch источнику данных разрешён", code("WebSearch", "market-analyze") == 0)
         expect("хук: агент общего типа сеть не теряет", code("WebSearch", "general-purpose") == 0)
         expect("хук: основная сессия Bash не ограничена", code("Bash", "", "rm -rf x", agent_id=None) == 0)
+        expect("хук: скрипт системы по пути в кавычках с пробелом подагенту разрешён",
+               code("Bash", "document-mapper", 'python3 "/Users/x/Папка с пробелом/scripts/check_map.py" tasks/x') == 0)
+        expect("хук: скрипт по пути с экранированным пробелом разрешён",
+               code("Bash", "document-mapper", "python3 /Users/x/Папка\\ с\\ пробелом/scripts/check_map.py tasks/x") == 0)
+        expect("хук: не скрипт системы по пути в кавычках запрещён",
+               code("Bash", "document-mapper", 'python3 "/Users/x/Папка с пробелом/evil.py"') == 2)
+        expect("хук: cd подагенту по-прежнему запрещён", code("Bash", "document-mapper", "cd tasks && ls") == 2)
     finally:
         shutil.rmtree(proj, ignore_errors=True)
 
@@ -2870,6 +2898,7 @@ def main():
         handoff_concrete_tests(root)
         hyp_concrete_tests(root)
         directions_tests(root)
+        source_guard_tests(root)
         field_tests(root)
         refute_tests(root)
         process_tests(root)
