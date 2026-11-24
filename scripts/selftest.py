@@ -729,6 +729,12 @@ def process_tests(root):
     w("02c-validation.md", val("сузить", ""))
     r = run([cp, t])
     expect("процесс: нет строки «Перенос:» — поймано", r.returncode == 1 and "нет строки «Перенос:»" in r.stdout, r.stdout)
+    w("02c-validation.md", val("сузить", "Перенос:    нет — внешней опоры нет, переносить нечего\n"))
+    r = run([cp, t])
+    expect("процесс: «Перенос: нет» при гипотезе без опоры — проходит", r.returncode == 0, r.stdout)
+    w("02c-validation.md", val("держится на бумаге", "Перенос:    нет — внешней опоры нет\n"))
+    r = run([cp, t])
+    expect("процесс: «держится» без опоры — поймано", r.returncode == 1 and "без внешней опоры" in r.stdout, r.stdout)
 
 
 def refute_tests(root):
@@ -1055,6 +1061,10 @@ def concrete_tests(root):
     write("06-validation.md", (table % "x").replace(" Скорее |", " Итог |"))
     r = run([cc, d])
     expect("конкретика: таблица без столбца «Скорее» — поймано", r.returncode == 1 and "столбца" in r.stdout, r.stdout)
+    summary = "## 1. Гипотезы\n\n| Гипотеза | Исход · что не так |\n| --- | --- |\n| Г-1 | сузить: мало опор |\n\n"
+    write("06-validation.md", (table % "сверяют вручную, уверенность низкая (оценка)").replace("## 2.", summary + "## 2."))
+    r = run([cc, d])
+    expect("конкретика: сводная таблица со словом «исход» выше таблицы утверждений — не ошибка", r.returncode == 0, r.stdout)
 
 
 def knowledge_links_tests(root):

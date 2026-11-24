@@ -256,18 +256,23 @@ def check_axes(text, tuples):
 
 
 def table_rows(text):
-    """(заголовок, строки) первой таблицы, в шапке которой есть «Скорее» или «исход»."""
+    """(заголовок, строки) таблицы утверждений: первой, в шапке которой есть «Скорее»; нет такой — первой со словом
+    «исход» (тогда проверка скажет, что «Скорее» не хватает). Сводная таблица гипотез со столбцом «Исход» выше
+    таблицы утверждений — не она."""
     lines = text.splitlines()
-    for i, line in enumerate(lines):
-        if line.strip().startswith("|") and re.search(r"исход", line, re.I):
-            head = [c.strip() for c in line.strip().strip("|").split("|")]
-            rows = []
-            for row in lines[i + 2:]:
-                if not row.strip().startswith("|"):
-                    break
-                rows.append([c.strip() for c in row.strip().strip("|").split("|")])
-            return head, rows
-    return None, []
+    heads = [i for i, line in enumerate(lines) if line.strip().startswith("|")
+             and (i == 0 or not lines[i - 1].strip().startswith("|"))]  # только шапки, не строки таблиц
+    pick = (next((i for i in heads if re.search(r"скорее", lines[i], re.I)), None)
+            or next((i for i in heads if re.search(r"исход", lines[i], re.I)), None))
+    if pick is None:
+        return None, []
+    head = [c.strip() for c in lines[pick].strip().strip("|").split("|")]
+    rows = []
+    for row in lines[pick + 2:]:
+        if not row.strip().startswith("|"):
+            break
+        rows.append([c.strip() for c in row.strip().strip("|").split("|")])
+    return head, rows
 
 
 def check_document(text):
