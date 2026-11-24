@@ -17,7 +17,9 @@
 state.json пишет только этот скрипт. Шаг — роль, артефакт (имя или маска для пачки), хэши всех файлов задачи до
 вызова. `done` сверяет хэши после: изменилось что-то кроме артефакта, масок --allow и служебного (log.md,
 реестр источников и чисел, checks/, map/, трасса, модель предмета) — ошибка периметра, по содержимому, а не по
-времени файла. Затем запускает check_step.py по артефакту и печатает его строки «Проверки» и «Расход» для лога.
+времени файла. Не ошибка: артефакты соседних шагов, шедших одновременно (даже закрытых раньше), и файлы, которые
+во время шага правила основная сессия через Write/Edit (след хука в checks/orchestrator-writes.jsonl) — их `done`
+печатает отдельной строкой. Затем запускает check_step.py по артефакту и печатает его строки «Проверки» и «Расход» для лога.
 
 Пока шаг идёт, хук записи пускает подагента только в артефакт и маски этого шага; хук остановки подагента
 прогоняет check_step и один раз возвращает исполнителю ошибки, чтобы он исправил артефакт сам (не для пачек).
@@ -175,6 +177,24 @@ def allowed_writes(task):
     for s in running(st):
         masks += [s["artifact"]] + s.get("allow", [])
     return masks
+
+
+def orchestrator_writes(task, since):
+    """Файлы задачи, которые основная сессия правила через Write/Edit с момента since (след хука guard_writes.py в
+    checks/orchestrator-writes.jsonl). Хука не было — следа нет, и периметр остаётся строгим."""
+    out = set()
+    try:
+        with open(os.path.join(task, "checks", "orchestrator-writes.jsonl"), encoding="utf-8") as f:
+            for line in f:
+                try:
+                    rec = json.loads(line)
+                except ValueError:
+                    continue
+                if rec.get("t", 0) >= since and rec.get("path"):
+                    out.add(rec["path"])
+    except OSError:
+        pass
+    return out
 
 
 def tests_in_context(task):
@@ -393,9 +413,14 @@ def cmd_done(task, n=None):
     before = step.pop("before", {})
     changed = sorted(p for p in set(before) | set(after) if before.get(p) != after.get(p))
     masks = [step["artifact"]] + step.get("allow", [])
-    others = [s for s in run_ if s is not step]
+    # соседние шаги, шедшие одновременно с этим (идут сейчас или закрылись уже после его старта): их артефакты —
+    # не нарушение, даже если соседа закрыли раньше
+    others = [s for s in st["steps"] if s is not step
+              and (s.get("status") == "running" or s.get("finished", 0) >= step["started"])]
     foreign = [p for p in changed if not matches(p, masks) and not matches(p, SERVICE)
                and not any(matches(p, [o["artifact"]] + o.get("allow", [])) for o in others)]
+    by_orch = sorted(set(foreign) & orchestrator_writes(task, step["started"]))
+    foreign = [p for p in foreign if p not in by_orch]
     produced = [p for p in changed if matches(p, masks)]
     errors = []
     if foreign:
@@ -408,10 +433,14 @@ def cmd_done(task, n=None):
     lines = [l for l in r.stdout.splitlines() if l.startswith(("Проверки:", "Расход:"))]
     step.update(status="failed" if errors or r.returncode else "done", finished=round(time.time()),
                 changed=changed, checks=lines[0] if lines else "", errors=errors)
+    if by_orch:
+        step["orchestrator_writes"] = by_orch
     save(task, st)
     print("Шаг %d — %s: %s" % (step["n"], step["role"], "ок" if step["status"] == "done" else "ОШИБКИ"))
     for e in errors:
         print("Периметр: " + e)
+    if by_orch:
+        print("Периметр: во время шага файлы правил оркестратор (не нарушение): " + ", ".join(by_orch))
     for l in lines:
         print(l)
     if r.returncode:

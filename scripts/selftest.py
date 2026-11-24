@@ -1584,6 +1584,35 @@ def route_tests():
         r = run([rt, "status", t])
         expect("маршрут: статус для продолжения после обрыва", "Шаг 2 — results-reviewer" in r.stdout and "Обязательные впереди" in r.stdout, r.stdout)
 
+        # Ложные срабатывания периметра из логов: запись оркестратора в служебный файл задачи во время шага
+        # (private.txt, заметки поиска) и параллельный шаг, закрытый раньше соседнего.
+        def write_main(name):
+            d = {"cwd": proj, "tool_name": "Write", "tool_input": {"file_path": os.path.join(t, name)}}
+            return run([hook], json.dumps(d)).returncode
+
+        run([rt, "start", t, "results-reviewer", "04-results.md"])
+        expect("хук: оркестратору в файл задачи во время шага можно", write_main("private.txt") == 0)
+        open(os.path.join(t, "private.txt"), "w", encoding="utf-8").write("закрытый термин\n")
+        open(os.path.join(t, "04-results.md"), "a", encoding="utf-8").write("Ещё строка.\n")
+        r = run([rt, "done", t])
+        expect("периметр: запись оркестратора во время шага — не нарушение, но видна",
+               r.returncode == 0 and "private.txt" in r.stdout and "оркестратор" in r.stdout, r.stdout)
+        run([rt, "start", t, "results-reviewer", "04-results.md"])
+        expect("хук: подагенту в чужой файл по-прежнему нельзя", write_code("notes.md") == 2)
+        open(os.path.join(t, "notes.md"), "w", encoding="utf-8").write("мимо хука\n")
+        open(os.path.join(t, "04-results.md"), "a", encoding="utf-8").write("И ещё.\n")
+        r = run([rt, "done", t])
+        expect("периметр: запись без следа оркестратора ловится, как раньше", r.returncode == 1 and "notes.md" in r.stdout, r.stdout)
+        os.remove(os.path.join(t, "notes.md"))
+        run([rt, "start", t, "lens-a", "src-a.md"])
+        run([rt, "start", t, "lens-b", "src-b.md"])
+        open(os.path.join(t, "src-a.md"), "w", encoding="utf-8").write(body)
+        r = run([rt, "done", t, str(len(json.load(open(os.path.join(t, "state.json"), encoding="utf-8"))["steps"]) - 1)])
+        open(os.path.join(t, "src-b.md"), "w", encoding="utf-8").write(body)
+        r = run([rt, "done", t])
+        expect("периметр: артефакт параллельного шага, закрытого раньше, — не нарушение",
+               "src-a.md" not in "".join(l for l in r.stdout.splitlines() if l.startswith("Периметр")), r.stdout)
+
         gate = os.path.join(HERE, "hooks", "step_gate.py")
         tr = os.path.join(proj, "agent.jsonl")
         open(tr, "w", encoding="utf-8").write(json.dumps({"type": "user", "timestamp": "2026-10-18T10:00:00Z",
