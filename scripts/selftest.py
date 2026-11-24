@@ -189,6 +189,10 @@ def readable_tests(root):
     open(os.path.join(d5, "06-validation.md"), "w", encoding="utf-8").write(val + "M1 · пройдена; слот пуст; см. D-1 и Г-2.\n")
     r = run([cr, d5])
     expect("читаемость: модуль методологии, слот, D-1 и Г-2 в документе валидации пойманы", r.returncode == 1 and "номер гипотезы" in r.stdout and "слово системы" in r.stdout, r.stdout)
+    open(os.path.join(d5, "06-validation.md"), "w", encoding="utf-8").write(
+        val + "Клиент: «рамка договора мешает, слот на встречу не найти» [F-006].\n")
+    r = run([cr, d5])
+    expect("читаемость: слова системы внутри дословной цитаты — не ошибка", r.returncode == 0, r.stdout)
     d3 = os.path.join(root, "tasks", "rd3")
     os.makedirs(d3)
     open(os.path.join(d3, "00-tz.md"), "w", encoding="utf-8").write("**ТИП ВЫХОДА:** ТЗ на доработку\n")
@@ -767,6 +771,19 @@ def refute_tests(root):
     w(hyp("опровержение: `без подхода` → «его границах» [%s]" % a2, miss))
     r = run([cr, t])
     expect("опровержение: другой источник с того же сайта — поймано", r.returncode == 1 and "того же источника или сайта" in r.stdout, r.stdout)
+    arx = {}
+    for key, loc in (("p1", "https://arxiv.org/abs/2601.00001"), ("p2", "https://arxiv.org/abs/2602.00002"),
+                     ("p1v", "https://arxiv.org/abs/2601.00001v2")):
+        r = run([add, "--task", t, "--kind", "web", "--location", loc, "--level", "3", "--pub-date", "2026-04-01"],
+                "Текст статьи %s о подходе и его границах.\n" % key)
+        arx[key] = r.stdout.strip()
+    w(hyp("опровержение: `без подхода` → «его границах» [%s]" % arx["p2"], miss).replace("[%s]" % a, "[%s]" % arx["p1"], 1))
+    r = run([cr, t])
+    expect("опровержение: другая статья из открытого архива (arxiv.org) — засчитано", r.returncode == 0, r.stdout)
+    w(hyp("опровержение: `без подхода` → «его границах» [%s]" % arx["p1v"], miss).replace("[%s]" % a, "[%s]" % arx["p1"], 1))
+    r = run([cr, t])
+    expect("опровержение: другая версия той же статьи архива — поймано",
+           r.returncode == 1 and "того же источника или сайта" in r.stdout, r.stdout)
     w(hyp(good1, "Уверенность-заглушка").replace("            Уверенность-заглушка\n", ""))
     r = run([cr, t])
     expect("опровержение: одна строка вместо двух — поймано", r.returncode == 1 and "нужно не меньше 2" in r.stdout, r.stdout)
@@ -843,6 +860,27 @@ def field_tests(root):
     r = run([cf, t])
     expect("поле: контраргумент из того же источника — поймано",
            r.returncode == 1 and "из того же источника или домена" in r.stdout, r.stdout)
+    arx = [run([add, "--task", t, "--kind", "web", "--location", "https://arxiv.org/abs/2603.0000%d" % i, "--level", "3",
+                "--pub-date", "2026-05-01"], "Статья %d о подходе и его границах.\n" % i).stdout.strip() for i in (1, 2)]
+    w(build().replace("[%s]" % ids[0], "[%s]" % arx[0]).replace("эффекта нет» [%s]" % ids[1], "эффекта нет» [%s]" % arx[1], 1))
+    r = run([cf, t])
+    expect("поле: контраргумент из другой статьи того же архива — не ошибка",
+           "контраргумент из того же" not in r.stdout, r.stdout)
+    few = build().split("# ЗАПРОСЫ\n")[0] + "# ЗАПРОСЫ\n" + "".join("- `запрос %d` — дал источник\n" % i for i in range(8)) \
+        + "".join("- `без подхода %d` [опровержение] — дал критику\n" % i for i in range(3))
+    w(few)
+    r = run([cf, t])
+    expect("поле: 11 запросов без потолка в ТЗ — мало", r.returncode == 1 and "запросов в журнале 11" in r.stdout, r.stdout)
+    tz_path = os.path.join(t, "00-tz.md")
+    open(tz_path, "w", encoding="utf-8").write("ТЗ\nСТАВКИ:     цена ошибки: низкая; потолок: до 15 запросов и 20 страниц.\n")
+    r = run([cf, t])
+    expect("поле: 11 запросов при потолке 15 в ТЗ — проходит (минимум — две трети потолка)",
+           "запросов в журнале" not in r.stdout, r.stdout)
+    w(build())
+    open(tz_path, "w", encoding="utf-8").write("ТЗ\nСТАВКИ:     цена ошибки: низкая; потолок: до 12 запросов.\n")
+    r = run([cf, t])
+    expect("поле: запросов больше потолка из ТЗ — поймано", r.returncode == 1 and "запросов в журнале 15, нужно 8–12" in r.stdout, r.stdout)
+    os.remove(tz_path)
     w(build(one_domain=True))
     r = run([cf, t])
     expect("поле: опоры с одного домена — поймано", r.returncode == 1 and "доменов" in r.stdout and "больше 30%" in r.stdout, r.stdout)
@@ -897,6 +935,10 @@ def source_guard_tests(root):
     r = run([add, "--task", t, "--kind", "web", "--location", "https://m.example/b", "--level", "3"],
             "Статья. пароль: qwerty12345\n" + filler)
     expect("реестр: пароль в видимом тексте по-прежнему замечен", "похоже на пароль" in r.stderr, r.stderr)
+    r = run([add, "--task", t, "--kind", "web", "--location", "https://m.example/c", "--level", "3"],
+            "We compute token-level accuracy; each token (subword) counts; login-based flows.\n" + filler)
+    expect("реестр: «token-level», «token (subword)», «login-based» в статье — не пароль",
+           r.returncode == 0 and "похоже на пароль" not in r.stderr, r.stderr)
 
 
 def directions_tests(root):

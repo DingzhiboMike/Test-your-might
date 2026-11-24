@@ -14,7 +14,8 @@
 Правила для каждого блока, где сверка была (поле не начинается с «не требовалась»):
 1. Строк «опровержение…:» не меньше двух; в каждой — запрос в обратных кавычках или id источника.
 2. Опровержение с id засчитывается, если хотя бы один его id — не из опор «за» этого поля и с другого домена
-   (адрес из sources.csv). Иначе — ошибка «из того же источника или сайта».
+   (адрес из sources.csv). Иначе — ошибка «из того же источника или сайта». У открытых архивов статей (arxiv.org,
+   ssrn.com и др., ARCHIVES) вместо сайта сравнивается статья: другая статья того же архива засчитывается.
 3. «Не найдено» засчитывается как сделанный запрос, но не как опровержение. Если засчитанного опровержения нет
    ни одного, «Уверенность:» блока — только «низкая».
 
@@ -51,10 +52,20 @@ def registry(task):
         return {}
 
 
+# Открытые архивы статей: на одном сайте лежат работы независимых авторов, поэтому граница независимости — статья,
+# а не сайт. Версии одной статьи (…v2) — один источник.
+ARCHIVES = ("arxiv.org", "ssrn.com", "biorxiv.org", "medrxiv.org", "osf.io", "zenodo.org", "openreview.net",
+            "aclanthology.org", "hal.science", "researchgate.net", "semanticscholar.org")
+
+
 def domain(row):
     loc = (row or {}).get("location", "")
-    host = urlparse(loc).netloc.lower() if "://" in loc else ""
+    url = urlparse(loc) if "://" in loc else None
+    host = url.netloc.lower() if url else ""
     host = host[4:] if host.startswith("www.") else host
+    if any(host == a or host.endswith("." + a) for a in ARCHIVES):
+        path = re.sub(r"(v\d+)?(\.pdf)?/?$", "", url.path.replace("/pdf/", "/abs/"))
+        return "архив:%s%s" % (host, path)
     return host or ("файл:" + loc if loc else "")
 
 

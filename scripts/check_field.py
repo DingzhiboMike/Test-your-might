@@ -9,7 +9,8 @@
 2. У каждого заполнены поля: Суть, Механизм, Где применяли, Сила опоры, Контраргумент, Цена, Перенос к нам, Уверенность.
 3. «Где применяли» и «Сила опоры» — с id источника [F-k].
 4. «Сила опоры» начинается со ступени: обзор, сравнение, кейс, практик, вендор.
-5. «Контраргумент» — с id источника, которого нет в опорах этого направления, и с другого домена; или «не нашли:» с
+5. «Контраргумент» — с id источника, которого нет в опорах этого направления, и с другого домена (у открытых
+   архивов статей — другая статья, check_refute.ARCHIVES); или «не нашли:» с
    запросом в обратных кавычках. «Не нашли» больше чем у половины направлений — ошибка: опровержения не искали.
 6. Веб-опор карты (уникальных id из «Где применяли» и «Сила опоры») — не меньше 6 доменов; ни один домен не держит
    больше 30% опор.
@@ -18,6 +19,7 @@
 8. Источник «Силы опоры» прочитан целиком (`read=full` в sources.csv) хотя бы у половины направлений.
 9. Разделы «# ОСИ», «# БЕЛЫЕ ПЯТНА», «# СПОРНЫЕ МЕСТА», «# ЗАПРОСЫ» есть и не пусты; осей не меньше трёх.
 10. В «# ЗАПРОСЫ» от 15 до 40 строк с запросом в обратных кавычках; помеченных «[опровержение]» не меньше трёх.
+    Если в ТЗ потолок («потолок: до N запросов»), он — верхняя граница, а нижняя — две трети N.
 
 Отчёт: tasks/<папка>/checks/field.md. Код возврата 1 — есть ошибки (оркестратор: один перезапрос с отчётом).
 """
@@ -26,6 +28,9 @@ import os
 import re
 import sys
 from urllib.parse import urlparse
+
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from check_refute import domain as refute_key  # noqa: E402
 
 FILE = "src-field.md"
 FIELDS = ("Суть", "Механизм", "Где применяли", "Сила опоры", "Контраргумент", "Цена", "Перенос к нам", "Уверенность")
@@ -89,6 +94,16 @@ def filled(v):
     return bool(v and v.strip(" —-–.…"))
 
 
+def query_bounds(tz):
+    """Границы числа запросов. Потолок в ТЗ («СТАВКИ: … потолок: до 15 запросов …») решает человек: он становится
+    верхней границей, а нижняя — две трети потолка, но не выше обычной. Потолка нет — обычные MIN_Q–MAX_Q."""
+    m = re.search(r"потолок[^\n]*?(\d+)\s*запрос", tz or "", re.I)
+    if not m:
+        return MIN_Q, MAX_Q
+    cap = int(m.group(1))
+    return min(MIN_Q, max(MIN_REFUTE, -(-cap * 2 // 3))), min(MAX_Q, cap)
+
+
 def main():
     if len(sys.argv) < 2:
         sys.stderr.write(__doc__)
@@ -145,8 +160,9 @@ def main():
         if not cids:
             errors.append("%s: контраргумент без id источника и без «не нашли:»" % label)
             continue
-        own_domains = {domain(reg.get(i)) for i in own} - {""}
-        other = [i for i in cids - own if domain(reg.get(i)) not in own_domains]
+        # независимость контраргумента — как в check_refute: у открытых архивов статей граница — статья, а не сайт
+        own_domains = {refute_key(reg.get(i)) for i in own} - {""}
+        other = [i for i in cids - own if refute_key(reg.get(i)) not in own_domains]
         if not other:
             errors.append("%s: контраргумент из того же источника или домена, что опора направления" % label)
     if dirs and not_found * 2 > len(dirs):
@@ -174,8 +190,9 @@ def main():
 
     qs = [l for l in sec.get("ЗАПРОСЫ", "").splitlines() if re.match(r"^\s*[-*]\s*`[^`]+`", l)]
     refute = [l for l in qs if "[опровержение]" in l.lower()]
-    if sec.get("ЗАПРОСЫ") is not None and not MIN_Q <= len(qs) <= MAX_Q:
-        errors.append("запросов в журнале %d, нужно %d–%d" % (len(qs), MIN_Q, MAX_Q))
+    min_q, max_q = query_bounds(read(os.path.join(task, "00-tz.md")))
+    if sec.get("ЗАПРОСЫ") is not None and not min_q <= len(qs) <= max_q:
+        errors.append("запросов в журнале %d, нужно %d–%d" % (len(qs), min_q, max_q))
     if sec.get("ЗАПРОСЫ") is not None and len(refute) < MIN_REFUTE:
         errors.append("запросов с пометкой [опровержение] %d, нужно не меньше %d" % (len(refute), MIN_REFUTE))
 

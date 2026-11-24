@@ -249,7 +249,8 @@ BLOCK_RE = re.compile(r"(?i)доступ запрещ|access denied|just a momen
                       r"captcha|verify you are human|подтвердите, что вы не робот|403 forbidden")
 
 SECRET_RE = re.compile(
-    r"(?i)(парол[ьяюе]|password|passwd|pwd|логин|login|secret|api[_ -]?key|токен|token)\s*[:=)(-]+\s*\S{3,}"
+    # только «слово: значение» и «слово = значение»: «token-level», «token (subword)», «login-based» в статьях — не секреты
+    r"(?i)\b(парол[ьяюе]|password|passwd|pwd|логин|login|secret|api[_ -]?key|токен|token)\s*[:=]+\s*\S{3,}"
     r"|\bBearer\s+[A-Za-z0-9._-]{12,}|\bsk-[A-Za-z0-9]{16,}")
 
 
