@@ -226,7 +226,26 @@ def main():
     if reason:
         sys.stderr.write("Запись в {} заблокирована: {}.\n".format(rel, reason))
         return 2
+    if parts[0] == "tasks" and len(parts) >= 3 and not data.get("agent_id"):
+        note_orchestrator_write(os.path.join(root, "tasks", parts[1]), "/".join(parts[2:]))
     return 0
+
+
+def note_orchestrator_write(task_dir, inner):
+    """Запись основной сессии в файл задачи, пока идёт шаг, — в checks/orchestrator-writes.jsonl. route.py done не
+    считает такой файл нарушением периметра, но выводит его отдельной строкой. Подагенту чужие файлы этот хук и так
+    не даёт, так что след оставляет только оркестратор. Учётное, а не защитное: не записалось — периметр строже, не
+    мягче."""
+    import time
+    masks = step_masks(task_dir)
+    if not masks:
+        return
+    try:
+        os.makedirs(os.path.join(task_dir, "checks"), exist_ok=True)
+        with open(os.path.join(task_dir, "checks", "orchestrator-writes.jsonl"), "a", encoding="utf-8") as f:
+            f.write(json.dumps({"t": round(time.time()), "path": inner}, ensure_ascii=False) + "\n")
+    except OSError:
+        pass
 
 
 if __name__ == "__main__":

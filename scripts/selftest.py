@@ -189,6 +189,10 @@ def readable_tests(root):
     open(os.path.join(d5, "06-validation.md"), "w", encoding="utf-8").write(val + "M1 · пройдена; слот пуст; см. D-1 и Г-2.\n")
     r = run([cr, d5])
     expect("читаемость: модуль методологии, слот, D-1 и Г-2 в документе валидации пойманы", r.returncode == 1 and "номер гипотезы" in r.stdout and "слово системы" in r.stdout, r.stdout)
+    open(os.path.join(d5, "06-validation.md"), "w", encoding="utf-8").write(
+        val + "Клиент: «рамка договора мешает, слот на встречу не найти» [F-006].\n")
+    r = run([cr, d5])
+    expect("читаемость: слова системы внутри дословной цитаты — не ошибка", r.returncode == 0, r.stdout)
     d3 = os.path.join(root, "tasks", "rd3")
     os.makedirs(d3)
     open(os.path.join(d3, "00-tz.md"), "w", encoding="utf-8").write("**ТИП ВЫХОДА:** ТЗ на доработку\n")
@@ -292,6 +296,15 @@ def log_sources_tests(root):
     w(good.replace("Пункт GAP: GAP 1 — Почему клиенты бросают пробный период\n", "Пункт GAP: GAP 3 — Доля бросивших по тарифам\n"))
     r = run([cl, d])
     expect("лог: веб по пункту с ответом во внутренних данных — пойман", r.returncode == 1 and "Пересмотр" in r.stdout, r.stdout)
+    w(good.replace("Пункт GAP: GAP 1 — Почему клиенты бросают пробный период\n", "Пункт GAP: GAP 3 — Доля бросивших по тарифам\n")
+          .replace("что клиенты называют причиной; веб; ≥5 причин со словами клиента; 12 запросов",
+                   "доля бросивших по тарифам из отчётов; таблица по тарифам; бюджет запросов: 0 (веб нет)"))
+    r = run([cl, d])
+    expect("лог: «веб нет» в бюджете запросов — не канал «веб»", "Пересмотр" not in r.stdout, r.stdout)
+    w(good.replace("Пункт GAP: GAP 1 — Почему клиенты бросают пробный период\n",
+                   "Пункт GAP: GAP 1 — Почему клиенты бросают пробный период [ключевой]; закрывает также GAP 3\n"))
+    r = run([cl, d])
+    expect("лог: «закрывает также GAP k» в строке пункта — не ошибка дословности", r.returncode == 0, r.stdout)
     w(good.replace("Если данных не будет: 10 звонков бросившим за неделю; не покажет долю, только причины\n", ""))
     r = run([cl, d])
     expect("лог: запрос данных без дешёвой замены — пойман", r.returncode == 1 and "D-1" in r.stdout, r.stdout)
@@ -729,6 +742,12 @@ def process_tests(root):
     w("02c-validation.md", val("сузить", ""))
     r = run([cp, t])
     expect("процесс: нет строки «Перенос:» — поймано", r.returncode == 1 and "нет строки «Перенос:»" in r.stdout, r.stdout)
+    w("02c-validation.md", val("сузить", "Перенос:    нет — внешней опоры нет, переносить нечего\n"))
+    r = run([cp, t])
+    expect("процесс: «Перенос: нет» при гипотезе без опоры — проходит", r.returncode == 0, r.stdout)
+    w("02c-validation.md", val("держится на бумаге", "Перенос:    нет — внешней опоры нет\n"))
+    r = run([cp, t])
+    expect("процесс: «держится» без опоры — поймано", r.returncode == 1 and "без внешней опоры" in r.stdout, r.stdout)
 
 
 def refute_tests(root):
@@ -761,6 +780,19 @@ def refute_tests(root):
     w(hyp("опровержение: `без подхода` → «его границах» [%s]" % a2, miss))
     r = run([cr, t])
     expect("опровержение: другой источник с того же сайта — поймано", r.returncode == 1 and "того же источника или сайта" in r.stdout, r.stdout)
+    arx = {}
+    for key, loc in (("p1", "https://arxiv.org/abs/2601.00001"), ("p2", "https://arxiv.org/abs/2602.00002"),
+                     ("p1v", "https://arxiv.org/abs/2601.00001v2")):
+        r = run([add, "--task", t, "--kind", "web", "--location", loc, "--level", "3", "--pub-date", "2026-04-01"],
+                "Текст статьи %s о подходе и его границах.\n" % key)
+        arx[key] = r.stdout.strip()
+    w(hyp("опровержение: `без подхода` → «его границах» [%s]" % arx["p2"], miss).replace("[%s]" % a, "[%s]" % arx["p1"], 1))
+    r = run([cr, t])
+    expect("опровержение: другая статья из открытого архива (arxiv.org) — засчитано", r.returncode == 0, r.stdout)
+    w(hyp("опровержение: `без подхода` → «его границах» [%s]" % arx["p1v"], miss).replace("[%s]" % a, "[%s]" % arx["p1"], 1))
+    r = run([cr, t])
+    expect("опровержение: другая версия той же статьи архива — поймано",
+           r.returncode == 1 and "того же источника или сайта" in r.stdout, r.stdout)
     w(hyp(good1, "Уверенность-заглушка").replace("            Уверенность-заглушка\n", ""))
     r = run([cr, t])
     expect("опровержение: одна строка вместо двух — поймано", r.returncode == 1 and "нужно не меньше 2" in r.stdout, r.stdout)
@@ -837,6 +869,27 @@ def field_tests(root):
     r = run([cf, t])
     expect("поле: контраргумент из того же источника — поймано",
            r.returncode == 1 and "из того же источника или домена" in r.stdout, r.stdout)
+    arx = [run([add, "--task", t, "--kind", "web", "--location", "https://arxiv.org/abs/2603.0000%d" % i, "--level", "3",
+                "--pub-date", "2026-05-01"], "Статья %d о подходе и его границах.\n" % i).stdout.strip() for i in (1, 2)]
+    w(build().replace("[%s]" % ids[0], "[%s]" % arx[0]).replace("эффекта нет» [%s]" % ids[1], "эффекта нет» [%s]" % arx[1], 1))
+    r = run([cf, t])
+    expect("поле: контраргумент из другой статьи того же архива — не ошибка",
+           "контраргумент из того же" not in r.stdout, r.stdout)
+    few = build().split("# ЗАПРОСЫ\n")[0] + "# ЗАПРОСЫ\n" + "".join("- `запрос %d` — дал источник\n" % i for i in range(8)) \
+        + "".join("- `без подхода %d` [опровержение] — дал критику\n" % i for i in range(3))
+    w(few)
+    r = run([cf, t])
+    expect("поле: 11 запросов без потолка в ТЗ — мало", r.returncode == 1 and "запросов в журнале 11" in r.stdout, r.stdout)
+    tz_path = os.path.join(t, "00-tz.md")
+    open(tz_path, "w", encoding="utf-8").write("ТЗ\nСТАВКИ:     цена ошибки: низкая; потолок: до 15 запросов и 20 страниц.\n")
+    r = run([cf, t])
+    expect("поле: 11 запросов при потолке 15 в ТЗ — проходит (минимум — две трети потолка)",
+           "запросов в журнале" not in r.stdout, r.stdout)
+    w(build())
+    open(tz_path, "w", encoding="utf-8").write("ТЗ\nСТАВКИ:     цена ошибки: низкая; потолок: до 12 запросов.\n")
+    r = run([cf, t])
+    expect("поле: запросов больше потолка из ТЗ — поймано", r.returncode == 1 and "запросов в журнале 15, нужно 8–12" in r.stdout, r.stdout)
+    os.remove(tz_path)
     w(build(one_domain=True))
     r = run([cf, t])
     expect("поле: опоры с одного домена — поймано", r.returncode == 1 and "доменов" in r.stdout and "больше 30%" in r.stdout, r.stdout)
@@ -891,6 +944,10 @@ def source_guard_tests(root):
     r = run([add, "--task", t, "--kind", "web", "--location", "https://m.example/b", "--level", "3"],
             "Статья. пароль: qwerty12345\n" + filler)
     expect("реестр: пароль в видимом тексте по-прежнему замечен", "похоже на пароль" in r.stderr, r.stderr)
+    r = run([add, "--task", t, "--kind", "web", "--location", "https://m.example/c", "--level", "3"],
+            "We compute token-level accuracy; each token (subword) counts; login-based flows.\n" + filler)
+    expect("реестр: «token-level», «token (subword)», «login-based» в статье — не пароль",
+           r.returncode == 0 and "похоже на пароль" not in r.stderr, r.stderr)
 
 
 def directions_tests(root):
@@ -1055,6 +1112,10 @@ def concrete_tests(root):
     write("06-validation.md", (table % "x").replace(" Скорее |", " Итог |"))
     r = run([cc, d])
     expect("конкретика: таблица без столбца «Скорее» — поймано", r.returncode == 1 and "столбца" in r.stdout, r.stdout)
+    summary = "## 1. Гипотезы\n\n| Гипотеза | Исход · что не так |\n| --- | --- |\n| Г-1 | сузить: мало опор |\n\n"
+    write("06-validation.md", (table % "сверяют вручную, уверенность низкая (оценка)").replace("## 2.", summary + "## 2."))
+    r = run([cc, d])
+    expect("конкретика: сводная таблица со словом «исход» выше таблицы утверждений — не ошибка", r.returncode == 0, r.stdout)
 
 
 def knowledge_links_tests(root):
@@ -1584,6 +1645,35 @@ def route_tests():
         r = run([rt, "status", t])
         expect("маршрут: статус для продолжения после обрыва", "Шаг 2 — results-reviewer" in r.stdout and "Обязательные впереди" in r.stdout, r.stdout)
 
+        # Ложные срабатывания периметра из логов: запись оркестратора в служебный файл задачи во время шага
+        # (private.txt, заметки поиска) и параллельный шаг, закрытый раньше соседнего.
+        def write_main(name):
+            d = {"cwd": proj, "tool_name": "Write", "tool_input": {"file_path": os.path.join(t, name)}}
+            return run([hook], json.dumps(d)).returncode
+
+        run([rt, "start", t, "results-reviewer", "04-results.md"])
+        expect("хук: оркестратору в файл задачи во время шага можно", write_main("private.txt") == 0)
+        open(os.path.join(t, "private.txt"), "w", encoding="utf-8").write("закрытый термин\n")
+        open(os.path.join(t, "04-results.md"), "a", encoding="utf-8").write("Ещё строка.\n")
+        r = run([rt, "done", t])
+        expect("периметр: запись оркестратора во время шага — не нарушение, но видна",
+               r.returncode == 0 and "private.txt" in r.stdout and "оркестратор" in r.stdout, r.stdout)
+        run([rt, "start", t, "results-reviewer", "04-results.md"])
+        expect("хук: подагенту в чужой файл по-прежнему нельзя", write_code("notes.md") == 2)
+        open(os.path.join(t, "notes.md"), "w", encoding="utf-8").write("мимо хука\n")
+        open(os.path.join(t, "04-results.md"), "a", encoding="utf-8").write("И ещё.\n")
+        r = run([rt, "done", t])
+        expect("периметр: запись без следа оркестратора ловится, как раньше", r.returncode == 1 and "notes.md" in r.stdout, r.stdout)
+        os.remove(os.path.join(t, "notes.md"))
+        run([rt, "start", t, "lens-a", "src-a.md"])
+        run([rt, "start", t, "lens-b", "src-b.md"])
+        open(os.path.join(t, "src-a.md"), "w", encoding="utf-8").write(body)
+        r = run([rt, "done", t, str(len(json.load(open(os.path.join(t, "state.json"), encoding="utf-8"))["steps"]) - 1)])
+        open(os.path.join(t, "src-b.md"), "w", encoding="utf-8").write(body)
+        r = run([rt, "done", t])
+        expect("периметр: артефакт параллельного шага, закрытого раньше, — не нарушение",
+               "src-a.md" not in "".join(l for l in r.stdout.splitlines() if l.startswith("Периметр")), r.stdout)
+
         gate = os.path.join(HERE, "hooks", "step_gate.py")
         tr = os.path.join(proj, "agent.jsonl")
         open(tr, "w", encoding="utf-8").write(json.dumps({"type": "user", "timestamp": "2026-10-18T10:00:00Z",
@@ -1594,11 +1684,54 @@ def route_tests():
               "agent_transcript_path": tr, "stop_hook_active": False}
         g = run([gate], json.dumps(ev))
         expect("ворота: артефакт с ошибками возвращается исполнителю", g.returncode == 2 and "04-results.md" in g.stderr, g.stderr)
+        gl = os.path.join(t, "checks", "gate.jsonl")
+        rec = [json.loads(l) for l in open(gl, encoding="utf-8")] if os.path.exists(gl) else []
+        expect("ворота: возврат исполнителю записан в учёт проверок",
+               len(rec) == 1 and rec[0].get("artifact") == "04-results.md" and rec[0].get("checks"), str(rec))
         ev["stop_hook_active"] = True
         expect("ворота: второй раз подряд не держат", run([gate], json.dumps(ev)).returncode == 0)
         ev["stop_hook_active"] = False
         open(os.path.join(t, "04-results.md"), "w", encoding="utf-8").write(body)
         expect("ворота: исправленный артефакт пропускают", run([gate], json.dumps(ev)).returncode == 0)
+    finally:
+        shutil.rmtree(proj, ignore_errors=True)
+
+
+def tally_tests():
+    """Учёт срабатываний проверок по задачам (check_tally.py): чем кончилось каждое срабатывание."""
+    proj = tempfile.mkdtemp(prefix="polygon-tally-")
+    try:
+        t = os.path.join(proj, "tasks", "a")
+        os.makedirs(os.path.join(t, "checks"))
+        ok = "Проверки: check_artifact — ок; check_quotes — ок (цитат 3); check_fresh — ок; check_private — ок"
+        steps = [
+            {"n": 1, "role": "b2b-consultant", "artifact": "01-review.md", "status": "done", "checks": ok},
+            {"n": 2, "role": "hypothesis-generator", "artifact": "02-hypotheses.md", "status": "done", "checks": ok,
+             "recheck": [{"fixed": "цитата по сырому тексту", "checks_before":
+                          "Проверки: check_artifact — ок; check_quotes — ОШИБКИ (1); check_fresh — ок; check_private — ок"}]},
+            {"n": 3, "role": "hypothesis-validator", "artifact": "02c-validation.md", "status": "failed", "errors": [],
+             "checks": "Проверки: check_artifact — ок; check_refute — ОШИБКИ (6)", "waived": "опровержения с того же архива"},
+            {"n": 4, "role": "field-scan", "artifact": "src-field.md", "status": "failed", "errors": [],
+             "checks": "Проверки: check_artifact — ок; check_fresh — ОШИБКИ (2)"},
+            {"n": 5, "role": "field-scan", "artifact": "src-field.md", "status": "done", "checks": ok},
+            {"n": 6, "role": "alternatives-analyst", "artifact": "src-alt.md", "status": "failed",
+             "errors": ["изменено вне периметра шага: notes.md"], "checks": ok, "waived": "заметки правил сами"},
+            {"n": 7, "role": "nostradamus", "artifact": "02f-forecast.md", "status": "failed", "errors": [],
+             "checks": "Проверки: check_artifact — ок; check_forecast — ОШИБКИ (1)"},
+        ]
+        open(os.path.join(t, "state.json"), "w", encoding="utf-8").write(json.dumps({"steps": steps}))
+        open(os.path.join(t, "checks", "gate.jsonl"), "w", encoding="utf-8").write(
+            json.dumps({"t": 1, "step": 4, "role": "field-scan", "artifact": "src-field.md", "checks": ["check_quotes"]}) + "\n")
+        r = run([os.path.join(HERE, "check_tally.py"), os.path.join(proj, "tasks")])
+        rows = {l.split("|")[1].strip(): [c.strip() for c in l.split("|")[2:-1]] for l in r.stdout.splitlines()
+                if l.startswith("| check_") or l.startswith("| периметр")}
+        expect("учёт: перепроверка после правки оркестратора", rows.get("check_quotes", [""] * 9)[2:4] == ["1", "1"], r.stdout)
+        expect("учёт: принято с оговоркой", rows.get("check_refute", [""] * 9)[5] == "1", r.stdout)
+        expect("учёт: перезапрос", rows.get("check_fresh", [""] * 9)[4] == "1", r.stdout)
+        expect("учёт: возврат исполнителю хуком", rows.get("check_quotes", [""] * 9)[1] == "1", r.stdout)
+        expect("учёт: ошибка периметра и её исход", rows.get("периметр", [""] * 9)[5] == "1", r.stdout)
+        expect("учёт: не снятая ошибка видна", rows.get("check_forecast", [""] * 9)[6] == "1", r.stdout)
+        expect("учёт: запуски считаются по всем шагам", rows.get("check_private", [""] * 9)[0] == "5", r.stdout)
     finally:
         shutil.rmtree(proj, ignore_errors=True)
 
@@ -2398,6 +2531,15 @@ def model_tests(root):
     ri = os.path.join(HERE, "rank_impact.py")
     cc = os.path.join(HERE, "check_chain.py")
     cr = os.path.join(HERE, "check_rank.py")
+    d0 = os.path.join(root, "tasks", "chain-work")
+    os.makedirs(d0)
+    open(os.path.join(d0, "02-hypotheses.md"), "w", encoding="utf-8").write("### Г-1 — бонус\n- **Суть:** x\n")
+    open(os.path.join(d0, "00m-schema.txt"), "w", encoding="utf-8").write("row: Малые команды\nfeature: Причины\n")
+    r = run([cc, d0])
+    expect("цепочка: строгий уровень (нет профиля) без модели — ошибка", r.returncode == 1 and "00m-model.json" in r.stdout, r.stdout)
+    open(os.path.join(d0, "state.json"), "w", encoding="utf-8").write(json.dumps({"profile": {"level": "work"}}))
+    r = run([cc, d0])
+    expect("цепочка: уровень work — модель не строится, проверка пропущена", r.returncode == 0 and "пропущена" in r.stdout, r.stdout)
     d = os.path.join(root, "tasks", "mdl")
     os.makedirs(os.path.join(d, "sources", "raw"))
     open(os.path.join(d, "sources.csv"), "w", encoding="utf-8").write(
@@ -2901,6 +3043,7 @@ def main():
         trace_tests()
         roles_tests()
         route_tests()
+        tally_tests()
         carry_tests()
         profile_tests()
         data_block_tests(root)
