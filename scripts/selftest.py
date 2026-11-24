@@ -821,7 +821,7 @@ def refute_tests(root):
     expect("опровержение: check_step запускает проверку на шаге проверки по сути", "check_refute — ОШИБКИ" in r.stdout, r.stdout)
     open(os.path.join(t, "00-tz.md"), "w", encoding="utf-8").write("ТЗ\nТИП ВЫХОДА: гипотезы\nСОГЛАСОВАНО: да\n")
     run([os.path.join(HERE, "route.py"), "init", t])
-    run([os.path.join(HERE, "route.py"), "profile", t, "level=light"])
+    run([os.path.join(HERE, "route.py"), "profile", t, "validation=method"])
     r = run([cr, t])
     expect("опровержение: при validation=method не проверяется", r.returncode == 0 and "validation=method" in r.stdout, r.stdout)
 
@@ -919,7 +919,7 @@ def field_tests(root):
     expect("поле: без режима шага разведки нет", "field-scan" not in nxt and "b2b-consultant" in nxt, nxt)
     open(os.path.join(m, "00-tz.md"), "w", encoding="utf-8").write(
         (tz % "РЕЖИМ: разведка поля: да\n").replace("план проверки", "гипотезы"))
-    run([rt, "profile", m, "level=light"])
+    run([rt, "profile", m, "level=auto", "run=solo"])
     nxt = run([rt, "next", m]).stdout
     expect("поле: в одиночном проходе разведка остаётся отдельным шагом", "field-scan → src-field.md" in nxt
            and "light-run" in nxt, nxt)
@@ -1028,7 +1028,7 @@ def directions_tests(root):
     run([rt, "init", di])
     nxt = run([rt, "next", di]).stdout
     expect("карта: при «новые идеи: да» в маршруте Нострадамус и отсев", "02f-forecast.md" in nxt or "nostradamus" in nxt, nxt)
-    run([rt, "profile", di, "level=light"])
+    run([rt, "profile", di, "level=auto"])
     r = run([rt, "ready", di])
     expect("карта: профиль без прогноза снимает Нострадамуса из обязательных артефактов",
            "02f-forecast.md" not in r.stdout and "02g-ideas-check.md" not in r.stdout, r.stdout)
@@ -1041,12 +1041,12 @@ def directions_tests(root):
         "id,kind,location,level,ctx_type,author,pub_date,data_date,opened,read,method,root,status,fetched,sha256,chars,note,ts\n"
         + "".join("F-%03d,context,context/f%d.md,,other,a,unknown,unknown,2026-11-06,full,raw,self,unknown,file,h%d,10,,1\n" % (i, i, i)
                   for i in range(1, 13)))
-    lo, wk, st = price(di, "light"), price(di, "work"), price(di, "strict")
-    expect("цена карты: лёгкий < рабочий < строгий, строгий не меньше рабочего + 3", 0 < lo < wk and st >= wk + 3, "%s %s %s" % (lo, wk, st))
+    wk = price(di, "auto")
+    expect("цена карты: стартовый набор auto считается", wk > 0, str(wk))
     open(os.path.join(di, "00-tz.md"), "a", encoding="utf-8").write("КОНТЕКСТ:   разбор материалов не повторяется\n")
-    wk2 = price(di, "work")
+    wk2 = price(di, "auto")
     expect("цена карты: «разбор материалов не повторяется» снимает вызов разбора", 0 < wk2 < wk, "%s %s" % (wk, wk2))
-    run([rt, "profile", di, "level=strict"])
+    run([rt, "profile", di, "validation=full"])
     r = run([rt, "ready", di])
     expect("карта: на строгом уровне обязательны проверка смысла карты и аудит",
            "review-06-directions.md" in r.stdout and "audit.md" in r.stdout, r.stdout)
@@ -1816,18 +1816,18 @@ def profile_tests():
         run([rt, "init", t])
         base = run([rt, "next", t]).stdout.splitlines()[0]
         expect("профиль: без профиля обязательны все шаги v1", "nostradamus" in base and "meaning-review" in base, base)
-        r = run([rt, "profile", t, "level=light"])
-        expect("профиль: level=light записан", r.returncode == 0 and "level=light" in r.stdout and
-               "forecast=off" in r.stdout and "validation=method" in r.stdout, r.stdout)
+        r = run([rt, "profile", t, "level=auto"])
+        expect("профиль: level=auto записан, инварианты включены", r.returncode == 0 and "level=auto" in r.stdout and
+               "forecast=off" in r.stdout and "validation=web" in r.stdout and "evidence=quotes" in r.stdout, r.stdout)
         nxt = run([rt, "next", t]).stdout.splitlines()[0]
-        expect("профиль light: один проход (run=solo): все артефакты за light-run, без Нострадамуса, проверки смысла и аудита",
-               "run=solo" in r.stdout and "light-run → 02c-validation.md" in nxt and "nostradamus" not in nxt
-               and "meaning-review" not in nxt and "audit.md" not in nxt, nxt + r.stdout)
-        run([rt, "profile", t, "run=steps"])
+        expect("профиль auto: цепочка агентов, проверка по сути есть, Нострадамуса и проверки смысла нет",
+               "hypothesis-validator" in nxt and "nostradamus" not in nxt and "meaning-review" not in nxt
+               and "light-run" not in nxt, nxt)
+        run([rt, "profile", t, "run=solo"])
         nxt = run([rt, "next", t]).stdout.splitlines()[0]
-        expect("профиль light + run=steps: цепочка отдельных агентов, проверка по сути остаётся",
-               "nostradamus" not in nxt and "meaning-review" not in nxt and "hypothesis-validator" in nxt, nxt)
-        run([rt, "profile", t, "level=strict"])
+        expect("профиль auto + run=solo: оркестратор может выбрать один проход",
+               "light-run → 02c-validation.md" in nxt, nxt)
+        run([rt, "profile", t, "run=steps", "validation=full", "forecast=on"])
         nxt = run([rt, "next", t]).stdout.splitlines()[0]
         expect("профиль strict: проверка смысла и Нострадамус возвращаются", "meaning-review" in nxt and
                "nostradamus" in nxt, nxt)
@@ -1838,8 +1838,8 @@ def profile_tests():
         rec = open(os.path.join(os.path.dirname(HERE), ".claude", "skills", "orchestrator", "recipes.md"),
                    encoding="utf-8").read() if os.path.exists(os.path.join(
                        os.path.dirname(HERE), ".claude", "skills", "orchestrator", "recipes.md")) else ""
-        expect("рецепты: есть recipes.md с колонками всех трёх уровней и правилом подбора линз",
-               all(x in rec for x in ("light", "work", "strict", "alternatives-analyst", "РЕЦЕПТ:")), rec[:80])
+        expect("рецепты: есть recipes.md с примерами и правилом подбора линз",
+               all(x in rec for x in ("alternatives-analyst", "РЕЦЕПТ:")), rec[:80])
         # перезапрос одной командой, проверка читаемости по файлу, пропуск проверки цепочки без модели предмета
         r = run([rt, "retry", t])
         expect("перезапрос: без шага с ошибками — отказ", r.returncode == 1 and "перезапрашивать нечего" in r.stdout, r.stdout)
@@ -1926,15 +1926,14 @@ def profile_tests():
         open(os.path.join(mt, "00d-map-b.md"), "w", encoding="utf-8").write("### F-001 — снова\n")
         r = run([os.path.join(HERE, "merge_map.py"), mt])
         expect("склейка досье: документ в двух частях — ошибка", r.returncode == 1 and "дважды" in r.stdout, r.stdout)
-        calls = {}
-        for lv in ("light", "work", "strict"):
-            m = re.search(r"~(\d+) вызов", run([ce, t, "--level", lv]).stdout)
-            calls[lv] = int(m.group(1)) if m else -1
-        expect("оценка: число вызовов растёт с уровнем (light < work < strict)",
-               0 < calls["light"] < calls["work"] < calls["strict"], str(calls))
+        m_auto = re.search(r"~(\d+) вызов", run([ce, t, "--level", "auto"]).stdout)
+        m_v1 = re.search(r"~(\d+) вызов", run([ce, t]).stdout)
+        expect("оценка: auto дешевле v1 (без обязательных Нострадамуса, проверки смысла, аудита)",
+               bool(m_auto and m_v1) and 0 < int(m_auto.group(1)) < int(m_v1.group(1)),
+               str((m_auto and m_auto.group(1), m_v1 and m_v1.group(1))))
         table = run([ce, t, "--levels"]).stdout
-        expect("оценка: таблица уровней — что будет сделано, что получите, чего не будет; без минут и токенов",
-               table.count("\n| ") >= 4 and "Что получите" in table and "Чего не будет" in table and "Подойдёт, если" in table and
+        expect("оценка: таблица стартового набора — что будет сделано, что получите, чего не будет; без минут и токенов",
+               table.count("\n| ") >= 1 and "Что получите" in table and "Чего не будет" in table and "Подойдёт, если" in table and
                " мин" not in table and "токен" not in table, table[:200])
     finally:
         shutil.rmtree(proj)
@@ -2065,25 +2064,21 @@ def trace_tests():
         expect("цена: с заказом новых идей — плюс вызов на отсев", "~29 вызовов" in r.stdout and "резерв 19" in r.stdout, r.stdout)
         open(os.path.join(cst, "00-tz.md"), "w", encoding="utf-8").write(tz.replace("ТИП ВЫХОДА: гипотезы", "ТИП ВЫХОДА: разбор / гипотезы"))
         base_tz = tz + "            новые идеи: нет\n"
-        open(os.path.join(cst, "00-tz.md"), "w", encoding="utf-8").write(base_tz + "НАГРУЗКА:   уровень: рабочий\n")
+        open(os.path.join(cst, "00-tz.md"), "w", encoding="utf-8").write(base_tz + "НАГРУЗКА:   уровень: авто\n")
         c0 = run([ce, cst]).stdout
-        open(os.path.join(cst, "00-tz.md"), "w", encoding="utf-8").write(base_tz.replace("новые идеи: нет", "новые идеи: нет · линзы: 2") + "НАГРУЗКА:   уровень: рабочий\n")
+        open(os.path.join(cst, "00-tz.md"), "w", encoding="utf-8").write(base_tz.replace("новые идеи: нет", "новые идеи: нет · линзы: 2") + "НАГРУЗКА:   уровень: авто\n")
         c2 = run([ce, cst]).stdout
         n0, n2 = re.search(r"~(\d+) вызов", c0), re.search(r"~(\d+) вызов", c2)
         expect("цена: линзы из ТЗ (РЕЖИМ: линзы: 2) добавляют вызовы, без строки линз нет",
                bool(n0 and n2) and int(n2.group(1)) == int(n0.group(1)) + 2, c0 + c2)
         res_tz = base_tz.replace("ТИП ВЫХОДА: гипотезы", "ТИП ВЫХОДА: исследование").replace("Tier 1", "Tier 2")
         nums = {}
-        for lv in ("лёгкий", "рабочий", "строгий"):
+        for lv in ("авто", "лёгкий"):
             open(os.path.join(cst, "00-tz.md"), "w", encoding="utf-8").write(res_tz + "НАГРУЗКА:   уровень: %s\n" % lv)
             m_ = re.search(r"~(\d+) вызов", run([ce, cst]).stdout)
             nums[lv] = int(m_.group(1)) if m_ else -1
-        expect("цена: исследование — уровни нагрузки различаются (лёгкий < рабочий < строгий)",
-               0 < nums["лёгкий"] < nums["рабочий"] < nums["строгий"], str(nums))
-        open(os.path.join(cst, "00-tz.md"), "w", encoding="utf-8").write(base_tz + "НАГРУЗКА:   уровень: лёгкий\n")
-        cl_ = run([ce, cst]).stdout
-        expect("цена: light, тип «гипотезы» — один проход (run=solo): ~2 вызова, свободная часть 1",
-               "~2 вызова" in cl_ and "свободная часть 1" in cl_, cl_)
+        expect("цена: исследование — auto дешевле v1; снятый уровень «лёгкий» считается как v1",
+               0 < nums["авто"] < nums["лёгкий"], str(nums))
         open(os.path.join(cst, "00-tz.md"), "w", encoding="utf-8").write(tz.replace("ТИП ВЫХОДА: гипотезы", "ТИП ВЫХОДА: разбор / гипотезы"))
         r = run([ce, cst])
         expect("цена: тип выхода не выбран — отказ, а не догадка", r.returncode == 1 and "ТИП ВЫХОДА" in r.stdout, r.stdout)

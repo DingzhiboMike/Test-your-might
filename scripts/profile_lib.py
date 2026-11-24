@@ -1,9 +1,13 @@
 #!/usr/bin/env python3
-"""Профиль прогона: нагрузка, строгость и ширина, которые выбирает оркестратор по тексту ТЗ и ответу человека.
+"""Профиль прогона — запись решений оркестратора о шагах и проверках, а не готовый уровень нагрузки.
 
 Хранится в state.json задачи (пишет только `route.py profile`). Нет профиля — действует v1: всё строго и обязательно.
 
-  level:      fast | light | work | strict  — уровень нагрузки (готовый набор параметров; параметры ниже можно править)
+Вариант A (ветка variant-a-ceiling): уровней нагрузки нет. Есть один стартовый набор `auto` — инварианты включены
+(отдельная проверка по сути с вебом, дословные цитаты), всё остальное оркестратор решает сам по ходу и фиксирует
+командой `route.py profile <параметр>=<значение>` с причиной в логе. Ограничение сверху — ПОТОЛОК вызовов от человека.
+
+  level:      auto                          — стартовый набор (параметры ниже оркестратор меняет сам)
   generation: narrow | medium | wide        — ширина генерации (narrow: без линз, Нострадамуса, отсева идей)
   evidence:   none | links | quotes         — опоры (none, links: цитаты/свежесть/числа не блокируют; quotes: как в v1)
   validation: none | method | web | full    — проверка (none: без проверки по сути; method: проверка по сути по методологии
@@ -20,8 +24,8 @@
                                               находки разбора материалов до генератора; по умолчанию off на всех уровнях
   ceiling:    произвольная строка           — потолок вызовов и модель (подсказка оркестратору)
 
-Шкала «креатив ↔ точность» (К5 … Т5) — язык для человека; уровни нагрузки — её готовые наборы:
-  light ≈ К5/К4, work ≈ баланс, strict ≈ Т4/Т5 (Т5: добавить generation=narrow).
+Старые уровни fast / light / work / strict сняты: они существовали, чтобы выключать обязательные шаги, а
+обязательными в варианте A остаются только инварианты. Профили старых задач в state.json читаются как есть.
 """
 import json
 import os
@@ -29,16 +33,16 @@ import os
 KEYS = ("level", "generation", "evidence", "validation", "forecast", "lenses", "data", "ceiling", "run", "reviewer", "audit")
 DEFAULT = {"level": "strict", "generation": "wide", "evidence": "quotes", "validation": "full", "forecast": "on",
            "lenses": "0", "data": "context", "ceiling": "", "run": "steps", "reviewer": "same", "audit": "off"}
-CHOICES = {"level": ("fast", "light", "work", "strict"), "generation": ("narrow", "medium", "wide"),
+CHOICES = {"level": ("auto", "fast", "light", "work", "strict"), "generation": ("narrow", "medium", "wide"),
            "evidence": ("none", "links", "quotes"), "validation": ("none", "method", "web", "full"),
            "forecast": ("on", "off"), "lenses": ("0", "1", "2", "3"), "data": ("none", "context", "public"), "run": ("steps", "solo"),
            "reviewer": ("same", "other", "human"), "audit": ("off", "on")}
-# Готовые наборы по уровню. fast — без маршрута (ответ диспетчера/оркестратора без исполнителей, 0–2 вызова).
+# Один стартовый набор. Инварианты: проверка по сути отдельным агентом с вебом (R-002, R-008), дословные цитаты
+# (R-019, R-024). Нострадамус, линзы, ширина, проверка смысла, аудит — не обязательны: включает оркестратор, когда
+# шаг меняет ответ («Если пропустить» в логе), или человек в ответах на вопросы (строка РЕЖИМ).
 LEVELS = {
-    "fast": {"generation": "narrow", "evidence": "none", "validation": "none", "forecast": "off", "lenses": "0", "run": "steps", "reviewer": "same"},
-    "light": {"generation": "medium", "evidence": "none", "validation": "method", "forecast": "off", "lenses": "0", "run": "solo", "reviewer": "same"},
-    "work": {"generation": "medium", "evidence": "links", "validation": "web", "forecast": "on", "lenses": "0", "run": "steps", "reviewer": "same"},
-    "strict": {"generation": "medium", "evidence": "quotes", "validation": "full", "forecast": "on", "lenses": "0", "run": "steps", "reviewer": "same"},
+    "auto": {"generation": "medium", "evidence": "quotes", "validation": "web", "forecast": "off", "lenses": "0",
+             "run": "steps", "reviewer": "same", "audit": "off"},
 }
 ALIASES = {"validation": {"logic": "method"}}
 

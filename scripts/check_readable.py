@@ -67,7 +67,7 @@ def read(path):
 
 
 INDEX_HEAD = re.compile(r"^##\s+Что лежит в папке задачи\s*$", re.M)
-LEVEL_LIMITS = {"light": 450, "work": 650, "strict": 900}  # слов в сдаче для человека по уровню нагрузки
+LEVEL_LIMITS = {"auto": 650, "light": 450, "work": 650, "strict": 900}  # слов в сдаче для человека по уровню нагрузки
 
 
 def strip_index(text):

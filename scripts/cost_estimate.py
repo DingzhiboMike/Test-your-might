@@ -4,8 +4,8 @@
   python3 scripts/cost_estimate.py tasks/<папка>            # строка ЦЕНА для ТЗ (диспетчер)
   python3 scripts/cost_estimate.py tasks/<папка> --detail   # из чего сложилась оценка
   python3 scripts/cost_estimate.py tasks/<папка> --left     # сколько потрачено и сколько свободных вызовов осталось
-  python3 scripts/cost_estimate.py tasks/<папка> --levels   # четыре уровня нагрузки: вызовы, токены, время, что утверждать
-  python3 scripts/cost_estimate.py tasks/<папка> --level light   # строка ЦЕНА для выбранного уровня (до route.py profile)
+  python3 scripts/cost_estimate.py tasks/<папка> --levels   # стартовый набор auto: что входит, прогон (вариант A: уровней нет)
+  python3 scripts/cost_estimate.py tasks/<папка> --level auto    # строка ЦЕНА для стартового набора (до route.py profile)
 
 Профиль прогона (state.json, `route.py profile`, либо --level, либо поле НАГРУЗКА в ТЗ) меняет оценку: линзы по
 числу lenses, Нострадамус и отсев идей по forecast, проверка смысла и аудит только при validation=full. Нет профиля —
@@ -314,10 +314,15 @@ def chosen_profile(task, tz, level=None):
         return prof
     if pl.has_profile(task):
         return pl.load(task)
-    m = re.search(r"уровень:\s*(быстро|лёгкий|легкий|рабочий|строгий)", tz_field(tz, "НАГРУЗКА"), re.I)
-    if m:
+    m = re.search(r"уровень:\s*(авто|быстро|лёгкий|легкий|рабочий|строгий)", tz_field(tz, "НАГРУЗКА"), re.I)
+    if m and m.group(1).lower() == "авто":
+        key = "auto"
+    elif m:
         key = {"быстро": "fast", "лёгкий": "light", "легкий": "light", "рабочий": "work",
                "строгий": "strict"}[m.group(1).lower()]
+    if m and key not in pl.LEVELS:
+        return None  # старый уровень снят в варианте A: оценка v1
+    if m:
         prof = dict(pl.DEFAULT)
         prof.update(pl.preset(key))
         prof["level"] = key
@@ -327,6 +332,8 @@ def chosen_profile(task, tz, level=None):
 
 
 LEVEL_TEXT = {
+    "auto": ("Авто (вариант A)", "шаги выбирает оркестратор под вопрос; обязательны отдельная проверка по сути с вебом и дословные цитаты",
+             "шагов, которые не меняют ответ: Нострадамус, линзы, проверка смысла — только если нужны или вы их заказали"),
     "fast": ("Быстро", "готовый ответ и несколько идей, без исполнителей",
              "идеи и рассуждение; выводы про рынок и факты не проверяются"),
     "light": ("Лёгкий (К5–К4)", "пул гипотез с дешёвыми тестами и порогами «убьёт»; проверка по методологии; веб точечно по пунктам ТЗ",
@@ -338,6 +345,7 @@ LEVEL_TEXT = {
                "широты: идей будет меньше, работа идёт осторожнее"),
 }
 WHEN = {  # «подойдёт, если»: как человеку выбрать уровень по своей ситуации
+    "auto": "всегда: ограничение одно — потолок вызовов",
     "fast": "нужен ответ сейчас, исследовать нечего или решение мелкое",
     "light": "материалов у вас мало или нет, цена ошибки низкая, нужны идеи и дешёвые тесты (при многих материалах — рабочий)",
     "work": "нужно опереться на факты из сети, материалы есть, решение средней важности",
@@ -375,7 +383,7 @@ def levels_table(task):
     _, _, _, ratios_level, _ = history_levels(root, exclude=task, kind=kind)
     out = ["| Уровень | Подойдёт, если | Что будет сделано | Что получите | Чего не будет | Прогон |",
            "|---|---|---|---|---|---|"]
-    for key in ("fast", "light", "work", "strict"):
+    for key in pl.LEVELS:
         name, got, nope = LEVEL_TEXT[key]
         if key == "fast":
             out.append("| %s | %s | ответ без исполнителей | %s | %s | очень короткий |" % (name, WHEN[key], got, nope))
