@@ -4,6 +4,7 @@
   python3 scripts/check_chain.py tasks/<папка>
 
 Читает `02-hypotheses.md` (блоки `### Г-<номер>`), `00m-model.json` (после `build_model.py`) и `00r-limits.md`.
+Модели нет, а уровень прогона не strict (модель там не строится) — проверка пропускается.
 В каждой гипотезе обязательны строки:
   - **Клетка:** <группа> × <признак> — клетка есть в модели. Клетка «нет данных» — предупреждение: гипотеза
     стоит на пробеле, опорой служит только идея.
@@ -73,6 +74,15 @@ def main():
         print("Модели предмета нет (карта документов не строилась): проверка цепочки гипотез пропущена.")
         return 0
     if model is None:
+        try:
+            import profile_lib
+            level = profile_lib.load(task)["level"] if profile_lib.has_profile(task) else "strict"
+        except Exception:
+            level = "strict"
+        if level != "strict":
+            # модель предмета строится только на level=strict (orchestrator/SKILL.md): без неё клетку не назвать
+            print("Модели предмета нет: на уровне %s она не строится — проверка цепочки гипотез пропущена." % level)
+            return 0
         errors.append("нет 00m-model.json: сначала собери модель (scripts/build_model.py)")
     lim = limits(task, errors)
     hyps = re.split(r"(?m)^(?=###\s+Г-\d+)", text)

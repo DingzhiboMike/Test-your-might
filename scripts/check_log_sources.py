@@ -190,12 +190,20 @@ def main():
         point = field(block, "Пункт GAP")
         if not point or skill in NO_GAP_TEXT or not items:
             continue
-        nums = [int(n) for n in re.findall(r"GAP\s*(\d+)", point)]
+        # «…; закрывает также GAP 4» в той же строке: попутный пункт — только номер, без дословного текста и сверки частей
+        cut = re.search(r"закрывает\s+также", point, re.I)
+        main, also = (point[:cut.start()], point[cut.end():]) if cut else (point, "")
+        nums = [int(n) for n in re.findall(r"GAP\s*(\d+)", main)]
         if not nums:
             errors.append("%s: в «Пункт GAP:» нет номера («GAP k — текст пункта»)" % where)
             continue
-        npoint = norm(re.sub(r"GAP\s*\d+\s*[—–:-]?", " ", point))
+        for n in (int(x) for x in re.findall(r"GAP\s*(\d+)", also)):
+            if n not in items:
+                errors.append("%s: GAP %d нет в ТЗ" % (where, n))
+        npoint = norm(re.sub(r"GAP\s*\d+\s*[—–:-]?", " ", main))
         question = field(block, "Вопрос")
+        # «веб нет», «без веба», «веб: нет» — отказ от канала, а не канал
+        web_asked = re.search(r"(?<!без )\bвеб\b(?!\s*[:—–-]?\s*(?:нет|не)\b)", question, re.I)
         narrowed = field(block, "Сужение")
         for n in nums:
             if n not in items:
@@ -208,7 +216,7 @@ def main():
             if lost and not narrowed:
                 errors.append("%s: в «Вопрос:» не видно частей GAP %d: %s — добавь их или строку «Сужение:» "
                               "(что убрано и почему)" % (where, n, " | ".join(lost)))
-            if re.search(r"\bвеб\b", question, re.I) and answers.get(n) is not None and "веб" not in answers[n] \
+            if web_asked and answers.get(n) is not None and "веб" not in answers[n] \
                     and not field(block, "Пересмотр"):
                 errors.append("%s: канал «веб» по GAP %d, а в ТЗ ответ помечен «%s» — нет строки «Пересмотр:» с "
                               "причиной" % (where, n, ", ".join(sorted(answers[n]))))
