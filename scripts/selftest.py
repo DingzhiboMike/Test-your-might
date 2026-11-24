@@ -1684,11 +1684,54 @@ def route_tests():
               "agent_transcript_path": tr, "stop_hook_active": False}
         g = run([gate], json.dumps(ev))
         expect("ворота: артефакт с ошибками возвращается исполнителю", g.returncode == 2 and "04-results.md" in g.stderr, g.stderr)
+        gl = os.path.join(t, "checks", "gate.jsonl")
+        rec = [json.loads(l) for l in open(gl, encoding="utf-8")] if os.path.exists(gl) else []
+        expect("ворота: возврат исполнителю записан в учёт проверок",
+               len(rec) == 1 and rec[0].get("artifact") == "04-results.md" and rec[0].get("checks"), str(rec))
         ev["stop_hook_active"] = True
         expect("ворота: второй раз подряд не держат", run([gate], json.dumps(ev)).returncode == 0)
         ev["stop_hook_active"] = False
         open(os.path.join(t, "04-results.md"), "w", encoding="utf-8").write(body)
         expect("ворота: исправленный артефакт пропускают", run([gate], json.dumps(ev)).returncode == 0)
+    finally:
+        shutil.rmtree(proj, ignore_errors=True)
+
+
+def tally_tests():
+    """Учёт срабатываний проверок по задачам (check_tally.py): чем кончилось каждое срабатывание."""
+    proj = tempfile.mkdtemp(prefix="polygon-tally-")
+    try:
+        t = os.path.join(proj, "tasks", "a")
+        os.makedirs(os.path.join(t, "checks"))
+        ok = "Проверки: check_artifact — ок; check_quotes — ок (цитат 3); check_fresh — ок; check_private — ок"
+        steps = [
+            {"n": 1, "role": "b2b-consultant", "artifact": "01-review.md", "status": "done", "checks": ok},
+            {"n": 2, "role": "hypothesis-generator", "artifact": "02-hypotheses.md", "status": "done", "checks": ok,
+             "recheck": [{"fixed": "цитата по сырому тексту", "checks_before":
+                          "Проверки: check_artifact — ок; check_quotes — ОШИБКИ (1); check_fresh — ок; check_private — ок"}]},
+            {"n": 3, "role": "hypothesis-validator", "artifact": "02c-validation.md", "status": "failed", "errors": [],
+             "checks": "Проверки: check_artifact — ок; check_refute — ОШИБКИ (6)", "waived": "опровержения с того же архива"},
+            {"n": 4, "role": "field-scan", "artifact": "src-field.md", "status": "failed", "errors": [],
+             "checks": "Проверки: check_artifact — ок; check_fresh — ОШИБКИ (2)"},
+            {"n": 5, "role": "field-scan", "artifact": "src-field.md", "status": "done", "checks": ok},
+            {"n": 6, "role": "alternatives-analyst", "artifact": "src-alt.md", "status": "failed",
+             "errors": ["изменено вне периметра шага: notes.md"], "checks": ok, "waived": "заметки правил сами"},
+            {"n": 7, "role": "nostradamus", "artifact": "02f-forecast.md", "status": "failed", "errors": [],
+             "checks": "Проверки: check_artifact — ок; check_forecast — ОШИБКИ (1)"},
+        ]
+        open(os.path.join(t, "state.json"), "w", encoding="utf-8").write(json.dumps({"steps": steps}))
+        open(os.path.join(t, "checks", "gate.jsonl"), "w", encoding="utf-8").write(
+            json.dumps({"t": 1, "step": 4, "role": "field-scan", "artifact": "src-field.md", "checks": ["check_quotes"]}) + "\n")
+        r = run([os.path.join(HERE, "check_tally.py"), os.path.join(proj, "tasks")])
+        rows = {l.split("|")[1].strip(): [c.strip() for c in l.split("|")[2:-1]] for l in r.stdout.splitlines()
+                if l.startswith("| check_") or l.startswith("| периметр")}
+        expect("учёт: перепроверка после правки оркестратора", rows.get("check_quotes", [""] * 9)[2:4] == ["1", "1"], r.stdout)
+        expect("учёт: принято с оговоркой", rows.get("check_refute", [""] * 9)[5] == "1", r.stdout)
+        expect("учёт: перезапрос", rows.get("check_fresh", [""] * 9)[4] == "1", r.stdout)
+        expect("учёт: возврат исполнителю хуком", rows.get("check_quotes", [""] * 9)[1] == "1", r.stdout)
+        expect("учёт: ошибка периметра и её исход", rows.get("периметр", [""] * 9)[5] == "1", r.stdout)
+        expect("учёт: не снятая ошибка видна", rows.get("check_forecast", [""] * 9)[6] == "1", r.stdout)
+        expect("учёт: запуски считаются по всем шагам", rows.get("check_private", [""] * 9)[0] == "5", r.stdout)
     finally:
         shutil.rmtree(proj, ignore_errors=True)
 
@@ -3000,6 +3043,7 @@ def main():
         trace_tests()
         roles_tests()
         route_tests()
+        tally_tests()
         carry_tests()
         profile_tests()
         data_block_tests(root)

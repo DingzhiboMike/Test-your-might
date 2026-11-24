@@ -51,6 +51,7 @@ def main():
             if r.returncode:
                 out.append("== %s\n%s" % (script, r.stdout.strip()[-1500:]))
         if out:
+            note_gate(task, mine[0], [o.split("\n", 1)[0][3:].replace(".py", "") for o in out])
             sys.stderr.write("Артефакт %s не прошёл проверки — исправь его и закончи снова:\n\n%s\n" % (art, "\n\n".join(out)))
             return 2
     except Exception as e:
@@ -60,6 +61,18 @@ def main():
                          "python3 scripts/check_step.py tasks/<задача> <артефакт> --since <время> и закончи снова.\n".format(type(e).__name__, e))
         return 2
     return 0
+
+
+def note_gate(task, step, checks):
+    """Возврат исполнителю — строкой в checks/gate.jsonl для scripts/check_tally.py. Учётное: не записалось — не беда."""
+    import time
+    try:
+        os.makedirs(os.path.join(task, "checks"), exist_ok=True)
+        with open(os.path.join(task, "checks", "gate.jsonl"), "a", encoding="utf-8") as f:
+            f.write(json.dumps({"t": round(time.time()), "step": step.get("n"), "role": step.get("role"),
+                                "artifact": step.get("artifact"), "checks": checks}, ensure_ascii=False) + "\n")
+    except OSError:
+        pass
 
 
 if __name__ == "__main__":
