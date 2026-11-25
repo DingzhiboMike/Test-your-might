@@ -13,14 +13,16 @@
 
 Правила для каждого блока, где сверка была (поле не начинается с «не требовалась»):
 1. Строк «опровержение…:» не меньше двух; в каждой — запрос в обратных кавычках или id источника.
-2. Опровержение с id засчитывается, если хотя бы один его id — не из опор «за» этого поля и с другого домена
-   (адрес из sources.csv). Иначе — ошибка «из того же источника или сайта». У открытых архивов статей (arxiv.org,
+2. Опровержение с id независимо, если хотя бы один его id — не из опор «за» этого поля и с другого домена
+   (адрес из sources.csv). Иначе — предупреждение «из того же источника или сайта» (вариант A: не блокирует шаг и
+   готовность, но видно в отчёте и идёт в сдачу как слабое место опоры). У открытых архивов статей (arxiv.org,
    ssrn.com и др., ARCHIVES) вместо сайта сравнивается статья: другая статья того же архива засчитывается.
-3. «Не найдено» засчитывается как сделанный запрос, но не как опровержение. Если засчитанного опровержения нет
-   ни одного, «Уверенность:» блока — только «низкая».
+3. «Не найдено» засчитывается как сделанный запрос, но не как опровержение. Если найденного опровержения нет
+   ни одного (только «не найдено»), «Уверенность:» блока — только «низкая».
 
 Проверка действует при профиле validation=web или full (и без профиля — v1): при method проверка по сути в веб не ходит.
-Отчёт: tasks/<папка>/checks/refute.md. Код возврата 1 — есть ошибки (оркестратор: один перезапрос с отчётом).
+Отчёт: tasks/<папка>/checks/refute.md. Код возврата 1 — есть ошибки (оркестратор: один перезапрос с отчётом);
+предупреждения код возврата не меняют.
 """
 import csv
 import os
@@ -97,8 +99,9 @@ def confidence(block):
     return m.group(1).lower().strip(".,;—-") if m else ""
 
 
-def check_block(label, block, reg):
+def check_block(label, block, reg, warnings=None):
     errors = []
+    warnings = warnings if warnings is not None else []
     name, lines = web_field(block)
     if name is None:
         return errors, None
@@ -118,10 +121,9 @@ def check_block(label, block, reg):
         if not ids:
             continue
         other = [i for i in ids - own if domain(reg.get(i)) not in own_domains]
-        if other:
-            counted += 1
-        else:
-            errors.append("%s: опровержение %d из того же источника или сайта, что опора «за»" % (label, n))
+        counted += 1
+        if not other:
+            warnings.append("%s: опровержение %d из того же источника или сайта, что опора «за»" % (label, n))
     if refutes and not counted and confidence(block) not in ("низкая",):
         errors.append("%s: засчитанных опровержений нет (только «не найдено»), а уверенность «%s» — допустима только "
                       "«низкая»" % (label, confidence(block) or "не указана"))
@@ -143,19 +145,22 @@ def main():
               % profile_lib.load(task)["validation"])
         return 0
     reg = registry(task)
-    errors, stats = [], []
+    errors, stats, warnings = [], [], []
     for f, text in texts:
         for label, block in blocks(text):
-            e, st = check_block("%s, %s" % (f, label), block, reg)
+            e, st = check_block("%s, %s" % (f, label), block, reg, warnings)
             errors += e
             if st:
                 stats.append("%s, %s: строк %d, засчитано %d" % (f, label, st[0], st[1]))
     lines = ["# Опровержения в проверке по сути", ""] + (["- " + s for s in stats] or ["- блоков со сверкой нет"]) + [""]
     lines += (["Ошибки:"] + ["- " + e for e in errors]) if errors else ["Ошибок нет."]
+    if warnings:
+        lines += ["", "Предупреждения (не блокируют; в сдаче — слабое место опоры):"] + ["- " + x for x in warnings]
     os.makedirs(os.path.join(task, "checks"), exist_ok=True)
     open(os.path.join(task, "checks", "refute.md"), "w", encoding="utf-8").write("\n".join(lines) + "\n")
     print("\n".join(lines))
-    print("Опровержения: %s" % ("ОШИБКИ (%d)" % len(errors) if errors else "ок"))
+    print("Опровержения: %s" % ("ОШИБКИ (%d)" % len(errors) if errors else
+                                ("ок, предупреждений %d" % len(warnings) if warnings else "ок")))
     return 1 if errors else 0
 
 

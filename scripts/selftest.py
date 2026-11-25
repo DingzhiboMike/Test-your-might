@@ -775,11 +775,11 @@ def refute_tests(root):
     expect("опровержение: другое место и «не найдено» — проходит", r.returncode == 0, r.stdout)
     w(hyp("опровержение: `без подхода` → «его границах» [%s]" % a, miss))
     r = run([cr, t])
-    expect("опровержение: тот же источник, что опора «за», — поймано",
-           r.returncode == 1 and "из того же источника или сайта" in r.stdout, r.stdout)
+    expect("опровержение: тот же источник, что опора «за», — предупреждение, не ошибка",
+           r.returncode == 0 and "Предупреждения" in r.stdout and "из того же источника или сайта" in r.stdout, r.stdout)
     w(hyp("опровержение: `без подхода` → «его границах» [%s]" % a2, miss))
     r = run([cr, t])
-    expect("опровержение: другой источник с того же сайта — поймано", r.returncode == 1 and "того же источника или сайта" in r.stdout, r.stdout)
+    expect("опровержение: другой источник с того же сайта — предупреждение", r.returncode == 0 and "того же источника или сайта" in r.stdout, r.stdout)
     arx = {}
     for key, loc in (("p1", "https://arxiv.org/abs/2601.00001"), ("p2", "https://arxiv.org/abs/2602.00002"),
                      ("p1v", "https://arxiv.org/abs/2601.00001v2")):
@@ -791,8 +791,8 @@ def refute_tests(root):
     expect("опровержение: другая статья из открытого архива (arxiv.org) — засчитано", r.returncode == 0, r.stdout)
     w(hyp("опровержение: `без подхода` → «его границах» [%s]" % arx["p1v"], miss).replace("[%s]" % a, "[%s]" % arx["p1"], 1))
     r = run([cr, t])
-    expect("опровержение: другая версия той же статьи архива — поймано",
-           r.returncode == 1 and "того же источника или сайта" in r.stdout, r.stdout)
+    expect("опровержение: другая версия той же статьи архива — предупреждение",
+           r.returncode == 0 and "того же источника или сайта" in r.stdout, r.stdout)
     w(hyp(good1, "Уверенность-заглушка").replace("            Уверенность-заглушка\n", ""))
     r = run([cr, t])
     expect("опровержение: одна строка вместо двух — поймано", r.returncode == 1 and "нужно не меньше 2" in r.stdout, r.stdout)
@@ -814,9 +814,9 @@ def refute_tests(root):
     expect("опровержение: «не требовалась» — не проверяется", r.returncode == 0, r.stdout)
     w(hyp(good1, "опровержение: `без подхода` → «о подходе» [%s]" % a, field="Из сети").replace("ГИПОТЕЗА 1 — проверка", "У-1 — утверждение"))
     r = run([cr, t])
-    expect("опровержение: утверждение валидации читается по «Из сети», ошибка во второй строке поймана",
-           r.returncode == 1 and "У-1: опровержение 2 из того же источника" in r.stdout, r.stdout)
-    w(hyp("опровержение: `без подхода` → «о подходе» [%s]" % a, miss))
+    expect("опровержение: утверждение валидации читается по «Из сети», вторая строка — предупреждение",
+           r.returncode == 0 and "У-1: опровержение 2 из того же источника" in r.stdout, r.stdout)
+    w(hyp(good1, "Уверенность-заглушка").replace("            Уверенность-заглушка\n", ""))
     r = run([os.path.join(HERE, "check_step.py"), t, "02c-validation.md"])
     expect("опровержение: check_step запускает проверку на шаге проверки по сути", "check_refute — ОШИБКИ" in r.stdout, r.stdout)
     open(os.path.join(t, "00-tz.md"), "w", encoding="utf-8").write("ТЗ\nТИП ВЫХОДА: гипотезы\nСОГЛАСОВАНО: да\n")
