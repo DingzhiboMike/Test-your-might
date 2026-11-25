@@ -1963,12 +1963,18 @@ def roles_tests():
         expect("хук: rm подагенту запрещён", code("Bash", "meaning-review", "rm -rf tasks") == 2)
         expect("хук: curl роли без сети запрещён", code("Bash", "nostradamus", "curl -s https://example.com") == 2)
         expect("хук: curl роли с сетью разрешён", code("Bash", "customer-path", "curl -s https://example.com | trafilatura") == 0)
-        expect("хук: keenable роли без сети запрещён", code("Bash", "nostradamus", "keenable search 'как бизнес сверяет платежи'") == 2)
-        expect("хук: keenable search проверяющему разрешён",
-               code("Bash", "hypothesis-validator", "keenable search 'кейс, где сеть привлекла клиентов без скидок'") == 0)
-        expect("хук: keenable fetch в add_source через stdin разрешён",
-               code("Bash", "hypothesis-validator", "keenable fetch https://example.com | python3 scripts/add_source.py --task tasks/x "
+        expect("хук: локальный движок без .polygon-local.json — не сетевая команда, запрещён",
+               code("Bash", "hypothesis-validator", "searchcli search 'кейс без скидок'") == 2)
+        open(os.path.join(proj, ".polygon-local.json"), "w", encoding="utf-8").write(
+            json.dumps({"web_commands": ["searchcli"], "web_mcp_prefixes": ["mcp__searchsrv__"]}))
+        expect("хук: команда из .polygon-local.json роли с сетью разрешена",
+               code("Bash", "hypothesis-validator", "searchcli search 'кейс, где сеть привлекла клиентов без скидок'") == 0)
+        expect("хук: команда из .polygon-local.json роли без сети запрещена",
+               code("Bash", "nostradamus", "searchcli search 'как бизнес сверяет платежи'") == 2)
+        expect("хук: локальный движок в add_source через stdin разрешён",
+               code("Bash", "hypothesis-validator", "searchcli fetch https://example.com | python3 scripts/add_source.py --task tasks/x "
                     "--kind web --location https://example.com --level 3 --pub-date 2026-01-01") == 0)
+        os.remove(os.path.join(proj, ".polygon-local.json"))
         expect("хук: WebSearch роли без сети запрещён", code("WebSearch", "meaning-review") == 2)
         expect("хук: WebSearch источнику данных разрешён", code("WebSearch", "market-analyze") == 0)
         expect("хук: агент общего типа сеть не теряет", code("WebSearch", "general-purpose") == 0)
@@ -3024,20 +3030,23 @@ def main():
                          "agent_id": "a1", "agent_type": "market-analyze"}).returncode == 2)
         expect("веб до запроса: чистый запрос проходит",
                web_hook({"tool_name": "WebSearch", "tool_input": {"query": "как малый бизнес сверяет платежи"}}).returncode == 0)
-        expect("веб до запроса: keenable с закрытым словом подагента блокируется",
-               web_hook({"tool_name": "Bash", "tool_input": {"command": "keenable search 'ПартнёрКо условия'"},
-                         "agent_id": "a1", "agent_type": "market-analyze"}).returncode == 2)
-        expect("веб до запроса: закрытое в пути cd не мешает чистому запросу keenable",
-               web_hook({"tool_name": "Bash", "tool_input": {"command": "cd /tmp/ПартнёрКо && keenable search 'как бизнес сверяет платежи'"},
+        expect("веб до запроса: закрытое в пути cd не мешает чистому запросу curl",
+               web_hook({"tool_name": "Bash", "tool_input": {"command": "cd /tmp/ПартнёрКо && curl -s 'https://x.ru/?q=платежи'"},
                          "agent_id": "a1", "agent_type": "market-analyze"}).returncode == 0)
-        expect("веб до запроса: MCP Keenable основной сессии с закрытым словом блокируется",
-               web_hook({"tool_name": "mcp__keenable__search_web_pages", "tool_input": {"query": "ПартнёрКо промокод"}}).returncode == 2)
-        expect("веб до запроса: MCP Keenable, закрытое в адресе страницы, блокируется",
-               web_hook({"tool_name": "mcp__keenable__fetch_page_content",
-                         "tool_input": {"urls": ["https://x.ru/?q=ПартнёрКо"]}}).returncode == 2)
-        expect("веб до запроса: MCP Keenable, чистый запрос проходит",
-               web_hook({"tool_name": "mcp__keenable__search_web_pages",
-                         "tool_input": {"query": "как малый бизнес сверяет платежи"}}).returncode == 0)
+        expect("веб до запроса: MCP-инструмент без объявления в .polygon-local.json не проверяется",
+               web_hook({"tool_name": "mcp__searchsrv__search", "tool_input": {"query": "ПартнёрКо промокод"}}).returncode == 0)
+        open(os.path.join(root, ".polygon-local.json"), "w", encoding="utf-8").write(
+            json.dumps({"web_commands": ["searchcli"], "web_mcp_prefixes": ["mcp__searchsrv__"]}))
+        expect("веб до запроса: локальная команда с закрытым словом блокируется",
+               web_hook({"tool_name": "Bash", "tool_input": {"command": "searchcli search 'ПартнёрКо условия'"},
+                         "agent_id": "a1", "agent_type": "market-analyze"}).returncode == 2)
+        expect("веб до запроса: объявленный MCP поиска с закрытым словом блокируется",
+               web_hook({"tool_name": "mcp__searchsrv__search", "tool_input": {"query": "ПартнёрКо промокод"}}).returncode == 2)
+        expect("веб до запроса: объявленный MCP, закрытое в адресе страницы, блокируется",
+               web_hook({"tool_name": "mcp__searchsrv__fetch", "tool_input": {"urls": ["https://x.ru/?q=ПартнёрКо"]}}).returncode == 2)
+        expect("веб до запроса: объявленный MCP, чистый запрос проходит",
+               web_hook({"tool_name": "mcp__searchsrv__search", "tool_input": {"query": "как малый бизнес сверяет платежи"}}).returncode == 0)
+        os.remove(os.path.join(root, ".polygon-local.json"))
         expect("веб до запроса: Bash без сети не проверяется",
                web_hook({"tool_name": "Bash", "tool_input": {"command": "echo ПартнёрКо"}}).returncode == 0)
         expect("веб до запроса: слово curl в тексте команды — не запрос в сеть",

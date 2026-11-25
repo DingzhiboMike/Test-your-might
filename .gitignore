@@ -24,3 +24,8 @@ __pycache__/
 system-notes.local.md
 *.bundle
 .venv/
+
+# Локальные поисковые движки машины (ключи, CLI, MCP) — в репозиторий не попадают
+.polygon-local.json
+.claude/settings.local.json
+methodology/*.local.md
