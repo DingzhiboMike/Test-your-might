@@ -38,6 +38,7 @@ import sys
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from check_effort import capacity  # noqa: E402
+from trust_block import mask_trust_block  # noqa: E402
 
 FILES = ("07a-analyst.md", "07b-editor.md", "07c-decisions.md")
 POSITION = "02e-position.md"
@@ -153,7 +154,8 @@ def main():
         if not os.path.exists(os.path.join(task, "08-service.md")):
             errors.append("%s: нет файла 08-service.md — служебная часть сдачи (путь, чек-лист, расход, замечания)" % HANDOFF)
     for f in present + ([POSITION] if has_position else []) + ([VALIDATION] if has_validation else []) + extra:
-        text = human_part(f, read(os.path.join(task, f)))
+        # блок «СЧЁТ ОПОР» переносится из checks/trust.md дословно: его слов, id и имён файлов проверка не читает
+        text = mask_trust_block(human_part(f, read(os.path.join(task, f))))
         for i, line in enumerate(text.splitlines(), 1):
             for label, rx in ID_PATTERNS:
                 if f == VALIDATION and label == "id источника или числа":

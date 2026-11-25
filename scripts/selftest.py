@@ -193,6 +193,13 @@ def readable_tests(root):
         val + "Клиент: «рамка договора мешает, слот на встречу не найти» [F-006].\n")
     r = run([cr, d5])
     expect("читаемость: слова системы внутри дословной цитаты — не ошибка", r.returncode == 0, r.stdout)
+    open(os.path.join(d5, "06-validation.md"), "w", encoding="utf-8").write(
+        val + "\nСЧЁТ ОПОР\nОпор: 3; из них первичных 1 (src-alternatives.md).\nПроверки смысла: 02c-validation.md — пройдена.\n\nДальше текст.\n")
+    r = run([cr, d5])
+    expect("читаемость: имена файлов внутри блока «СЧЁТ ОПОР» — не ошибка", r.returncode == 0, r.stdout)
+    open(os.path.join(d5, "06-validation.md"), "w", encoding="utf-8").write(val + "Смотри src-alternatives.md.\n")
+    r = run([cr, d5])
+    expect("читаемость: имя файла вне блока «СЧЁТ ОПОР» — ошибка", r.returncode == 1 and "имя файла системы" in r.stdout, r.stdout)
     d3 = os.path.join(root, "tasks", "rd3")
     os.makedirs(d3)
     open(os.path.join(d3, "00-tz.md"), "w", encoding="utf-8").write("**ТИП ВЫХОДА:** ТЗ на доработку\n")
