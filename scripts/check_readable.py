@@ -22,7 +22,7 @@
 - 08-handoff.md — сдача для человека, целиком: без слов системы и номеров; раздел «## Что лежит в папке задачи» (таблица
   файлов из handoff_index.py) допускает имена файлов и не входит в число слов. Служебная часть лежит в 08-service.md,
   на языке системы, и не проверяется; раздел «Служебное» внутри 08-handoff.md — ошибка. Лимит слов — по уровню нагрузки
-  (быстро, лёгкий 450, рабочий 650, строгий 900; без профиля 900).
+  (быстро, лёгкий 450, рабочий 650, строгий 900; без профиля 900; тип «валидация» — 1100).
 Если тип выхода «гипотезы» и есть 02e-position.md, а 03-backlog.md нет — ошибка.
 
 Лимиты: 07a — до 1600 слов и до 10 задач, 07b — до 1600 слов, 07c — до 500 слов и до 10 пунктов,
@@ -81,14 +81,20 @@ def strip_index(text):
     return text[:m.start()] + (rest[nxt.start():] if nxt else "")
 
 
+VALIDATION_HANDOFF = 1100  # слов: сдача валидации несёт решение, блок «убрать/усилить/оставить» и версии «скорее»
+
+
 def handoff_limit(task):
+    base = LIMITS[HANDOFF]
     try:
         import profile_lib
         if profile_lib.has_profile(task):
-            return LEVEL_LIMITS.get(profile_lib.load(task)["level"], LIMITS[HANDOFF])
+            base = LEVEL_LIMITS.get(profile_lib.load(task)["level"], base)
     except ImportError:
         pass
-    return LIMITS[HANDOFF]
+    if re.search(r"ТИП ВЫХОДА\W*валидация", read(os.path.join(task, "00-tz.md")), re.I):
+        base = max(base, VALIDATION_HANDOFF)
+    return base
 
 
 def human_part(f, text):
