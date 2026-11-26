@@ -12,14 +12,15 @@
 
 Для подагентов (во входе хука есть agent_id) ещё два правила, по таблице ролей scripts/roles.py:
 - Bash — только скрипты системы (python3 scripts/…) и команды чтения; запись в файл перенаправлением, sed -i,
-  find -delete/-exec, python3 -c запрещены; curl и trafilatura — только ролям с сетью;
+  find -delete/-exec, python3 -c запрещены; curl, trafilatura и команды из .polygon-local.json — только ролям с сетью;
 - WebSearch и WebFetch — не для известных ролей без сети (agent_type из таблицы). Подагент общего типа
   (agent_type не из таблицы) сеть не теряет: роль хук не знает.
 
 Если в задаче заведён маршрут (tasks/<задача>/state.json, его пишет scripts/route.py), подагент пишет в папку задачи
 только артефакт идущего шага и маски --allow этого шага; шага нет — запись блокируется: route.py start перед вызовом.
 
-Для всех, включая основную сессию и режим правки системы: WebSearch, WebFetch и curl/trafilatura в Bash не уходят,
+Для всех, включая основную сессию и режим правки системы: WebSearch, WebFetch, curl/trafilatura в Bash и
+дополнительные поисковые движки из локального .polygon-local.json (команды Bash и MCP-инструменты) не уходят,
 если в запросе, адресе или команде есть e-mail, телефон, ИНН, паспорт или термин из private.txt / closed-web.txt
 любой задачи (scripts/check_private.py, web_leaks) — проверка до отправки, а не по логу после.
 
@@ -34,6 +35,7 @@ import sys
 
 TOOLS = {"Write", "Edit", "MultiEdit", "NotebookEdit"}
 WEB_TOOLS = {"WebSearch", "WebFetch"}
+BASE_NET = {"curl", "wget", "trafilatura"}
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 try:
@@ -46,6 +48,15 @@ def known_role(agent_type):
     return _roles is not None and agent_type in _roles.roles()
 
 
+def mcp_web_prefixes(root):
+    """MCP-инструменты поиска, объявленные в локальном .polygon-local.json (scripts/roles.py, local_config)."""
+    return _roles.web_mcp_prefixes(root) if _roles is not None else ()
+
+
+def net_commands(root):
+    return BASE_NET | set(_roles.web_commands(root) if _roles is not None else ())
+
+
 def web_leak_reason(root, tool, ti):
     """Закрытое во внешнем запросе (scripts/check_private.py, web_leaks) или None. Действует для всех, включая
     основную сессию и режим правки системы: утечка одинакова, кто бы ни отправил."""
@@ -54,20 +65,25 @@ def web_leak_reason(root, tool, ti):
         query, urls = ti.get("query", ""), list(ti.get("allowed_domains") or []) + list(ti.get("blocked_domains") or [])
     elif tool == "WebFetch":
         query, urls = ti.get("prompt", ""), [ti.get("url", "")]
+    elif any(tool.startswith(p) for p in mcp_web_prefixes(root)):
+        query = " ".join(str(ti.get(k) or "") for k in ("query", "objective", "prompt"))
+        urls = [str(u) for u in (ti.get("urls") or [])] + [str(ti.get(k) or "") for k in ("url", "site")]
     else:
         cmd = ti.get("command", "")
-        heads = []
+        net = net_commands(root)
+        net_segs = []  # проверяется только сетевой фрагмент: путь в cd, имена файлов и прочее в сеть не уходят
         for seg in re.split(r"&&|\|\||[;|\n]|\$\(", cmd):
             words = seg.replace("(", " ").split()
             while words and re.match(r"^[A-Z_][A-Z0-9_]*=", words[0]):
                 words = words[1:]
-            if words:
-                heads.append(os.path.basename(words[0]))
-                if heads[-1] in ("python3", "python") and "trafilatura" in words[1:4]:
-                    heads.append("trafilatura")
-        if not set(heads) & {"curl", "wget", "trafilatura"}:
+            if not words:
+                continue
+            head = os.path.basename(words[0])
+            if head in net or (head in ("python3", "python") and "trafilatura" in words[1:4]):
+                net_segs.append(seg)
+        if not net_segs:
             return None
-        query, urls = "", [cmd]
+        query, urls = "", net_segs
     try:
         import check_private
     except Exception as e:
@@ -85,7 +101,7 @@ def web_allowed(agent_type):
     return not known_role(agent_type) or agent_type in _roles.WEB
 
 
-def bash_reason(cmd, agent_type):
+def bash_reason(cmd, agent_type, root=None):
     """Причина запрета команды подагента или None."""
     import re
     if _roles is None:
@@ -114,7 +130,7 @@ def bash_reason(cmd, agent_type):
             if not args or not re.search(r"(^|/)scripts/[\w/.-]+\.py$", args[0]):
                 return "python3 — только скрипты системы scripts/…"
             continue
-        if head in _roles.WEB_COMMANDS:
+        if head in _roles.web_commands(root):
             if web_allowed(agent_type):
                 continue
             return "у роли %s нет доступа к сети" % agent_type
@@ -170,14 +186,19 @@ def main():
         sys.stderr.write("Хук записи: вход не читается как JSON ({}) — действие заблокировано.\n".format(e))
         return 2
     tool = data.get("tool_name")
-    if tool not in TOOLS and tool not in WEB_TOOLS and tool != "Bash":
+    if tool not in TOOLS and tool not in WEB_TOOLS and tool != "Bash" and not (tool or "").startswith("mcp__"):
         return 0
     root = project_root(data)
-    if tool in WEB_TOOLS or tool == "Bash":
+    mcp_web = any((tool or "").startswith(p) for p in mcp_web_prefixes(root))
+    if (tool or "").startswith("mcp__") and not mcp_web:
+        return 0
+    if tool in WEB_TOOLS or tool == "Bash" or mcp_web:
         leak = web_leak_reason(root, tool, data.get("tool_input") or {})
         if leak:
             sys.stderr.write("{} заблокирован: {}.\n".format(tool, leak))
             return 2
+    if mcp_web:
+        return 0  # подагенты MCP не получают (набор — scripts/roles.py); основной сессии — только проверка закрытого
     if os.path.exists(os.path.join(root, ".polygon-dev")):
         return 0
     agent_type = data.get("agent_type") or ""
@@ -190,7 +211,7 @@ def main():
     if tool == "Bash":
         if not data.get("agent_id"):
             return 0
-        reason = bash_reason((data.get("tool_input") or {}).get("command", ""), agent_type)
+        reason = bash_reason((data.get("tool_input") or {}).get("command", ""), agent_type, root)
         if reason:
             sys.stderr.write("Команда заблокирована: {}.\n".format(reason))
             return 2

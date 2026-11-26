@@ -248,6 +248,10 @@ def read_mhtml(path):
 BLOCK_RE = re.compile(r"(?i)доступ запрещ|access denied|just a moment|enable javascript|включите javascript|"
                       r"captcha|verify you are human|подтвердите, что вы не робот|403 forbidden")
 
+# Ответ сервиса загрузки вместо страницы («error: Bad gateway … request_id: …»): это не источник, как и блокировка.
+ERROR_RE = re.compile(r"(?is)\A\s*error\s*:.{0,600}?\b(?:code|type|request_id)\s*:|\A\s*(?:error\s*)?(?:50[0-4]|404)\s+"
+                      r"(?:bad gateway|service unavailable|gateway time-?out|internal server error|not found)\b")
+
 SECRET_RE = re.compile(
     # только «слово: значение» и «слово = значение»: «token-level», «token (subword)», «login-based» в статьях — не секреты
     r"(?i)\b(парол[ьяюе]|password|passwd|pwd|логин|login|secret|api[_ -]?key|токен|token)\s*[:=]+\s*\S{3,}"
@@ -381,6 +385,9 @@ def main():
         # пустой текст = не прочитано, а не «на странице ничего нет» (web-protocol.md, 2а)
         if a.read != "not-read":
             fail("текст пустой: регистрируй с --read not-read, а не как прочитанный")
+    elif a.kind == "web" and a.read != "not-read" and ERROR_RE.search(text[:1500]):
+        fail("вместо страницы — сообщение об ошибке загрузки («error: …», 502, 404): это не источник. "
+             "Регистрируй с --read not-read без текста или возьми другой адрес (web-protocol.md, 2а)")
     elif a.kind == "web" and a.read == "full" and BLOCK_RE.search(text[:1500]):
         fail("в начале текста страница блокировки или проверка бота («доступ запрещён», captcha, «включите JavaScript»): "
              "это не источник. Регистрируй с --read not-read или найди страницу без блокировки (web-protocol.md, 2а)")
