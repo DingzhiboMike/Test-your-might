@@ -68,6 +68,16 @@ def injection_tests(root):
     expect("инъекция: пометка в реестре, статья про ИИ без обращения не помечена",
            rows[0]["note"] == "[инъекция] строки 2, 3", rows[0]["note"])
     expect("инъекция: предупреждение без текста инструкции", "ВНИМАНИЕ" in r.stderr and "пароль" not in r.stderr, r.stderr)
+    te = os.path.join(root, "tasks", "errpage")
+    os.makedirs(te)
+    err = ("error: Bad gateway\ntype: target_error\ncode: target_unreachable\n"
+           "message: The target page could not be reached by the fetcher.\n")
+    for i, (body, name) in enumerate(((err, "ответ сервиса «error: …»"), ("502 Bad Gateway\nnginx\n", "страница 502"))):
+        rr = run([add, "--task", te, "--kind", "web", "--location", "https://down.ru/%d" % i, "--level", "4"], body)
+        expect("источник: " + name + " не регистрируется", rr.returncode != 0 and "не источник" in rr.stderr, rr.stdout + rr.stderr)
+    rr = run([add, "--task", te, "--kind", "web", "--location", "https://ok.ru/a", "--level", "4"],
+            "Error: самая частая ошибка в сверке платежей — ручной ввод.\n" + "Обычный текст статьи. " * 100)
+    expect("источник: статья про ошибки регистрируется", rr.returncode == 0, rr.stdout + rr.stderr)
     clean = run([add, "--task", t, "--kind", "web", "--location", "https://inj.ru/b", "--level", "2"],
                 "Опрос: сверка платежей вручную — главная жалоба малого бизнеса.\n").stdout.strip()
     art = os.path.join(t, "02c-validation.md")
