@@ -1,0 +1,65 @@
+<!doctype html>
+<html lang="ru"><head><meta charset="utf-8">
+<style>
+:root{--bg:#141819;--box:#1d2223;--line:#e6e6e6;--teal:#4cc8a8;--tealbg:#17332d;--or:#e9955f;--orbg:#3b2a20;--muted:#b4b8ba;--grp:#454b4e}
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{background:var(--bg);width:952px}
+body{font-family:Inter,"SF Pro Text",-apple-system,"Helvetica Neue",Arial,sans-serif;color:#f4f4f4;padding:28px 32px}
+.row{display:flex;align-items:stretch;justify-content:center;gap:0}
+.b{border:1.5px solid var(--line);border-radius:8px;background:var(--box);padding:12px 12px;display:flex;flex-direction:column;justify-content:center;text-align:center;flex:1;min-width:0}
+.b h3{font-size:18px;font-weight:700;line-height:1.25}
+.b p{font-size:14.5px;line-height:1.38;color:var(--muted);margin-top:5px}
+.sys{border-color:var(--teal);background:var(--tealbg)}
+.sys p{color:#c3e3da}
+.you{border-color:var(--or);background:var(--orbg)}
+.you h3{color:var(--or)}
+.you p{color:#efc5a3}
+.a{width:34px;flex:none;position:relative}
+.a:before{content:"";position:absolute;left:4px;right:9px;top:calc(50% - 1px);height:2px;background:var(--line)}
+.a:after{content:"";position:absolute;right:3px;top:calc(50% - 6px);border-left:9px solid var(--line);border-top:6px solid transparent;border-bottom:6px solid transparent}
+.down{height:42px;position:relative}
+.down:before{content:"";position:absolute;top:6px;bottom:10px;width:2px;background:var(--line);left:var(--x)}
+.down:after{content:"";position:absolute;bottom:3px;left:calc(var(--x) - 5px);border-top:9px solid var(--line);border-left:6px solid transparent;border-right:6px solid transparent}
+.down span{position:absolute;top:11px;font-size:14px;color:var(--or);font-weight:600;left:calc(var(--x) + 14px);white-space:nowrap}
+.down span.left{left:auto;right:calc(888px - var(--x) + 14px)}
+.group{border:1.5px dashed var(--grp);border-radius:10px;padding:14px 16px 16px}
+.group>h2{font-size:15px;font-weight:600;color:#e4e4e4;margin-bottom:12px}
+.note{font-size:14px;color:var(--muted);line-height:1.5;margin-top:12px;text-align:center}
+.legend{display:flex;gap:26px;justify-content:center;margin-top:20px;font-size:14px;color:var(--muted)}
+.legend i{display:inline-block;width:14px;height:14px;border-radius:3px;border:1.5px solid;margin-right:8px;vertical-align:-2px}
+</style></head><body>
+
+<div class="row">
+  <div class="b you"><h3>Ты</h3><p>идея или вопрос<br>и материалы</p></div><div class="a"></div>
+  <div class="b sys"><h3>Диспетчер</h3><p>пишет ТЗ: цель,<br>вопросы, цену</p></div><div class="a"></div>
+  <div class="b you"><h3>Пауза</h3><p>до трёх вопросов<br>и твоё «да»</p></div><div class="a"></div>
+  <div class="b sys"><h3>Оркестратор</h3><p>выбирает шаги<br>под потолок цены</p></div>
+</div>
+
+<div class="down" style="--x:780px"><span class="left">дальше без пауз</span></div>
+
+<div class="group">
+  <h2>Проверка: каждый шаг делает отдельный агент</h2>
+  <div class="row">
+    <div class="b"><h3>Разложить</h3><p>что должно быть<br>правдой, чтобы идея<br>сработала</p></div><div class="a"></div>
+    <div class="b"><h3>Найти</h3><p>твои материалы<br>и сеть: доводы<br>за и против</p></div><div class="a"></div>
+    <div class="b"><h3>Проверить</h3><p>не тот, кто строил:<br>что держится<br>и чего не знаем</p></div><div class="a"></div>
+    <div class="b"><h3>Перепроверить</h3><p>держит ли цитата<br>вывод в вердиктах<br>и итоге проверки</p></div>
+  </div>
+  <p class="note">Скрипты сверяют цитаты и числа и не пускают в поиск персональные данные и закрытые слова.<br>Состав шагов зависит от задачи: на схеме типичный ход.</p>
+</div>
+
+<div class="down" style="--x:112px"></div>
+
+<div class="row">
+  <div class="b you"><h3>Сдача</h3><p>ответ, что делать,<br>где подробнее</p></div><div class="a"></div>
+  <div class="b you"><h3>Живая проверка</h3><p>запускаешь ты:<br>только она подтверждает</p></div><div class="a"></div>
+  <div class="b sys"><h3>Сверка</h3><p>результаты против<br>критериев из плана</p></div><div class="a"></div>
+  <div class="b"><h3>context/</h3><p>случившееся служит<br>следующим задачам</p></div>
+</div>
+
+<div class="legend">
+  <span><i style="border-color:var(--or);background:var(--orbg)"></i>твоё участие и то, что получаешь</span>
+  <span><i style="border-color:var(--teal);background:var(--tealbg)"></i>делает система</span>
+</div>
+</body></html>
