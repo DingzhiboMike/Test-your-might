@@ -1,12 +1,12 @@
 # Схема
 
-`architecture.png` — как проходит задача: от запроса через единственную паузу и проверку до сдачи, живой проверки и возврата в `context/`. Тёмная тема, ширина 1904 px (двойной масштаб).
+`architecture.png` — общая схема: роли, хранилища, маршрут и контур эксперимента. Тёмная тема, ширина 1904 px (двойной масштаб).
 
 Исходник — `src/architecture.html`. После изменений в системе правь HTML и переснимай PNG в Chrome без окна:
 
 ```
 "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome" --headless=new --hide-scrollbars \
-  --force-device-scale-factor=2 --window-size=952,616 \
+  --force-device-scale-factor=2 --window-size=952,1000 \
   --screenshot="$PWD/docs/architecture.png" "file://$PWD/docs/src/architecture.html"
 ```
 
